@@ -1,7 +1,7 @@
 # LangGraph Architecture Specification: BKT-Driven Example-Based Learning
 
 ## 1. Architectural Overview
-This document outlines the target LangGraph architecture for the Socratic AI Tutor. It explicitly bridges the gap between the theoretical **Expertise Reversal Effect (ERE)** and technical implementation. 
+This document outlines the target LangGraph architecture for the adaptive Example-Based Learning (EBL) AI Tutor. It explicitly bridges the gap between the theoretical **Expertise Reversal Effect (ERE)** and technical implementation. 
 
 Unlike standard LLM chatbots that use a single agent to handle all queries, this architecture uses a **Deterministic Router (Conditional Edge)**. The router retrieves the student's mathematical mastery probability (`probMastery`) from the Bayesian Knowledge Tracing (BKT) engine and strictly routes the request to one of three highly specialized Example-Based Learning (EBL) Agent Nodes.
 

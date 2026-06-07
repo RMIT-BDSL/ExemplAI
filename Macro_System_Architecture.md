@@ -100,7 +100,7 @@ flowchart TB
 
 The student-facing interface uses a **Split-Pane** layout:
 
-![Socratic Tutor Split-Pane UX Mockup](./UX-mockup.png)
+![Split-Pane UX Mockup](./UX-mockup.png)
 
 | Pane | Role | Description |
 |------|------|-------------|
@@ -125,4 +125,4 @@ The student-facing interface uses a **Split-Pane** layout:
 
 ### Layer 4: The Dean Agent
 * **What it does:** The institutional safeguard against giving away direct answers.
-* **Key Components:** Before any LangGraph response is sent back to the student through the API, it must pass through the **Dean Agent**. If an EBL agent accidentally generated a direct code answer that bypasses the Socratic method, the Dean Agent rejects it and forces a rewrite, ensuring academic integrity.
+* **Key Components:** Before any LangGraph response is sent back to the student through the API, it must pass through the **Dean Agent**. If an EBL agent accidentally generated a direct code answer that bypasses the example-based learning scaffolding, the Dean Agent rejects it and forces a rewrite, ensuring academic integrity.
