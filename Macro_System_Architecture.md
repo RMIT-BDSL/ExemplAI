@@ -21,7 +21,7 @@ Students will login to a custom application hosted by anyone appropriate (not ne
 - students are placed into two groups randomly: A Experimental (BKT), and B Control (regular LLM chat)
 - An introductory problem is selected from the syllabus(?) or course X
 - The student is presented with a dual interface with:
-  - code window that can run code and show compiler output
+  - code window that can run code and show compiler output (language?)
   - LLM/Chat window that is our custom langGraph agent interface
 - The student will attempt to answer a problem by submitting some code,
   - if successful, they will be presented with a new problem
@@ -109,20 +109,20 @@ The student-facing interface uses a **Split-Pane** layout:
 
 ---
 
-## 4. The 4 Layers Explained
+## 4. The 4 Layers 
 
 ### Layer 1: The User Interface
-* **What it does:** Provides the standalone web interface the students interact with. 
-* **Key Components:** A **Next.js** frontend application. This replaces the complex LMS/LTI integration, allowing for rapid prototype deployment and direct student access via a standalone web portal.
+
+* **Key Components:** A **Next.js(?)** frontend application. (It doesn't have to be Next.js. ): Some studies try to tie in with Canvas or their school's LMS; not necessary for this pilot.
 
 ### Layer 2: Data
-* **What it does:** Maintains the mathematical "epistemological state" of every student.
-* **Key Components:** The **BKT Engine** (running Python libraries like `pyBKT`) calculates the probabilities of mastery. Simultaneously, the **KDD Event Logs** track granular behavioral data (e.g., time spent pausing before typing) which is needed for data analysis and control trial determination.
+
+* **Key Components:** The **BKT Engine** (running Python libraries like `pyBKT`) calculates the probabilities of mastery. Simultaneously, the **KDD Event Logs** track granular behavioral data (e.g., time spent pausing before typing) which is needed for data analysis and control trial determination. We also need the baseline data set and info stored.
 
 ### Layer 3: Generative Reasoning & Routing (LangGraph Engine)
-* **What it does:** The intelligence loop that manages the RCT conditions and pedagogical scaffolding.
-* **Key Components:** The FastAPI gateway splits traffic into two paths. **Code Submits** (Left Pane) trigger Automated Unit Tests. **Chat Replies** (Right Pane) trigger conversational LLM Evaluation. The **A/B Experiment Router** then splits traffic: the Control Group is routed to a standard Control Agent, while the Experimental Group hits the BKT Orchestrator, which dynamically generates a Complete, Faded, or Erroneous example based on the Layer 2 mastery score.
+
+* **Key Components:** The FastAPI gateway splits traffic into two paths. **Code Submits** (Left Pane) trigger Automated Unit Tests. **Chat Replies** (Right Pane) trigger conversational LLM Evaluation. The **A/B Experiment Router** then splits traffic: the Control Group is routed to a standard Control Agent (TBD), while the Experimental Group hits the BKT Orchestrator, which dynamically generates a Complete, Faded, or Erroneous example based on the BKT mastery score.
 
 ### Layer 4: The Dean Agent
-* **What it does:** The institutional safeguard against giving away direct answers.
-* **Key Components:** Before any LangGraph response is sent back to the student through the API, it must pass through the **Dean Agent**. If an EBL agent accidentally generated a direct code answer that bypasses the example-based learning scaffolding, the Dean Agent rejects it and forces a rewrite, ensuring academic integrity.
+
+* **Key Components:** Before any LangGraph response is sent back to the student through the API, it must pass through the **Dean Agent**. If an EBL agent accidentally generated a direct code answer that bypasses the example-based learning scaffolding, the Dean Agent rejects it and forces a rewrite, ensuring cognitive effort is not offloaded to the LLM.
