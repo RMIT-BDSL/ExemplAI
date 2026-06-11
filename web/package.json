@@ -28,6 +28,7 @@
     "@tanstack/react-store": "latest",
     "@tanstack/router-plugin": "^1.132.0",
     "@tanstack/store": "latest",
+    "axios": "^1.17.0",
     "better-auth": "^1.5.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

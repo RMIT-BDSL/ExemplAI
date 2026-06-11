@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import Editor from '@monaco-editor/react'
 import { Button } from '#/components/ui/button'
+import axios from 'axios'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -17,15 +18,16 @@ function Home() {
     editorRef.current = editor;
   }
 
-  function showValue() {
+  async function showValue() {
     // this is the code to be submitted.
 
     const submissionCode = editorRef.current.getValue()
-    alert(submissionCode) // for testing, you can remove this later
+    // alert(submissionCode) // for testing, you can remove this later
 
     // send the code to backend
-    // let result = await 
-    //
+    let result = await axios.post(`${url}/execute`, {
+      code: submissionCode
+    });
     // console.log(result);
 
   }
