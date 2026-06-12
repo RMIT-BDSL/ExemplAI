@@ -4,6 +4,7 @@ import axios from 'axios'
 import CodeEditor from '#/components/student/CodeEditor'
 import CodingBar from '#/components/student/InteractionBar'
 import ResetCodeForm from '#/components/student/ResetCodeForm'
+import SidePanel from '#/components/student/SidePane'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -87,7 +88,7 @@ function Home() {
     <ClientOnly>
       <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
         {/* Workspace Container */}
-        <div className="flex flex-1 flex-col overflow-hidden p-3 w-full h-full">
+        <div className="flex flex-1 flex-row overflow-hidden p-3 w-full h-full">
           <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
             {/* Top Toolbar */}
             <CodingBar
@@ -116,6 +117,12 @@ function Home() {
               />
             </div>
           </div>
+
+          {/* Problem Description and Chat Panel */}
+          <div className="flex-shrink-0">
+            <SidePanel />
+          </div>
+
         </div>
 
         {/* Solid Reset Confirmation Modal */}
