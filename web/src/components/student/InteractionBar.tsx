@@ -100,11 +100,11 @@ export default function CodingBar({
 
       {/* Right controls */}
       <div className="flex items-center gap-4">
-        {/* Autosave Status */}
+        {/* Autosave Status
         <div className="flex items-center gap-1.5 text-xs text-zinc-500">
           <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Autosaved to Cloud</span>
-        </div>
+        </div> */}
 
         <div className="h-4 w-px bg-zinc-800" />
 
@@ -143,6 +143,6 @@ export default function CodingBar({
           )}
         </div>
       </div>
-    </div>
+    </div >
   )
 }
