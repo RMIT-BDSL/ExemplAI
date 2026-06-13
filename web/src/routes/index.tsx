@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import axios from 'axios'
+import { BookOpen, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
 import CodeEditor from '#/components/student/CodeEditor'
 import CodingBar from '#/components/student/InteractionBar'
 import ResetCodeForm from '#/components/student/ResetCodeForm'
 import SidePanel from '#/components/student/SidePane'
+import Problem from '#/components/student/problem/Problem'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -27,6 +29,8 @@ function Home() {
   const [executionResult, setExecutionResult] = useState<any>(null)
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false)
   const [showResetModal, setShowResetModal] = useState<boolean>(false)
+  const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false)
+  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true)
 
   function handleEditorMount(editor: any, monaco: any) {
     editorRef.current = editor
@@ -88,7 +92,33 @@ function Home() {
     <ClientOnly>
       <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
         {/* Workspace Container */}
-        <div className="flex flex-1 flex-row overflow-hidden p-3 w-full h-full">
+        <div className="flex flex-1 flex-row overflow-hidden p-3 w-full h-full gap-3">
+          {/* Problem Description Container */}
+          {!isProblemCollapsed && (
+            <div className="flex h-full w-[450px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
+              {/* Header */}
+              <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 flex-shrink-0">
+                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                  <BookOpen className="size-4 text-indigo-400" />
+                  <span>Problem Description</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsProblemCollapsed(true)}
+                  className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+                  title="Collapse panel"
+                >
+                  <ChevronLeft className="size-4 text-zinc-400" />
+                </button>
+              </div>
+              {/* Problem Content */}
+              <div className="flex-1 min-h-0 bg-zinc-900/50">
+                <Problem />
+              </div>
+            </div>
+          )}
+
+          {/* Code Editor Container */}
           <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
             {/* Top Toolbar */}
             <CodingBar
@@ -97,6 +127,10 @@ function Home() {
               fontSize={fontSize}
               setFontSize={setFontSize}
               onResetClick={() => setShowResetModal(true)}
+              isProblemCollapsed={isProblemCollapsed}
+              setIsProblemCollapsed={setIsProblemCollapsed}
+              isChatCollapsed={isChatCollapsed}
+              setIsChatCollapsed={setIsChatCollapsed}
             />
 
             {/* Editor Container */}
@@ -118,10 +152,12 @@ function Home() {
             </div>
           </div>
 
-          {/* Problem Description and Chat Panel */}
-          <div className="flex-shrink-0">
-            <SidePanel />
-          </div>
+          {/* Chat Panel */}
+          {!isChatCollapsed && (
+            <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
+              <SidePanel onCollapse={() => setIsChatCollapsed(true)} />
+            </div>
+          )}
 
         </div>
 

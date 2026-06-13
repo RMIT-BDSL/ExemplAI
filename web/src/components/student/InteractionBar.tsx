@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { RotateCcw, Settings, ChevronDown, Check, Code } from 'lucide-react'
+import { RotateCcw, Settings, ChevronDown, Check, Code, BookOpen, MessageSquare } from 'lucide-react'
+import { cn } from '#/lib/utils.ts'
 
 interface CodingBarProps {
   language: string
@@ -7,6 +8,10 @@ interface CodingBarProps {
   fontSize: number
   setFontSize: (size: number) => void
   onResetClick: () => void
+  isProblemCollapsed: boolean
+  setIsProblemCollapsed: (collapsed: boolean) => void
+  isChatCollapsed: boolean
+  setIsChatCollapsed: (collapsed: boolean) => void
 }
 
 const LANGUAGES = [
@@ -24,6 +29,10 @@ export default function CodingBar({
   fontSize,
   setFontSize,
   onResetClick,
+  isProblemCollapsed,
+  setIsProblemCollapsed,
+  isChatCollapsed,
+  setIsChatCollapsed,
 }: CodingBarProps) {
   const [isLangOpen, setIsLangOpen] = useState(false)
   const [isFontOpen, setIsFontOpen] = useState(false)
@@ -51,6 +60,21 @@ export default function CodingBar({
     <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-900/95 px-4 text-sm text-zinc-300">
       {/* Left controls */}
       <div className="flex items-center gap-3">
+        {/* Toggle Left Sidebar (Problem Description) */}
+        <button
+          type="button"
+          onClick={() => setIsProblemCollapsed(!isProblemCollapsed)}
+          title={isProblemCollapsed ? "Show Problem Description" : "Hide Problem Description"}
+          className={cn(
+            "flex size-7 items-center justify-center rounded-md border transition-all cursor-pointer",
+            isProblemCollapsed
+              ? "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+              : "bg-indigo-600/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-600/20"
+          )}
+        >
+          <BookOpen className="size-3.5" />
+        </button>
+
         {/* Mock Quest File Tab */}
         <div className="flex items-center gap-2 rounded-t-lg bg-zinc-950/80 px-3 py-1.5 text-xs font-semibold text-emerald-500 border border-zinc-800 border-b-transparent">
           <Code className="size-3.5" />
@@ -142,6 +166,23 @@ export default function CodingBar({
             </div>
           )}
         </div>
+
+        <div className="h-4 w-px bg-zinc-800" />
+
+        {/* Toggle Right Sidebar (AI Assistant) */}
+        <button
+          type="button"
+          onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+          title={isChatCollapsed ? "Show AI Assistant" : "Hide AI Assistant"}
+          className={cn(
+            "flex size-7 items-center justify-center rounded-md border transition-all cursor-pointer",
+            isChatCollapsed
+              ? "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+              : "bg-emerald-600/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20"
+          )}
+        >
+          <MessageSquare className="size-3.5" />
+        </button>
       </div>
     </div >
   )
