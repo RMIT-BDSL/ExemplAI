@@ -5,12 +5,15 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { ConvexProvider, ConvexReactClient } from 'convex/react'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
+
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL)
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -47,7 +50,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ConvexProvider client={convex}>
+          {children}
+        </ConvexProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',
@@ -65,3 +70,4 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     </html>
   )
 }
+

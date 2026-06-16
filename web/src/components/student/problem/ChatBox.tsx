@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Send, Bot, User, Sparkles, AlertCircle, RefreshCw } from "lucide-react"
+import { Send, Bot, User, Sparkles, RefreshCw } from "lucide-react"
 import { cn } from "#/lib/utils.ts"
 
 // Types for Chat

@@ -2,25 +2,44 @@
 import { useRef, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import axios from 'axios'
-import { BookOpen, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
+import { BookOpen, ChevronLeft } from 'lucide-react'
+import { useQuery } from 'convex/react'
+import { api } from '../../convex/_generated/api'
 import CodeEditor from '#/components/student/CodeEditor'
 import CodingBar from '#/components/student/InteractionBar'
 import ResetCodeForm from '#/components/student/ResetCodeForm'
 import SidePanel from '#/components/student/SidePane'
 import Problem from '#/components/student/problem/Problem'
 
-export const Route = createFileRoute('/course')({ component: Course })
+export const Route = createFileRoute('/course')({
+    component: Course,
+    validateSearch: (search: Record<string, unknown>) => {
+        return {
+            problemId: (search.problemId as string) || undefined,
+        }
+    },
+})
 
 const CODE_TEMPLATES = {
     python: `def main():\n    # Write your Python code here\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()`,
+    /*
     javascript: `function main() {\n    // Write your JavaScript code here\n    console.log("Hello, World!");\n}\n\nmain();`,
     cpp: `#include <iostream>\n\nint main() {\n    // Write your C++ code here\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
-    java: `public class Main {\n    public static void main(String[] args) {\n        // Write your Java code here\n        System.out.println("Hello, World!");\n    }\n}`,
+    java: `public class Main {\n    // Write your Java code here\n    System.out.println("Hello, World!");\n    }\n}`,
+    */
 }
 
 function Course() {
     const editorRef = useRef<any>(null)
     const url = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+    const { problemId } = Route.useSearch()
+
+    const questions = useQuery(api.courses.getAllCourses)
+    const fetchedQuestion = useQuery(
+        api.courses.getQuestionById,
+        problemId ? { id: problemId } : "skip"
+    )
 
     const [language, setLanguage] = useState<string>('python')
     const [fontSize, setFontSize] = useState<number>(14)
@@ -33,7 +52,36 @@ function Course() {
     const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false)
     const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true)
 
-    function handleEditorMount(editor: any, monaco: any) {
+    const activeQuestion = problemId
+        ? fetchedQuestion
+        : (questions && questions.length > 0 ? questions[0] : null)
+
+    if (activeQuestion === undefined) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
+                <div className="text-center space-y-4">
+                    <p className="text-zinc-500 text-sm animate-pulse">Loading workspace...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (activeQuestion === null) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
+                <p className="text-zinc-400">No problems available in the database.</p>
+            </div>
+        )
+    }
+
+    const mappedProblem = {
+        id: activeQuestion._id,
+        title: activeQuestion.problem_name,
+        description: activeQuestion.problem_description,
+        tags: ["Python"],
+    }
+
+    function handleEditorMount(editor: any) {
         editorRef.current = editor
     }
 
@@ -114,7 +162,7 @@ function Course() {
                             </div>
                             {/* Problem Content */}
                             <div className="flex-1 min-h-0 bg-zinc-900/50">
-                                <Problem />
+                                <Problem problem={mappedProblem} />
                             </div>
                         </div>
                     )}

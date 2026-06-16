@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Link } from "@tanstack/react-router"
+import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Lock,
@@ -9,151 +9,151 @@ import {
   Compass,
   ChevronDown,
   ChevronRight,
-} from "lucide-react"
-import { cn } from "#/lib/utils.ts"
+} from "lucide-react";
+import { cn } from "#/lib/utils.ts";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export type ShortProblem = {
-  id: string
-  name: string
-  description: string
-  week: number
-  status: "completed" | "in-progress" | "pending"
-  language: "Python"
-  difficulty: "Easy" | "Medium" | "Hard"
-  tags: string[]
-  acceptance: string
-}
+  id: string;
+  name: string;
+  description: string;
+  week: number;
+  status: "completed" | "in-progress" | "pending";
+  language: "Python";
+  difficulty: "Easy" | "Medium" | "Hard";
+  tags: string[];
+  // acceptance: string
+};
 
-const MOCK_PROBLEMS: ShortProblem[] = [
-  {
-    id: "two-sum",
-    name: "Two Sum",
-    description: "Given an array of integers, return indices of the two numbers that add up to a target value.",
-    week: 1,
+/*
+const MOCK_METADATA: Record<string, Partial<ShortProblem>> = {
+  "Two Sum": {
     status: "completed",
-    language: "Python",
     difficulty: "Easy",
     tags: ["Array", "Hash Table"],
     acceptance: "54.2%",
   },
-  {
-    id: "valid-parentheses",
-    name: "Valid Parentheses",
-    description: "Determine if the input string containing brackets has valid matching open and close pairs.",
-    week: 1,
+  "Valid Parentheses": {
     status: "completed",
-    language: "Python",
     difficulty: "Easy",
     tags: ["Stack", "String"],
     acceptance: "41.5%",
   },
-  {
-    id: "merge-sorted-lists",
-    name: "Merge Two Sorted Lists",
-    description: "Merge two sorted linked lists and return it as a new sorted list, recursively or iteratively.",
-    week: 2,
+  "Merge Two Sorted Lists": {
     status: "in-progress",
-    language: "Python",
     difficulty: "Medium",
     tags: ["Linked List", "Recursion"],
     acceptance: "63.7%",
   },
-  {
-    id: "max-subarray",
-    name: "Maximum Subarray",
-    description: "Find the contiguous subarray within a one-dimensional array of numbers which has the largest sum.",
-    week: 2,
+  "Maximum Subarray": {
     status: "pending",
-    language: "Python",
     difficulty: "Medium",
     tags: ["Array", "Divide & Conquer"],
     acceptance: "50.1%",
   },
-  {
-    id: "binary-tree-inorder",
-    name: "Binary Tree Inorder Traversal",
-    description: "Given the root of a binary tree, return the inorder traversal of its nodes' values.",
-    week: 3,
+  "Binary Tree Inorder Traversal": {
     status: "pending",
-    language: "Python",
     difficulty: "Easy",
     tags: ["Tree", "DFS"],
     acceptance: "74.8%",
   },
-  {
-    id: "clone-graph",
-    name: "Clone Graph",
-    description: "Return a deep copy of a given connected undirected graph represented as node references.",
-    week: 3,
+  "Clone Graph": {
     status: "pending",
-    language: "Python",
     difficulty: "Medium",
     tags: ["Graph", "BFS"],
     acceptance: "56.2%",
   },
-  {
-    id: "course-schedule",
-    name: "Course Schedule",
-    description: "Determine if you can finish all courses given the total number of courses and list of prerequisites.",
-    week: 4,
+  "Course Schedule": {
     status: "pending",
-    language: "Python",
     difficulty: "Hard",
     tags: ["Graph", "DFS", "BFS"],
     acceptance: "60.4%",
   },
-  {
-    id: "longest-palindrome",
-    name: "Longest Palindromic Substring",
-    description: "Given a string, find the longest palindromic substring in it using dynamic programming.",
-    week: 4,
+  "Longest Palindromic Substring": {
     status: "pending",
-    language: "Python",
     difficulty: "Medium",
     tags: ["String", "Dynamic Programming"],
     acceptance: "34.1%",
   },
-]
+}
+*/
 
 export default function CourseList() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedWeek, setSelectedWeek] = useState<number | "all">("all")
-  const [selectedStatus, setSelectedStatus] = useState<ShortProblem["status"] | "all">("all")
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>({})
+  const questions = useQuery(api.courses.getAllCourses);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
+  const [selectedStatus, setSelectedStatus] = useState<ShortProblem["status"] | "all">("all");
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>({});
+
+  if (questions === undefined) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div>
+          <div className="h-6 w-48 bg-zinc-200 rounded"></div>
+          <div className="h-4 w-72 bg-zinc-100 rounded mt-2"></div>
+        </div>
+        <div className="h-24 bg-zinc-200/50 rounded-xl border border-line"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-zinc-200/30 rounded-xl border border-line"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const problems: ShortProblem[] = questions.map((q: any) => {
+    return {
+      id: q._id,
+      name: q.problem_name,
+      description: q.problem_description,
+      week: q.week,
+      status: "pending",
+      language: "Python",
+      difficulty: "Easy",
+      tags: [],
+      // acceptance: "50.0%",
+    };
+  });
 
   // Filter problems based on states
-  const filteredProblems = MOCK_PROBLEMS.filter((problem) => {
+  const filteredProblems = problems.filter((problem) => {
     const matchesSearch =
       problem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       problem.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      problem.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesWeek = selectedWeek === "all" || problem.week === selectedWeek
-    const matchesStatus = selectedStatus === "all" || problem.status === selectedStatus
+    const matchesWeek = selectedWeek === "all" || problem.week === selectedWeek;
+    const matchesStatus = selectedStatus === "all" || problem.status === selectedStatus;
 
-    return matchesSearch && matchesWeek && matchesStatus
-  })
+    return matchesSearch && matchesWeek && matchesStatus;
+  });
 
   // Group filtered problems by week
-  const problemsByWeek = filteredProblems.reduce<Record<number, ShortProblem[]>>((groups, problem) => {
-    if (!groups[problem.week]) {
-      groups[problem.week] = []
-    }
-    groups[problem.week].push(problem)
-    return groups
-  }, {})
+  const problemsByWeek = filteredProblems.reduce<Record<number, ShortProblem[]>>(
+    (groups, problem) => {
+      if (!groups[problem.week]) {
+        groups[problem.week] = [];
+      }
+      groups[problem.week].push(problem);
+      return groups;
+    },
+    {}
+  );
 
   // Get sorted list of active weeks
   const sortedWeeks = Object.keys(problemsByWeek)
     .map(Number)
-    .sort((a, b) => a - b)
+    .sort((a, b) => a - b);
 
   const toggleWeek = (weekNum: number) => {
     setCollapsedWeeks((prev) => ({
       ...prev,
       [weekNum]: !prev[weekNum],
-    }))
-  }
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -164,7 +164,8 @@ export default function CourseList() {
           <span>Python Programming Syllabus</span>
         </h2>
         <p className="text-sm text-sea-ink-soft mt-1">
-          Complete the challenges below sequentially. Use the workspace editor to run and submit your solutions.
+          Complete the challenges below sequentially. Use the workspace editor to run and submit
+          your solutions.
         </p>
       </div>
 
@@ -236,8 +237,8 @@ export default function CourseList() {
       {sortedWeeks.length > 0 ? (
         <div className="space-y-6">
           {sortedWeeks.map((weekNum) => {
-            const isCollapsed = collapsedWeeks[weekNum]
-            const weekProblems = problemsByWeek[weekNum]
+            const isCollapsed = collapsedWeeks[weekNum];
+            const weekProblems = problemsByWeek[weekNum];
 
             return (
               <div key={weekNum} className="space-y-3">
@@ -246,7 +247,8 @@ export default function CourseList() {
                   className="w-full flex items-center justify-between border-b border-line pb-1.5 hover:border-lagoon-deep text-left cursor-pointer group transition-colors"
                 >
                   <h3 className="font-extrabold text-xs uppercase tracking-wider text-sea-ink-soft group-hover:text-sea-ink">
-                    Week {weekNum} ({weekProblems.length} {weekProblems.length === 1 ? "exercise" : "exercises"})
+                    Week {weekNum} ({weekProblems.length}{" "}
+                    {weekProblems.length === 1 ? "exercise" : "exercises"})
                   </h3>
                   {isCollapsed ? (
                     <ChevronRight className="size-4 text-sea-ink-soft group-hover:text-sea-ink" />
@@ -263,7 +265,7 @@ export default function CourseList() {
                   </div>
                 )}
               </div>
-            )
+            );
           })}
         </div>
       ) : (
@@ -276,7 +278,7 @@ export default function CourseList() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function ShortProblemCard({
@@ -288,13 +290,12 @@ function ShortProblemCard({
   language,
   difficulty,
   tags,
-  acceptance,
 }: ShortProblem) {
   const difficultyStyles = {
     Easy: "text-emerald-600 bg-emerald-50 border-emerald-200/50",
     Medium: "text-amber-600 bg-amber-50 border-amber-200/50",
     Hard: "text-rose-600 bg-rose-50 border-rose-200/50",
-  }
+  };
 
   return (
     <div className="feature-card rounded-xl border border-line p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -302,13 +303,19 @@ function ShortProblemCard({
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="shrink-0">
           {status === "completed" && (
-            <CheckCircle2 className="size-5 text-palm" title="Completed" />
+            <span title="Completed">
+              <CheckCircle2 className="size-5 text-palm" />
+            </span>
           )}
           {status === "in-progress" && (
-            <PlayCircle className="size-5 text-amber-600" title="In Progress" />
+            <span title="In Progress">
+              <PlayCircle className="size-5 text-amber-600" />
+            </span>
           )}
           {status === "pending" && (
-            <Lock className="size-5 text-sea-ink-soft/40" title="Locked" />
+            <span title="Locked">
+              <Lock className="size-5 text-sea-ink-soft/40" />
+            </span>
           )}
         </div>
 
@@ -345,38 +352,38 @@ function ShortProblemCard({
             </span>
           ))}
         </div>
-        
+
         <span className="text-[10px] font-bold text-sea-ink-soft bg-sand/50 px-2 py-0.5 rounded border border-line">
           {language}
         </span>
 
         <Link
           to="/course"
+          search={{ problemId: id }}
           className={cn(
             "text-xs font-bold px-3 py-1.5 rounded-lg border text-center transition-colors flex items-center gap-1 cursor-pointer",
             status === "completed"
               ? "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
               : status === "in-progress"
-              ? "bg-palm text-white border-palm hover:bg-palm/90"
-              : "bg-white border-line text-sea-ink hover:bg-sand/35"
+                ? "bg-palm text-white border-palm hover:bg-palm/90"
+                : "bg-white border-line text-sea-ink hover:bg-sand/35"
           )}
         >
           {status === "completed" ? "Review" : status === "in-progress" ? "Resume" : "Start"}
         </Link>
       </div>
     </div>
-  )
+  );
 }
 
 // Deprecated original function kept for absolute backward compatibility
 export function ShortProblem({
-  id,
   name,
   description,
   week,
   status,
   language,
-}: ShortProblem & { difficulty?: "Easy" | "Medium" | "Hard"; tags?: string[]; acceptance?: string }) {
+}: Omit<ShortProblem, "problemId" | "difficulty" | "tags">) {
   return (
     <div className="border border-line rounded-lg p-3 bg-white">
       <h1 className="font-bold text-lg">{name}</h1>
@@ -385,5 +392,5 @@ export function ShortProblem({
       <p className="text-xs font-medium">Status: {status}</p>
       <p className="text-xs text-lagoon-deep">Language: {language}</p>
     </div>
-  )
+  );
 }

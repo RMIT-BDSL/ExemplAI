@@ -1,33 +1,35 @@
-import * as React from "react"
-import { BookOpen, CheckCircle, Code2, Cpu, HelpCircle, Tag } from "lucide-react"
-import { cn } from "#/lib/utils.ts"
+import { Tag } from "lucide-react";
 
 // Types for Problem
+/*
 export interface Example {
   input: string
   output: string
   explanation?: string
 }
+*/
 
 export interface ProblemData {
-  id: string
-  title: string
-  difficulty: "Easy" | "Medium" | "Hard"
-  acceptanceRate: string
-  tags: string[]
-  description: string
-  examples: Example[]
-  constraints: string[]
+  id: string;
+  title: string;
+  // difficulty: "Easy" | "Medium" | "Hard"
+  // acceptanceRate: string
+  tags: string[];
+  description: string;
+  // examples: Example[]
+  // constraints: string[]
 }
 
 // Mock Problem Data for initial design
 export const MOCK_PROBLEM: ProblemData = {
   id: "1",
   title: "1. Two Sum",
-  difficulty: "Easy",
-  acceptanceRate: "54.2%",
+  // difficulty: "Easy",
+  // acceptanceRate: "54.2%",
   tags: ["Array", "Hash Table"],
-  description: "Given an array of integers `nums` and an integer `target`, return *indices of the two numbers* such that they add up to `target`.\n\nYou may assume that each input would have ***exactly* one solution**, and you may not use the *same* element twice.\n\nYou can return the answer in any order.",
+  description:
+    "Given an array of integers `nums` and an integer `target`, return *indices of the two numbers* such that they add up to `target`.\n\nYou may assume that each input would have ***exactly* one solution**, and you may not use the *same* element twice.\n\nYou can return the answer in any order.",
+  /*
   examples: [
     {
       input: "nums = [2,7,11,15], target = 9",
@@ -50,29 +52,34 @@ export const MOCK_PROBLEM: ProblemData = {
     "-10^9 <= target <= 10^9",
     "Only one valid answer exists."
   ]
-}
+  */
+};
 
 // 1. Problem Header Component
 export interface ProblemHeaderProps {
-  title: string
-  difficulty: "Easy" | "Medium" | "Hard"
-  acceptanceRate: string
-  tags: string[]
+  title: string;
+  // difficulty: "Easy" | "Medium" | "Hard"
+  // acceptanceRate: string
+  tags: string[];
 }
 
-export function ProblemHeader({ title, difficulty, acceptanceRate, tags }: ProblemHeaderProps) {
+export function ProblemHeader({
+  title,
+  /* difficulty, acceptanceRate, */ tags,
+}: ProblemHeaderProps) {
+  /*
   const difficultyStyles = {
     Easy: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
     Medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     Hard: "text-rose-400 bg-rose-500/10 border-rose-500/20",
   }
+  */
 
   return (
     <div className="space-y-4 border-b border-zinc-800 pb-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-          {title}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">{title}</h1>
+        {/*
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
@@ -87,6 +94,7 @@ export function ProblemHeader({ title, difficulty, acceptanceRate, tags }: Probl
             Acceptance: {acceptanceRate}
           </span>
         </div>
+        */}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -101,13 +109,13 @@ export function ProblemHeader({ title, difficulty, acceptanceRate, tags }: Probl
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 // Helper to format inline code markers like `code` and bold markdown markers in problem description
 function renderFormattedText(text: string) {
   // A simple markdown-like formatter for inline code, bold, and italics to make the mock UI look premium
-  const parts = text.split(/(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`)/g)
+  const parts = text.split(/(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
@@ -117,52 +125,51 @@ function renderFormattedText(text: string) {
         >
           {part.slice(1, -1)}
         </code>
-      )
+      );
     }
     if (part.startsWith("***") && part.endsWith("***")) {
       return (
         <strong key={index} className="font-extrabold italic text-zinc-100">
           {part.slice(3, -3)}
         </strong>
-      )
+      );
     }
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
         <strong key={index} className="font-bold text-zinc-100">
           {part.slice(2, -2)}
         </strong>
-      )
+      );
     }
     if (part.startsWith("*") && part.endsWith("*")) {
       return (
         <em key={index} className="italic text-zinc-200">
           {part.slice(1, -1)}
         </em>
-      )
+      );
     }
-    return part
-  })
+    return part;
+  });
 }
 
 // 2. Problem Description Text Component
 export interface ProblemDescriptionTextProps {
-  description: string
+  description: string;
 }
 
 export function ProblemDescriptionText({ description }: ProblemDescriptionTextProps) {
-  const paragraphs = description.split("\n\n")
+  const paragraphs = description.split("\n\n");
 
   return (
     <div className="space-y-4 text-sm leading-relaxed text-zinc-300">
       {paragraphs.map((p, i) => (
-        <p key={i}>
-          {renderFormattedText(p)}
-        </p>
+        <p key={i}>{renderFormattedText(p)}</p>
       ))}
     </div>
-  )
+  );
 }
 
+/*
 // 3. Problem Examples Component
 export interface ProblemExamplesProps {
   examples: Example[]
@@ -240,10 +247,11 @@ export function ProblemConstraints({ constraints }: ProblemConstraintsProps) {
     </div>
   )
 }
+*/
 
 // 5. Main Default Problem Component
 export interface ProblemProps {
-  problem?: ProblemData
+  problem?: ProblemData;
 }
 
 export default function Problem({ problem = MOCK_PROBLEM }: ProblemProps) {
@@ -253,19 +261,19 @@ export default function Problem({ problem = MOCK_PROBLEM }: ProblemProps) {
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
         <ProblemHeader
           title={problem.title}
-          difficulty={problem.difficulty}
-          acceptanceRate={problem.acceptanceRate}
+          // difficulty={problem.difficulty}
+          // acceptanceRate={problem.acceptanceRate}
           tags={problem.tags}
         />
 
         <div className="space-y-6">
           <ProblemDescriptionText description={problem.description} />
-          
-          <ProblemExamples examples={problem.examples} />
 
-          <ProblemConstraints constraints={problem.constraints} />
+          {/* <ProblemExamples examples={problem.examples} /> */}
+
+          {/* <ProblemConstraints constraints={problem.constraints} /> */}
         </div>
       </div>
     </div>
-  )
+  );
 }
