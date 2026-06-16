@@ -1,27 +1,35 @@
-import { useState, useRef, useEffect } from 'react'
-import { RotateCcw, Settings, ChevronDown, Check, Code, BookOpen, MessageSquare } from 'lucide-react'
-import { cn } from '#/lib/utils.ts'
+import { useState, useRef, useEffect } from "react";
+import {
+  RotateCcw,
+  Settings,
+  ChevronDown,
+  Check,
+  Code,
+  BookOpen,
+  MessageSquare,
+} from "lucide-react";
+import { cn } from "#/lib/utils.ts";
 
 interface CodingBarProps {
-  language: string
-  setLanguage: (lang: string) => void
-  fontSize: number
-  setFontSize: (size: number) => void
-  onResetClick: () => void
-  isProblemCollapsed: boolean
-  setIsProblemCollapsed: (collapsed: boolean) => void
-  isChatCollapsed: boolean
-  setIsChatCollapsed: (collapsed: boolean) => void
+  language: string;
+  setLanguage: (lang: string) => void;
+  fontSize: number;
+  setFontSize: (size: number) => void;
+  onResetClick: () => void;
+  isProblemCollapsed: boolean;
+  setIsProblemCollapsed: (collapsed: boolean) => void;
+  isChatCollapsed: boolean;
+  setIsChatCollapsed: (collapsed: boolean) => void;
 }
 
 const LANGUAGES = [
-  { id: 'python', name: 'Python 3' },
-  { id: 'javascript', name: 'JavaScript' },
-  { id: 'cpp', name: 'C++' },
-  { id: 'java', name: 'Java' },
-]
+  { id: "python", name: "Python 3" },
+  // { id: 'javascript', name: 'JavaScript' },
+  // { id: 'cpp', name: 'C++' },
+  // { id: 'java', name: 'Java' },
+];
 
-const FONT_SIZES = [12, 14, 16, 18]
+const FONT_SIZES = [12, 14, 16, 18];
 
 export default function CodingBar({
   language,
@@ -34,27 +42,27 @@ export default function CodingBar({
   isChatCollapsed,
   setIsChatCollapsed,
 }: CodingBarProps) {
-  const [isLangOpen, setIsLangOpen] = useState(false)
-  const [isFontOpen, setIsFontOpen] = useState(false)
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isFontOpen, setIsFontOpen] = useState(false);
 
-  const langRef = useRef<HTMLDivElement>(null)
-  const fontRef = useRef<HTMLDivElement>(null)
+  const langRef = useRef<HTMLDivElement>(null);
+  const fontRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (langRef.current && !langRef.current.contains(event.target as Node)) {
-        setIsLangOpen(false)
+        setIsLangOpen(false);
       }
       if (fontRef.current && !fontRef.current.contains(event.target as Node)) {
-        setIsFontOpen(false)
+        setIsFontOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const currentLanguageName = LANGUAGES.find((l) => l.id === language)?.name || 'Python 3'
+  const currentLanguageName = LANGUAGES.find((l) => l.id === language)?.name || "Python 3";
 
   return (
     <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-900/95 px-4 text-sm text-zinc-300">
@@ -78,7 +86,16 @@ export default function CodingBar({
         {/* Mock Quest File Tab */}
         <div className="flex items-center gap-2 rounded-t-lg bg-zinc-950/80 px-3 py-1.5 text-xs font-semibold text-emerald-500 border border-zinc-800 border-b-transparent">
           <Code className="size-3.5" />
-          <span>solution.{language === 'python' ? 'py' : language === 'javascript' ? 'js' : language === 'cpp' ? 'cpp' : 'java'}</span>
+          <span>
+            solution.
+            {language === "python"
+              ? "py"
+              : language === "javascript"
+                ? "js"
+                : language === "cpp"
+                  ? "cpp"
+                  : "java"}
+          </span>
         </div>
 
         <div className="h-4 w-px bg-zinc-800" />
@@ -90,7 +107,9 @@ export default function CodingBar({
             className="flex items-center gap-1.5 rounded-md bg-zinc-800/60 px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
           >
             <span>{currentLanguageName}</span>
-            <ChevronDown className={`size-3.5 transition-transform duration-200 ${isLangOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`size-3.5 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`}
+            />
           </button>
 
           {isLangOpen && (
@@ -99,8 +118,8 @@ export default function CodingBar({
                 <button
                   key={lang.id}
                   onClick={() => {
-                    setLanguage(lang.id)
-                    setIsLangOpen(false)
+                    setLanguage(lang.id);
+                    setIsLangOpen(false);
                   }}
                   className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
                 >
@@ -154,8 +173,8 @@ export default function CodingBar({
                 <button
                   key={size}
                   onClick={() => {
-                    setFontSize(size)
-                    setIsFontOpen(false)
+                    setFontSize(size);
+                    setIsFontOpen(false);
                   }}
                   className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
                 >
@@ -184,6 +203,6 @@ export default function CodingBar({
           <MessageSquare className="size-3.5" />
         </button>
       </div>
-    </div >
-  )
+    </div>
+  );
 }
