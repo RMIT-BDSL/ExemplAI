@@ -1,4 +1,5 @@
 import { Tag } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 // Types for Problem
 /*
@@ -78,7 +79,9 @@ export function ProblemHeader({
   return (
     <div className="space-y-4 border-b border-zinc-800 pb-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">{title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+          {title}
+        </h1>
         {/*
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -112,59 +115,17 @@ export function ProblemHeader({
   );
 }
 
-// Helper to format inline code markers like `code` and bold markdown markers in problem description
-function renderFormattedText(text: string) {
-  // A simple markdown-like formatter for inline code, bold, and italics to make the mock UI look premium
-  const parts = text.split(/(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
-  return parts.map((part, index) => {
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return (
-        <code
-          key={index}
-          className="rounded-md border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 font-mono text-xs font-semibold text-sky-400"
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-    if (part.startsWith("***") && part.endsWith("***")) {
-      return (
-        <strong key={index} className="font-extrabold italic text-zinc-100">
-          {part.slice(3, -3)}
-        </strong>
-      );
-    }
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return (
-        <strong key={index} className="font-bold text-zinc-100">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    if (part.startsWith("*") && part.endsWith("*")) {
-      return (
-        <em key={index} className="italic text-zinc-200">
-          {part.slice(1, -1)}
-        </em>
-      );
-    }
-    return part;
-  });
-}
-
 // 2. Problem Description Text Component
 export interface ProblemDescriptionTextProps {
   description: string;
 }
 
-export function ProblemDescriptionText({ description }: ProblemDescriptionTextProps) {
-  const paragraphs = description.split("\n\n");
-
+export function ProblemDescriptionText({
+  description,
+}: ProblemDescriptionTextProps) {
   return (
-    <div className="space-y-4 text-sm leading-relaxed text-zinc-300">
-      {paragraphs.map((p, i) => (
-        <p key={i}>{renderFormattedText(p)}</p>
-      ))}
+    <div className="prose prose-invert prose-sm max-w-none text-zinc-300">
+      <ReactMarkdown>{description}</ReactMarkdown>
     </div>
   );
 }

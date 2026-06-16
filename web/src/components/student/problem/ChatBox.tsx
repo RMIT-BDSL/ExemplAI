@@ -1,19 +1,20 @@
-import * as React from "react"
-import { Send, Bot, User, Sparkles, RefreshCw } from "lucide-react"
-import { cn } from "#/lib/utils.ts"
+import { Bot, RefreshCw, Send, Sparkles, User } from "lucide-react";
+import * as React from "react";
+import ReactMarkdown from "react-markdown";
+import { cn } from "#/lib/utils.ts";
 
 // Types for Chat
 export interface Message {
-  id: string
-  sender: "user" | "assistant"
-  content: string
-  timestamp: Date
+  id: string;
+  sender: "user" | "assistant";
+  content: string;
+  timestamp: Date;
 }
 
 // 1. Chat Header Component
 export interface ChatHeaderProps {
-  onClearChat?: () => void
-  isTyping?: boolean
+  onClearChat?: () => void;
+  isTyping?: boolean;
 }
 
 export function ChatHeader({ onClearChat, isTyping }: ChatHeaderProps) {
@@ -41,22 +42,22 @@ export function ChatHeader({ onClearChat, isTyping }: ChatHeaderProps) {
         </button>
       )}
     </div>
-  )
+  );
 }
 
 // 2. Individual Message Bubble Component
 export interface MessageBubbleProps {
-  message: Message
+  message: Message;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const isUser = message.sender === "user"
+  const isUser = message.sender === "user";
 
   return (
     <div
       className={cn(
         "flex w-full gap-3 text-sm",
-        isUser ? "flex-row-reverse" : "flex-row"
+        isUser ? "flex-row-reverse" : "flex-row",
       )}
     >
       {/* Avatar */}
@@ -65,7 +66,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           "flex size-7 shrink-0 select-none items-center justify-center rounded-full text-xs font-semibold border",
           isUser
             ? "bg-zinc-800 border-zinc-700 text-zinc-300"
-            : "bg-indigo-950 border-indigo-800 text-indigo-400"
+            : "bg-indigo-950 border-indigo-800 text-indigo-400",
         )}
       >
         {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
@@ -78,16 +79,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             "rounded-2xl px-4 py-2.5 leading-relaxed shadow-sm",
             isUser
               ? "bg-indigo-600 text-white rounded-tr-none font-medium"
-              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none"
+              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2",
           )}
         >
-          {message.content}
+          {isUser ? (
+            message.content
+          ) : (
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          )}
         </div>
         {/* Timestamp */}
         <span
           className={cn(
             "text-[10px] text-zinc-500 px-1 select-none",
-            isUser ? "text-right" : "text-left"
+            isUser ? "text-right" : "text-left",
           )}
         >
           {message.timestamp.toLocaleTimeString([], {
@@ -97,22 +102,22 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </span>
       </div>
     </div>
-  )
+  );
 }
 
 // 3. Message Feed Component
 export interface MessageFeedProps {
-  messages: Message[]
-  isTyping?: boolean
+  messages: Message[];
+  isTyping?: boolean;
 }
 
 export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
-  const bottomRef = React.useRef<HTMLDivElement>(null)
+  const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
   React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isTyping])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800">
@@ -122,9 +127,12 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
             <Sparkles className="size-5" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-zinc-300">Start a conversation</p>
+            <p className="text-sm font-semibold text-zinc-300">
+              Start a conversation
+            </p>
             <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
-              Ask questions about the problem description, request code hints, or understand complexity.
+              Ask questions about the problem description, request code hints,
+              or understand complexity.
             </p>
           </div>
         </div>
@@ -141,9 +149,18 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
           </div>
           <div className="flex flex-col gap-1 max-w-[80%]">
             <div className="flex items-center gap-1 bg-zinc-800/80 border border-zinc-800 rounded-2xl rounded-tl-none px-4 py-3 text-zinc-400">
-              <span className="size-1.5 animate-bounce rounded-full bg-zinc-500" style={{ animationDelay: "0ms" }} />
-              <span className="size-1.5 animate-bounce rounded-full bg-zinc-500" style={{ animationDelay: "150ms" }} />
-              <span className="size-1.5 animate-bounce rounded-full bg-zinc-500" style={{ animationDelay: "300ms" }} />
+              <span
+                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                style={{ animationDelay: "300ms" }}
+              />
             </div>
           </div>
         </div>
@@ -151,31 +168,31 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
 
       <div ref={bottomRef} />
     </div>
-  )
+  );
 }
 
 // 4. Chat Input Component
 export interface ChatInputProps {
-  onSendMessage: (text: string) => void
-  disabled?: boolean
+  onSendMessage: (text: string) => void;
+  disabled?: boolean;
 }
 
 export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
-  const [text, setText] = React.useState("")
+  const [text, setText] = React.useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!text.trim() || disabled) return
-    onSendMessage(text.trim())
-    setText("")
-  }
+    e.preventDefault();
+    if (!text.trim() || disabled) return;
+    onSendMessage(text.trim());
+    setText("");
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
+      e.preventDefault();
+      handleSubmit(e);
     }
-  }
+  };
 
   return (
     <form
@@ -199,14 +216,14 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             "inline-flex size-8 items-center justify-center rounded-lg transition-all select-none shrink-0",
             text.trim() && !disabled
               ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95"
-              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed"
+              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed",
           )}
         >
           <Send className="size-3.5" />
         </button>
       </div>
     </form>
-  )
+  );
 }
 
 // 5. Chat Box default exported container
@@ -215,11 +232,12 @@ export default function ChatBox() {
     {
       id: "welcome",
       sender: "assistant",
-      content: "Hi there! I am your AI learning assistant. I can help you understand the 'Two Sum' problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
+      content:
+        "Hi there! I am your AI learning assistant. I can help you understand the 'Two Sum' problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
       timestamp: new Date(),
     },
-  ])
-  const [isTyping, setIsTyping] = React.useState(false)
+  ]);
+  const [isTyping, setIsTyping] = React.useState(false);
 
   const handleSendMessage = (text: string) => {
     // 1. Add User Message
@@ -228,21 +246,29 @@ export default function ChatBox() {
       sender: "user",
       content: text,
       timestamp: new Date(),
-    }
-    setMessages((prev) => [...prev, userMsg])
-    setIsTyping(true)
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsTyping(true);
 
     // 2. Simulate AI response
     setTimeout(() => {
-      let reply = "I'm here to help! Could you explain your current approach, or would you like a hint about a brute force solution vs. using a hash map?"
-      
-      const lower = text.toLowerCase()
+      let reply =
+        "I'm here to help! Could you explain your current approach, or would you like a hint about a brute force solution vs. using a hash map?";
+
+      const lower = text.toLowerCase();
       if (lower.includes("hint") || lower.includes("clue")) {
-        reply = "Here's a hint: Think about how you can check if the complement (`target - nums[i]`) exists in the array as you iterate. Can we store seen numbers to find it in O(1) time?"
+        reply =
+          "Here's a hint: Think about how you can check if the complement (`target - nums[i]`) exists in the array as you iterate. Can we store seen numbers to find it in O(1) time?";
       } else if (lower.includes("complexity") || lower.includes("o(n)")) {
-        reply = "A brute force solution takes O(N²) time. However, using a Hash Map lets you search for the complement in O(1) average time, bringing the overall complexity down to O(N) time and O(N) space."
-      } else if (lower.includes("code") || lower.includes("solution") || lower.includes("answer")) {
-        reply = "I can't write the final code for you, but I can guide you! Try creating a map that stores key-value pairs of `{ number: index }`. While iterating, check if `target - current_number` is already in the map."
+        reply =
+          "A brute force solution takes O(N²) time. However, using a Hash Map lets you search for the complement in O(1) average time, bringing the overall complexity down to O(N) time and O(N) space.";
+      } else if (
+        lower.includes("code") ||
+        lower.includes("solution") ||
+        lower.includes("answer")
+      ) {
+        reply =
+          "I can't write the final code for you, but I can guide you! Try creating a map that stores key-value pairs of `{ number: index }`. While iterating, check if `target - current_number` is already in the map.";
       }
 
       const assistantMsg: Message = {
@@ -250,11 +276,11 @@ export default function ChatBox() {
         sender: "assistant",
         content: reply,
         timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, assistantMsg])
-      setIsTyping(false)
-    }, 1200)
-  }
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      setIsTyping(false);
+    }, 1200);
+  };
 
   const handleClearChat = () => {
     setMessages([
@@ -264,20 +290,23 @@ export default function ChatBox() {
         content: "Chat reset. How can I help you with this problem?",
         timestamp: new Date(),
       },
-    ])
-  }
+    ]);
+  };
 
   // Quick prompt triggers
   const quickPrompts = [
     { label: "Give a hint", query: "Can you give me a hint on Two Sum?" },
-    { label: "Explain complexity", query: "What is the optimal time complexity?" },
+    {
+      label: "Explain complexity",
+      query: "What is the optimal time complexity?",
+    },
     { label: "Stuck on approach", query: "I'm stuck, how should I start?" },
-  ]
+  ];
 
   return (
     <div className="flex h-full flex-col bg-zinc-900/50">
       <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} />
-      
+
       <MessageFeed messages={messages} isTyping={isTyping} />
 
       {/* Quick Actions (only visible when not typing) */}
@@ -298,5 +327,5 @@ export default function ChatBox() {
 
       <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
     </div>
-  )
+  );
 }
