@@ -1,25 +1,34 @@
-import * as React from "react"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Mail, Lock, User, LogOut, ArrowRight, ShieldCheck, AlertCircle, CheckCircle2 } from "lucide-react"
-import { useForm } from "@tanstack/react-form"
-import { authClient } from "#/lib/auth-client"
-import { AuthCard } from "#/components/auth/AuthCard"
-import { AuthTabs } from "#/components/auth/AuthTabs"
-import { AuthTextField } from "#/components/auth/AuthTextField"
-import { AuthButton } from "#/components/auth/AuthButton"
+import * as React from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  Mail,
+  Lock,
+  User,
+  LogOut,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
+import { useForm } from "@tanstack/react-form";
+import { authClient } from "#/lib/auth-client";
+import { AuthCard } from "#/components/auth/AuthCard";
+import { AuthTabs } from "#/components/auth/AuthTabs";
+import { AuthTextField } from "#/components/auth/AuthTextField";
+import { AuthButton } from "#/components/auth/AuthButton";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
-})
+});
 
 function AuthPage() {
-  const navigate = useNavigate()
-  const { data: session, isPending: isSessionLoading } = authClient.useSession()
+  const navigate = useNavigate();
+  const { data: session, isPending: isSessionLoading } = authClient.useSession();
 
-  const [activeTab, setActiveTab] = React.useState<"signin" | "signup" | "magiclink">("signin")
-  const [isSigningOut, setIsSigningOut] = React.useState(false)
-  const [successMessage, setSuccessMessage] = React.useState("")
-  const [globalError, setGlobalError] = React.useState("")
+  const [activeTab, setActiveTab] = React.useState<"signin" | "signup" | "magiclink">("signin");
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState("");
+  const [globalError, setGlobalError] = React.useState("");
 
   // Initialize TanStack Form with centralized validators
   const form = useForm({
@@ -28,104 +37,84 @@ function AuthPage() {
       email: "",
       password: "",
     },
-    validators: {
-      onChange: ({ value }) => {
-        const fieldErrors: { name?: string; email?: string; password?: string } = {}
-
-        // Email validation
-        if (!value.email) {
-          fieldErrors.email = "Email is required"
-        } else if (!/\S+@\S+\.\S+/.test(value.email)) {
-          fieldErrors.email = "Please enter a valid email address"
-        }
-
-        // Name validation for Sign Up tab
-        if (activeTab === "signup" && !value.name.trim()) {
-          fieldErrors.name = "Name is required"
-        }
-
-        // Password validation for password-based routes (Sign In and Sign Up)
-        if (activeTab === "signin" || activeTab === "signup") {
-          if (!value.password) {
-            fieldErrors.password = "Password is required"
-          } else if (value.password.length < 8) {
-            fieldErrors.password = "Password must be at least 8 characters"
-          }
-        }
-
-        return fieldErrors
-      },
-    },
     onSubmit: async ({ value }) => {
-      setGlobalError("")
-      setSuccessMessage("")
+      setGlobalError("");
+      setSuccessMessage("");
 
       try {
         if (activeTab === "signin") {
           const { error } = await authClient.signIn.email({
             email: value.email,
             password: value.password,
-          })
+          });
           if (error) {
-            setGlobalError(error.message || "Invalid email or password")
+            setGlobalError(error.message || "Invalid email or password");
           } else {
-            navigate({ to: "/" })
+            navigate({ to: "/" });
           }
         } else if (activeTab === "magiclink") {
           // Log magic link request to the terminal/console
-          console.log(`[Auth] Magic Link Sign In initiated for email: "${value.email}"`)
+          console.log(`[Auth] Magic Link Sign In initiated for email: "${value.email}"`);
 
-          if (authClient.signIn && "magicLink" in authClient.signIn && typeof (authClient.signIn as any).magicLink === "function") {
+          if (
+            authClient.signIn &&
+            "magicLink" in authClient.signIn &&
+            typeof (authClient.signIn as any).magicLink === "function"
+          ) {
             const { error } = await (authClient.signIn as any).magicLink({
               email: value.email,
               callbackURL: "/",
-            })
+            });
             if (error) {
-              setGlobalError(error.message || "Failed to send magic link")
+              setGlobalError(error.message || "Failed to send magic link");
             } else {
-              setSuccessMessage("Magic link sent! Please check your email inbox.")
+              setSuccessMessage("Magic link sent! Please check your email inbox.");
             }
           } else {
             // Log warning & simulate success response to developer/terminal
-            console.warn("[Auth] better-auth magicLink plugin is not configured. Simulating success.")
-            setSuccessMessage(`Magic link has been simulated & logged to terminal! (Email: ${value.email})`)
+            console.warn(
+              "[Auth] better-auth magicLink plugin is not configured. Simulating success."
+            );
+            setSuccessMessage(
+              `Magic link has been simulated & logged to terminal! (Email: ${value.email})`
+            );
           }
         } else {
           const { error } = await authClient.signUp.email({
             email: value.email,
             password: value.password,
             name: value.name,
-          })
+          });
           if (error) {
-            setGlobalError(error.message || "Failed to create account")
+            setGlobalError(error.message || "Failed to create account");
           } else {
-            navigate({ to: "/" })
+            navigate({ to: "/" });
           }
         }
       } catch (err: any) {
-        setGlobalError(err.message || "An unexpected error occurred. Please try again.")
+        setGlobalError(err.message || "An unexpected error occurred. Please try again.");
       }
     },
-  })
+  });
 
   // Reset form values and message states when tab changes
   React.useEffect(() => {
-    form.reset()
-    setGlobalError("")
-    setSuccessMessage("")
-  }, [activeTab])
+    form.reset();
+    setGlobalError("");
+    setSuccessMessage("");
+  }, [activeTab]);
 
   const handleSignOut = async () => {
-    setIsSigningOut(true)
+    setIsSigningOut(true);
     try {
-      await authClient.signOut()
-      navigate({ to: "/auth" })
+      await authClient.signOut();
+      navigate({ to: "/auth" });
     } catch (err: any) {
-      setGlobalError("Failed to sign out. Please try again.")
+      setGlobalError("Failed to sign out. Please try again.");
     } finally {
-      setIsSigningOut(false)
+      setIsSigningOut(false);
     }
-  }
+  };
 
   // Session loading skeleton
   if (isSessionLoading) {
@@ -133,10 +122,12 @@ function AuthPage() {
       <div className="flex min-h-screen w-full items-center justify-center bg-[var(--bg-base)] text-[var(--sea-ink)]">
         <div className="flex flex-col items-center gap-4">
           <div className="size-12 rounded-full border-4 border-zinc-200 border-t-[var(--lagoon-deep)] animate-spin" />
-          <p className="text-sm font-semibold tracking-wider animate-pulse">Checking credentials...</p>
+          <p className="text-sm font-semibold tracking-wider animate-pulse">
+            Checking credentials...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   // Already authenticated UI
@@ -157,7 +148,15 @@ function AuthPage() {
               Already Signed In
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-              Welcome back, <span className="font-semibold text-zinc-900 dark:text-white">{session.user.name}</span>. You are currently logged in with <span className="font-mono text-xs text-zinc-600 dark:text-zinc-300">{session.user.email}</span>.
+              Welcome back,{" "}
+              <span className="font-semibold text-zinc-900 dark:text-white">
+                {session.user.name}
+              </span>
+              . You are currently logged in with{" "}
+              <span className="font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                {session.user.email}
+              </span>
+              .
             </p>
 
             <div className="flex flex-col gap-3">
@@ -183,7 +182,7 @@ function AuthPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Login / Register Form
@@ -194,15 +193,15 @@ function AuthPage() {
           activeTab === "signin"
             ? "Welcome Back"
             : activeTab === "magiclink"
-            ? "Magic Link"
-            : "Create Account"
+              ? "Magic Link"
+              : "Create Account"
         }
         subtitle={
           activeTab === "signin"
             ? "Sign in with your email and password to access the platform."
             : activeTab === "magiclink"
-            ? "Enter your email to receive a passwordless sign-in link."
-            : "Sign up to start tracking your learning progress and assignments."
+              ? "Enter your email to receive a passwordless sign-in link."
+              : "Sign up to start tracking your learning progress and assignments."
         }
       >
         {/* M3 Segmented Tabs */}
@@ -227,14 +226,24 @@ function AuthPage() {
         {/* Authentication Form */}
         <form
           onSubmit={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            form.handleSubmit()
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
           }}
           className="flex flex-col gap-5"
         >
           {activeTab === "signup" && (
-            <form.Field name="name">
+            <form.Field
+              name="name"
+              validators={{
+                onChange: ({ value }) => {
+                  if (!value.trim()) {
+                    return "Name is required";
+                  }
+                  return undefined;
+                },
+              }}
+            >
               {(field) => (
                 <AuthTextField
                   label="Full Name"
@@ -243,7 +252,11 @@ function AuthPage() {
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+                  error={
+                    field.state.meta.errors
+                      ? field.state.meta.errors.join(", ")
+                      : undefined
+                  }
                   leadingIcon={<User className="size-5" />}
                   required
                 />
@@ -251,7 +264,20 @@ function AuthPage() {
             </form.Field>
           )}
 
-          <form.Field name="email">
+          <form.Field
+            name="email"
+            validators={{
+              onChange: ({ value }) => {
+                if (!value) {
+                  return "Email is required";
+                }
+                if (!/\S+@\S+\.\S+/.test(value)) {
+                  return "Please enter a valid email address";
+                }
+                return undefined;
+              },
+            }}
+          >
             {(field) => (
               <AuthTextField
                 label="Email Address"
@@ -260,7 +286,11 @@ function AuthPage() {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
-                error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+                error={
+                  field.state.meta.errors
+                    ? field.state.meta.errors.join(", ")
+                    : undefined
+                }
                 leadingIcon={<Mail className="size-5" />}
                 required
               />
@@ -268,7 +298,20 @@ function AuthPage() {
           </form.Field>
 
           {activeTab !== "magiclink" && (
-            <form.Field name="password">
+            <form.Field
+              name="password"
+              validators={{
+                onChange: ({ value }) => {
+                  if (!value) {
+                    return "Password is required";
+                  }
+                  if (value.length < 8) {
+                    return "Password must be at least 8 characters";
+                  }
+                  return undefined;
+                },
+              }}
+            >
               {(field) => (
                 <AuthTextField
                   label="Password"
@@ -277,7 +320,11 @@ function AuthPage() {
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+                  error={
+                    field.state.meta.errors
+                      ? field.state.meta.errors.join(", ")
+                      : undefined
+                  }
                   leadingIcon={<Lock className="size-5" />}
                   required
                 />
@@ -291,7 +338,9 @@ function AuthPage() {
                 type="button"
                 className="text-xs font-semibold text-zinc-500 hover:underline outline-none cursor-pointer"
                 onClick={() => {
-                  setGlobalError("Password reset is not configured yet. Please contact your administrator.")
+                  setGlobalError(
+                    "Password reset is not configured yet. Please contact your administrator."
+                  );
                 }}
               >
                 Forgot Password?
@@ -300,28 +349,26 @@ function AuthPage() {
           )}
 
           {/* Form helper component to bind submission capability */}
-          <form.Subscribe
-            selector={(state) => [state.canSubmit, state.isSubmitting]}
-          >
-            {([canSubmit, isSubmitting]) => (
+          <form.Subscribe selector={(state) => [state.isSubmitting]}>
+            {([isSubmitting]) => (
               <AuthButton
                 type="submit"
                 variant="filled"
                 className="w-full h-12 text-base mt-2"
                 isLoading={isSubmitting}
-                disabled={!canSubmit}
+                disabled={isSubmitting}
                 icon={<ArrowRight className="size-5" />}
               >
                 {activeTab === "signup"
                   ? "Sign Up"
                   : activeTab === "magiclink"
-                  ? "Send Magic Link"
-                  : "Sign In"}
+                    ? "Send Magic Link"
+                    : "Sign In"}
               </AuthButton>
             )}
           </form.Subscribe>
         </form>
       </AuthCard>
     </div>
-  )
+  );
 }
