@@ -1,0 +1,48 @@
+name: Release Preview
+
+on:
+  pull_request:
+    branches:
+      - main # Runs whenever a PR is opened or updated against main
+
+jobs:
+  preview:
+    name: Preview Next Version
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Required so the bot can post a comment on the PR
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history so git-cliff can calculate the bump correctly
+
+      # 1. Run git-cliff to see what version it calculates based on the PR commits
+      - name: Calculate Next Version
+        id: git_cliff_dry
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --bump --dry-run
+        continue-on-error: true
+
+      # 2. Extract just the version string from the output
+      - name: Parse Version
+        id: version_parse
+        run: |
+          # git-cliff outputs text; we grab the version line
+          VERSION=$(echo "${{ steps.git_cliff_dry.outputs.content }}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+          echo "calculated_version=v$VERSION" >> $GITHUB_OUTPUT
+
+      # 3. Post a comment on the Pull Request with the preview data
+      - name: Comment PR
+        uses: mshick/fast-category-logout-action@v1 # Note: Standard PR commenting action
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            ### 🚀 Release Preview
+            If you merge this PR right now, `git-cliff` will bump the project to:
+            **`${{ steps.version_parse.outputs.calculated_version }}`**
+            
+            _Based on the conventional commits found in this branch._
