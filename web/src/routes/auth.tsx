@@ -56,27 +56,15 @@ function AuthPage() {
           // Log magic link request to the terminal/console
           console.log(`[Auth] Magic Link Sign In initiated for email: "${value.email}"`);
 
-          if (
-            authClient.signIn &&
-            "magicLink" in authClient.signIn &&
-            typeof (authClient.signIn as any).magicLink === "function"
-          ) {
-            const { error } = await (authClient.signIn as any).magicLink({
-              email: value.email,
-              callbackURL: "/",
-            });
-            if (error) {
-              setGlobalError(error.message || "Failed to send magic link");
-            } else {
-              setSuccessMessage("Magic link sent! Please check your email inbox.");
-            }
+          const { error } = await authClient.signIn.magicLink({
+            email: value.email,
+            callbackURL: "/",
+          });
+          if (error) {
+            setGlobalError(error.message || "Failed to send magic link");
           } else {
-            // Log warning & simulate success response to developer/terminal
-            console.warn(
-              "[Auth] better-auth magicLink plugin is not configured. Simulating success."
-            );
             setSuccessMessage(
-              `Magic link has been simulated & logged to terminal! (Email: ${value.email})`
+              "Magic link sent! Please check your email inbox."
             );
           }
         } else {
@@ -369,6 +357,7 @@ function AuthPage() {
           </form.Subscribe>
         </form>
       </AuthCard>
+
     </div>
   );
 }
