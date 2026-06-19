@@ -24,7 +24,7 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --bump --dry-run
+          args: --bumped-version
         continue-on-error: true
 
       # 2. Extract just the version string from the output
