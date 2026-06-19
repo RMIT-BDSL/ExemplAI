@@ -1,4 +1,3 @@
-
 import { useRef, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import axios from 'axios'
@@ -11,7 +10,7 @@ import ResetCodeForm from '#/components/student/ResetCodeForm'
 import SidePanel from '#/components/student/SidePane'
 import Problem from '#/components/student/problem/Problem'
 
-export const Route = createFileRoute('/course')({
+export const Route = createFileRoute('/_authenticated/course')({
     component: Course,
     validateSearch: (search: Record<string, unknown>) => {
         return {
@@ -22,11 +21,6 @@ export const Route = createFileRoute('/course')({
 
 const CODE_TEMPLATES = {
     python: `def main():\n    # Write your Python code here\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()`,
-    /*
-    javascript: `function main() {\n    // Write your JavaScript code here\n    console.log("Hello, World!");\n}\n\nmain();`,
-    cpp: `#include <iostream>\n\nint main() {\n    // Write your C++ code here\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
-    java: `public class Main {\n    // Write your Java code here\n    System.out.println("Hello, World!");\n    }\n}`,
-    */
 }
 
 function Course() {
