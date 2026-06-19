@@ -383,7 +383,7 @@ export function ShortProblem({
   week,
   status,
   language,
-}: Omit<ShortProblem, "problemId" | "difficulty" | "tags">) {
+}: Omit<ShortProblem, "id" | "difficulty" | "tags">) {
   return (
     <div className="border border-line rounded-lg p-3 bg-white">
       <h1 className="font-bold text-lg">{name}</h1>
