@@ -37,7 +37,6 @@ jobs:
 
       # 3. Post a comment on the Pull Request with the preview data
       - name: Comment PR
-        uses: mshick/fast-category-logout-action@v1 # Note: Standard PR commenting action
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
