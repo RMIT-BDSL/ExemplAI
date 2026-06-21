@@ -31,27 +31,27 @@ jobs:
           config: cliff.toml
           args: --bump
 
-      # 2. Update CHANGELOG.md in the repository with the complete history including the new version
+      # 2. Generate the actual changelog text for this specific release
+      - name: Generate Changelog
+        id: git_cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose --bump --unreleased --strip all
+
+      # 3. Update CHANGELOG.md in the repository with the complete history including the new version
       - name: Update CHANGELOG.md
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
           args: --bump --output CHANGELOG.md
 
-      # 3. Commit and Push CHANGELOG.md
+      # 4. Commit and Push CHANGELOG.md
       - name: Commit and Push CHANGELOG.md
         run: |
           git add CHANGELOG.md
-          git commit -m "chore(release): update CHANGELOG.md for ${{ steps.next_version.outputs.version }} [skip ci]" || echo "No changes to commit"
+          git commit -m "chore(release): prepare for ${{ steps.next_version.outputs.version }} [skip ci]" || echo "No changes to commit"
           git push origin main
-
-      # 4. Generate the actual changelog text for this specific release
-      - name: Generate Changelog
-        id: git_cliff
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: --verbose --bump --latest --strip all
 
       # 5. Create the GitHub Release and paste the changelog into it
       - name: Create GitHub Release
