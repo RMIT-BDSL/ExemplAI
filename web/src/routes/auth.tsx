@@ -23,7 +23,7 @@ export function sanitizeRedirect(
   if (!redirect) return "/";
 
   try {
-    const url = new URL(redirect, window.location.origin);
+    const url = new URL(redirect, allowedOrigin);
 
     const envOrigins = (import.meta.env.VITE_TRUSTED_ORIGINS || "")
       .split(",")
