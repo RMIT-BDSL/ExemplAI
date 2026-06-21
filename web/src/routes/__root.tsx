@@ -57,7 +57,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               "https://eu.posthog.com",
             defaults: "2025-05-24",
             capture_exceptions: true,
-            debug: import.meta.env.DEV,
+            debug: typeof window !== "undefined" && import.meta.env.DEV,
           }}
         >
           <ConvexProvider client={convex}>{children}</ConvexProvider>
