@@ -16,10 +16,32 @@ interface AuthSearch {
   redirect?: string;
 }
 
-function sanitizeRedirect(redirect: string): string {
+export function sanitizeRedirect(
+  redirect: string,
+  allowedOrigin: string = window.location.origin
+): string {
   if (!redirect) return "/";
-  if (!redirect.startsWith("/") || redirect.startsWith("//")) return "/";
-  return redirect;
+
+  try {
+    const url = new URL(redirect, window.location.origin);
+
+    const envOrigins = (import.meta.env.VITE_TRUSTED_ORIGINS || "")
+      .split(",")
+      .map((item: string) => item.trim())
+      .filter(Boolean);
+
+    const allowedOrigins = [allowedOrigin, ...envOrigins].map((origin) =>
+      origin.toLowerCase()
+    );
+
+    if (!allowedOrigins.includes(url.origin.toLowerCase())) {
+      return "/";
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
 }
 
 export const Route = createFileRoute("/auth")({
