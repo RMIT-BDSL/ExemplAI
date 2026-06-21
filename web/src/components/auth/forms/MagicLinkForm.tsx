@@ -1,9 +1,10 @@
-import { Mail, ArrowRight } from "lucide-react";
+import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
-import { authClient } from "#/lib/auth-client";
+import { ArrowRight, Mail } from "lucide-react";
 import { checkUserExists } from "#/lib/auth.functions";
-import { AuthTextField } from "../AuthTextField";
+import { authClient } from "#/lib/auth-client";
 import { AuthButton } from "../AuthButton";
+import { AuthTextField } from "../AuthTextField";
 
 interface MagicLinkFormProps {
   onSuccess: () => void;
@@ -18,6 +19,7 @@ export function MagicLinkForm({
   onError,
   redirectUrl,
 }: MagicLinkFormProps) {
+  const posthog = usePostHog();
   const form = useForm({
     defaultValues: {
       email: "",
@@ -31,7 +33,9 @@ export function MagicLinkForm({
           return;
         }
 
-        console.log(`[Auth] Magic Link Sign In initiated for email: "${value.email}"`);
+        console.log(
+          `[Auth] Magic Link Sign In initiated for email: "${value.email}"`,
+        );
 
         const { error } = await authClient.signIn.magicLink({
           email: value.email,
@@ -41,9 +45,11 @@ export function MagicLinkForm({
         if (error) {
           onError(error.message || "Failed to send magic link");
         } else {
+          posthog.capture("magic_link_requested", { email: value.email });
           onSuccess();
         }
       } catch (err: any) {
+        posthog.captureException(err);
         onError(err.message || "An unexpected error occurred.");
       }
     },
@@ -63,7 +69,8 @@ export function MagicLinkForm({
         validators={{
           onChange: ({ value }) => {
             if (!value) return "Email is required";
-            if (!/\S+@\S+\.\S+/.test(value)) return "Please enter a valid email address";
+            if (!/\S+@\S+\.\S+/.test(value))
+              return "Please enter a valid email address";
             return undefined;
           },
         }}
@@ -76,7 +83,11 @@ export function MagicLinkForm({
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<Mail className="size-5" />}
             required
           />
