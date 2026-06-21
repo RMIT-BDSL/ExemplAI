@@ -1,3 +1,8 @@
+## [0.1.5] - 2026-06-21
+
+### 🐛 Bug Fixes
+
+- Issues that relevant to websites stability and security. (#5)
 ## [0.1.4] - 2026-06-21
 
 ### ⚙️ Miscellaneous Tasks
