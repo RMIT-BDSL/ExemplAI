@@ -1,8 +1,14 @@
+## [0.1.4] - 2026-06-21
+
+### ⚙️ Miscellaneous Tasks
+
+- Update the changelog release pipeline
 ## [0.1.3] - 2026-06-21
 
 ### ⚙️ Miscellaneous Tasks
 
 - Duplicate changelog update
+- *(release)* Update CHANGELOG.md for 0.1.3 [skip ci]
 ## [0.1.2] - 2026-06-21
 
 ### ⚙️ Miscellaneous Tasks
