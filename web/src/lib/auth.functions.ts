@@ -1,17 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeaders } from "@tanstack/react-start/server";
-import { auth } from "./auth";
+import { fetchAuthQuery } from "./auth-server";
+import { api } from "../../convex/_generated/api";
 
 export const getSession = createServerFn({ method: "GET" }).handler(async () => {
-  const headers = getRequestHeaders();
-  return await auth.api.getSession({ headers });
+  return await fetchAuthQuery(api.auth.getSessionUser, {});
 });
 
 export const checkUserExists = createServerFn({ method: "POST" })
   .validator((email: string) => email)
   .handler(async ({ data: email }) => {
-    const context = await auth.$context;
-    const result = await context.internalAdapter.findUserByEmail(email);
-    return { exists: !!result?.user };
+    const exists = await fetchAuthQuery(api.auth.checkUserExistsQuery, { email });
+
+    console.log("is user exists in Convex: ", exists);
+    return { exists };
   });
 
