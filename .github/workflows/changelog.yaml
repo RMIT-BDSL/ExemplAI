@@ -1,4 +1,4 @@
-name: Automated Release
+name: Update Changelog
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - main # Triggers when code is merged into main
 
 jobs:
-  release:
-    name: Generate Changelog & Release
+  changelog:
+    name: Update CHANGELOG.md
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Crucial: Allows the bot to push changes and create releases
+      contents: write # Allows pushing the updated CHANGELOG.md back to the repository
 
     steps:
       - name: Checkout Code
@@ -31,22 +31,16 @@ jobs:
           config: cliff.toml
           args: --bump
 
-      # 2. Generate the actual changelog text for this specific release
-      - name: Generate Changelog
-        id: git_cliff
+      # 2. Update CHANGELOG.md in the repository with the complete history including the new version
+      - name: Update CHANGELOG.md
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --verbose --bump --latest --strip all
+          args: --bump --output CHANGELOG.md
 
-      # 3. Create the GitHub Release and paste the changelog into it
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.next_version.outputs.version }}
-          name: Release ${{ steps.next_version.outputs.version }}
-          body: ${{ steps.git_cliff.outputs.content }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 3. Commit and Push CHANGELOG.md
+      - name: Commit and Push CHANGELOG.md
+        run: |
+          git add CHANGELOG.md
+          git commit -m "chore(release): bump version to ${{ steps.next_version.outputs.version }} [skip ci]" || echo "No changes to commit"
+          git push origin main
