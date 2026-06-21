@@ -1,9 +1,6 @@
 import * as React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "#/lib/auth-client";
@@ -17,6 +14,34 @@ import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
 
 interface AuthSearch {
   redirect?: string;
+}
+
+export function sanitizeRedirect(
+  redirect: string,
+  allowedOrigin: string = window.location.origin
+): string {
+  if (!redirect) return "/";
+
+  try {
+    const url = new URL(redirect, window.location.origin);
+
+    const envOrigins = (import.meta.env.VITE_TRUSTED_ORIGINS || "")
+      .split(",")
+      .map((item: string) => item.trim())
+      .filter(Boolean);
+
+    const allowedOrigins = [allowedOrigin, ...envOrigins].map((origin) =>
+      origin.toLowerCase()
+    );
+
+    if (!allowedOrigins.includes(url.origin.toLowerCase())) {
+      return "/";
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
 }
 
 export const Route = createFileRoute("/auth")({
@@ -52,7 +77,9 @@ function AuthPage() {
 
     try {
       // 1. Validate invitation code in Convex
-      const validation = await convex.query(api.invitationCodes.validateCode, { code: codeToSubmit });
+      const validation = await convex.query(api.invitationCodes.validateCode, {
+        code: codeToSubmit,
+      });
       if (!validation.isValid) {
         setModalError(validation.reason || "Invalid invitation code.");
         setIsSubmittingModal(false);
@@ -60,7 +87,7 @@ function AuthPage() {
       }
 
       // 2. Request magic link with the invitation code attached to callback URL
-      const redirectUrl = redirect || "/";
+      const redirectUrl = sanitizeRedirect(redirect || "/");
       const finalCallback = `${redirectUrl}${redirectUrl.includes("?") ? "&" : "?"}code=${encodeURIComponent(codeToSubmit)}`;
 
       const { error } = await authClient.signIn.magicLink({
@@ -72,7 +99,9 @@ function AuthPage() {
         setModalError(error.message || "Failed to send magic link.");
       } else {
         setShowMagicCodeModal(false);
-        setSuccessMessage("Magic link sent! Once you click it in your email, your account will be created.");
+        setSuccessMessage(
+          "Magic link sent! Once you click it in your email, your account will be created."
+        );
       }
     } catch (err: any) {
       setModalError(err.message || "An error occurred.");
@@ -118,7 +147,7 @@ function AuthPage() {
     return (
       <AlreadySignedIn
         session={session}
-        onGoToDashboard={() => navigate({ to: redirect || "/" })}
+        onGoToDashboard={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
         onSignOut={handleSignOut}
         isSigningOut={isSigningOut}
       />
@@ -166,14 +195,14 @@ function AuthPage() {
         {/* Render appropriate form component */}
         {activeTab === "signin" && (
           <SignInForm
-            onSuccess={() => navigate({ to: redirect || "/" })}
+            onSuccess={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
             onError={setGlobalError}
           />
         )}
 
         {activeTab === "signup" && (
           <SignUpForm
-            onSuccess={() => navigate({ to: redirect || "/" })}
+            onSuccess={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
             onError={setGlobalError}
           />
         )}
@@ -187,7 +216,7 @@ function AuthPage() {
               setShowMagicCodeModal(true);
             }}
             onError={setGlobalError}
-            redirectUrl={redirect}
+            redirectUrl={sanitizeRedirect(redirect || "/")}
           />
         )}
       </AuthCard>
