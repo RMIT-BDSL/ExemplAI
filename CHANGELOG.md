@@ -1,3 +1,8 @@
+## [0.1.6] - 2026-06-21
+
+### 🐛 Bug Fixes
+
+- Authentication not working after registration
 ## [0.1.5] - 2026-06-21
 
 ### 🐛 Bug Fixes
