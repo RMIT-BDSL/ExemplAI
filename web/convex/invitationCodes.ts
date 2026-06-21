@@ -139,6 +139,7 @@ async function useCodeHelper(ctx: MutationCtx, code: string, userTokenIdentifier
   if (profile) {
     await ctx.db.patch(profile._id, {
       invitationCode: code,
+      tokenIdentifier: userTokenIdentifier,
     });
   } else {
     await ctx.db.insert("userProfiles", {
@@ -235,8 +236,8 @@ export const createUserAndUseCode = mutation({
       });
       user = (await ctx.db.get(userId))!;
     } else {
-      // Sync tokenIdentifier if not set
-      if (!user.tokenIdentifier) {
+      // Sync tokenIdentifier if not set or changed
+      if (user.tokenIdentifier !== args.tokenIdentifier) {
         await ctx.db.patch(user._id, {
           tokenIdentifier: args.tokenIdentifier,
         });
@@ -253,5 +254,3 @@ export const createUserAndUseCode = mutation({
     return { success: true };
   },
 });
-
-
