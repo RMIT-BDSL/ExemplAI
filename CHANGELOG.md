@@ -1,8 +1,14 @@
+## [0.1.3] - 2026-06-21
+
+### ⚙️ Miscellaneous Tasks
+
+- Duplicate changelog update
 ## [0.1.2] - 2026-06-21
 
 ### ⚙️ Miscellaneous Tasks
 
 - Include only the latest change in release and update changelog .md each commit.
+- *(release)* Bump version to 0.1.2 [skip ci]
 ## [0.1.1] - 2026-06-21
 
 ### ⚙️ Miscellaneous Tasks
