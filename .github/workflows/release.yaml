@@ -1,0 +1,54 @@
+name: Automated Release
+
+on:
+  push:
+    branches:
+      - main # Triggers when code is merged into main
+
+jobs:
+  release:
+    name: Generate Changelog & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Crucial: Allows the bot to push changes and create releases
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history so git-cliff can read past commits
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # 1. Use git-cliff to calculate the next version number based on semantic commits
+      - name: Determine Next Version
+        id: next_version
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --bump --bump-deps
+
+      # 2. Generate the actual changelog text for this specific release
+      - name: Generate Changelog
+        id: git_cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose --bump --strip all
+        env:
+          OUTPUT: NEW_CHANGELOG.md
+
+      # 3. Create the GitHub Release and paste the changelog into it
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next_version.outputs.version }}
+          name: Release ${{ steps.next_version.outputs.version }}
+          body: ${{ steps.git_cliff.outputs.content }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
