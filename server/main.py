@@ -74,9 +74,10 @@ async def judge0_execution(student_code: StudentCode, request: Request):
     auth_key = os.getenv('JUDGE0_AUTH_KEY')
     if auth_key and not is_rapidapi:
         headers['X-Auth-Token'] = auth_key
-    
-    # support for rapidapi
-    if is_rapidapi:
+
+    # support for rapidapi and that both string is not empty
+    is_rapidapiconfig_valid = os.getenv('RAPIDAPI_KEY', '').strip() and os.getenv('RAPIDAPI_HOST', '').strip()
+    if is_rapidapi and is_rapidapiconfig_valid:
         headers['X-RapidAPI-Key'] = os.getenv('RAPIDAPI_KEY', '')
         # Clean protocol scheme from Host if present (e.g. 'https://host' -> 'host')
         host = os.getenv('RAPIDAPI_HOST', '')
