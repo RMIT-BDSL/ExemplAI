@@ -20,22 +20,22 @@ const config = defineConfig({
   ],
   server: {
     proxy: {
-      "/ingest/static": {
+      "^/api/v1/static": {
         target: "https://eu-assets.i.posthog.com",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ingest/, ""),
+        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
         secure: false,
       },
-      "/ingest/array": {
+      "^/api/v1/array": {
         target: "https://eu-assets.i.posthog.com",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ingest/, ""),
+        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
         secure: false,
       },
-      "/ingest": {
+      "^/api/v1": {
         target: "https://eu.i.posthog.com",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ingest/, ""),
+        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
         secure: false,
       },
     },

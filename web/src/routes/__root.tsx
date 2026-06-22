@@ -51,7 +51,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <PostHogProvider
           apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN!}
           options={{
-            api_host: "/ingest",
+            api_host: "/api/v1",
+            api_transport: "XHR",
             ui_host:
               import.meta.env.VITE_PUBLIC_POSTHOG_HOST ||
               "https://eu.posthog.com",
