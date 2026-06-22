@@ -5,16 +5,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import sentry_sdk
-
-sentry_sdk.init(
-    # Add data like request headers and IP for users,
-    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-    send_default_pii=True,
-)
+from sentry_sdk import metrics
 
 # logging with rich
 import logging
 from rich.logging import RichHandler
+
+
+
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 log = logging.getLogger("rich")
 log.setLevel(logging.INFO)
@@ -41,6 +45,7 @@ app.add_middleware(
 
 
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -51,6 +56,8 @@ def read_root():
 # code execution for now
 @app.post('/execute')
 def judge0_execution(student_code: StudentCode):
+    # count to sentry for analytics
+    metrics.count("code.execution", 1)
     # print student code
 
     # send the code to judge0
