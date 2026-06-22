@@ -9,4 +9,5 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
     "rich>=15.0.0",
+    "sentry-sdk>=2.62.0",
 ]
