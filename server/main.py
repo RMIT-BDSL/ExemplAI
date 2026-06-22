@@ -38,6 +38,8 @@ app.add_middleware(
 def read_root():
     return {"Hello": "World"}
 
+# todo: allow easy update of the following
+is_rapidapi = os.getenv("IS_RAPIDAPI") == "True"
 
 # send to url
 # todo: prob need question id to do this, testing
@@ -49,31 +51,60 @@ def judge0_execution(student_code: StudentCode):
     # send the code to judge0
     # make new request to configured judge0 endpoint - current would block until done
     exec_url = os.getenv('JUDGE0_ENDPOINT') + '/submissions?base64_encoded=false&wait=true'
-    
     # beautifully format the request payload
     payload = {
         'source_code': student_code.code,
         'language_id': 71, # python
     }
-
     # setup headers if auth key is provided
     headers = {}
     auth_key = os.getenv('JUDGE0_AUTH_KEY')
-    if auth_key:
+    if auth_key and not is_rapidapi:
         headers['X-Auth-Token'] = auth_key
-
+    
+    # support for rapidapi
+    if is_rapidapi:
+        headers['X-RapidAPI-Key'] = os.getenv('RAPIDAPI_KEY')
+        headers['X-RapidAPI-Host'] = os.getenv('RAPIDAPI_HOST')
+    
     # make request
     response = requests.post(exec_url, json=payload, headers=headers)
-    
+    print(response)
     # get the output
     output = response.json()
-
     # print the output using rich
     log.info(output)
 
     # return the output
     return output
 
+
+# @app.post('/execute_api')
+# def judge0_api_exec(student_code: StudentCode):
+#     # print student code
+
+#     # send the code to judge0
+#     # make new request to configured judge0 endpoint - current would block until done
+#     exec_url = os.getenv('JUDGE0_ENDPOINT') + '/submissions?base64_encoded=false&wait=true'
+#     # beautifully format the request payload
+#     payload = {
+#         'source_code': student_code.code,
+#         'language_id': 71, # python
+#     }
+#     # setup headers if auth key is provided
+#     headers = {}
+#     # auth_key = os.getenv('JUDGE0_AUTH_KEY')
+#     if auth_key:
+#         headers['X-Auth-Token'] = auth_key
+#     # make request
+#     response = requests.post(exec_url, json=payload, headers=headers)
+#     # get the output
+#     output = response.json()
+#     # print the output using rich
+#     log.info(output)
+
+#     # return the output
+#     return output
 
 
 
