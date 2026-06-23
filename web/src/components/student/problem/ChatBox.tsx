@@ -55,19 +55,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.sender === "user";
 
   return (
-    <div
-      className={cn(
-        "flex w-full gap-3 text-sm",
-        isUser ? "flex-row-reverse" : "flex-row",
-      )}
-    >
+    <div className={cn("flex w-full gap-3 text-sm", isUser ? "flex-row-reverse" : "flex-row")}>
       {/* Avatar */}
       <div
         className={cn(
           "flex size-7 shrink-0 select-none items-center justify-center rounded-full text-xs font-semibold border",
           isUser
             ? "bg-zinc-800 border-zinc-700 text-zinc-300"
-            : "bg-indigo-950 border-indigo-800 text-indigo-400",
+            : "bg-indigo-950 border-indigo-800 text-indigo-400"
         )}
       >
         {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
@@ -80,20 +75,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             "rounded-2xl px-4 py-2.5 leading-relaxed shadow-sm",
             isUser
               ? "bg-indigo-600 text-white rounded-tr-none font-medium"
-              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2",
+              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2"
           )}
         >
-          {isUser ? (
-            message.content
-          ) : (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          )}
+          {isUser ? message.content : <ReactMarkdown>{message.content}</ReactMarkdown>}
         </div>
         {/* Timestamp */}
         <span
           className={cn(
             "text-[10px] text-zinc-500 px-1 select-none",
-            isUser ? "text-right" : "text-left",
+            isUser ? "text-right" : "text-left"
           )}
         >
           {message.timestamp.toLocaleTimeString([], {
@@ -128,19 +119,15 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
             <Sparkles className="size-5" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-zinc-300">
-              Start a conversation
-            </p>
+            <p className="text-sm font-semibold text-zinc-300">Start a conversation</p>
             <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
-              Ask questions about the problem description, request code hints,
-              or understand complexity.
+              Ask questions about the problem description, request code hints, or understand
+              complexity.
             </p>
           </div>
         </div>
       ) : (
-        messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))
+        messages.map((message) => <MessageBubble key={message.id} message={message} />)
       )}
 
       {isTyping && (
@@ -196,10 +183,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="border-t border-zinc-800 bg-zinc-900/40 p-4 space-y-3"
-    >
+    <form onSubmit={handleSubmit} className="border-t border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
       <div className="relative flex items-end gap-2 bg-zinc-950 border border-zinc-800 focus-within:border-zinc-700 rounded-xl px-3.5 py-2 transition-all">
         <textarea
           value={text}
@@ -217,7 +201,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             "inline-flex size-8 items-center justify-center rounded-lg transition-all select-none shrink-0",
             text.trim() && !disabled
               ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95"
-              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed",
+              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed"
           )}
         >
           <Send className="size-3.5" />
@@ -259,12 +243,19 @@ export default function ChatBox() {
         content: msg.content,
       }));
 
-      const reply = await sendChatMessage(conversationPayload);
+      const response = await sendChatMessage(conversationPayload);
+
+      // Find the last AI assistant message content from the response messages
+      const aiMessages = response.messages.filter(
+        (msg) => msg.type === "ai" || msg.type === "assistant"
+      );
+      const lastAiMessage = aiMessages[aiMessages.length - 1];
+      const replyContent = lastAiMessage ? lastAiMessage.content : "Sorry, I couldn't get a response.";
 
       const assistantMsg: Message = {
-        id: Math.random().toString(),
+        id: lastAiMessage?.id || Math.random().toString(),
         sender: "assistant",
-        content: reply,
+        content: replyContent,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);

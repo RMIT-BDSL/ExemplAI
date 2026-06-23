@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from model.chat import Chat
+from ai.teacher import graph
 
 # logging with rich
 import logging
@@ -142,11 +143,15 @@ def read_item(item_id: int, q: str | None = None):
 
 @app.post("/chat")
 def chat(chat: Chat):
-    # Extract the last user message
-    user_message = ""
-    for msg in reversed(chat.conversation):
-        if msg.get("sender") == "user":
-            user_message = msg.get("content", "")
-            break
+    # Map the conversation messages to LangGraph role and content structure
+    langgraph_messages = []
+    for msg in chat.conversation:
+        role = "user" if msg.get("sender") == "user" else "assistant"
+        langgraph_messages.append({"role": role, "content": msg.get("content", "")})
 
-    return {"response": f"AI Assistant received: {user_message}"}
+    # Fallback to a default greeting if conversation is empty
+    if not langgraph_messages:
+        langgraph_messages = [{"role": "user", "content": "hi!"}]
+
+    result = graph.invoke({"messages": langgraph_messages})
+    return result
