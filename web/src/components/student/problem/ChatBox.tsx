@@ -2,6 +2,7 @@ import { Bot, RefreshCw, Send, Sparkles, User } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
+import { sendChatMessage } from "#/lib/api.ts";
 
 // Types for Chat
 export interface Message {
@@ -239,7 +240,7 @@ export default function ChatBox() {
   ]);
   const [isTyping, setIsTyping] = React.useState(false);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     // 1. Add User Message
     const userMsg: Message = {
       id: Math.random().toString(),
@@ -247,29 +248,18 @@ export default function ChatBox() {
       content: text,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setIsTyping(true);
 
-    // 2. Simulate AI response
-    setTimeout(() => {
-      let reply =
-        "I'm here to help! Could you explain your current approach, or would you like a hint about a brute force solution vs. using a hash map?";
+    try {
+      // Map messages to structure expected by server Pydantic model
+      const conversationPayload = updatedMessages.map((msg) => ({
+        sender: msg.sender,
+        content: msg.content,
+      }));
 
-      const lower = text.toLowerCase();
-      if (lower.includes("hint") || lower.includes("clue")) {
-        reply =
-          "Here's a hint: Think about how you can check if the complement (`target - nums[i]`) exists in the array as you iterate. Can we store seen numbers to find it in O(1) time?";
-      } else if (lower.includes("complexity") || lower.includes("o(n)")) {
-        reply =
-          "A brute force solution takes O(N²) time. However, using a Hash Map lets you search for the complement in O(1) average time, bringing the overall complexity down to O(N) time and O(N) space.";
-      } else if (
-        lower.includes("code") ||
-        lower.includes("solution") ||
-        lower.includes("answer")
-      ) {
-        reply =
-          "I can't write the final code for you, but I can guide you! Try creating a map that stores key-value pairs of `{ number: index }`. While iterating, check if `target - current_number` is already in the map.";
-      }
+      const reply = await sendChatMessage(conversationPayload);
 
       const assistantMsg: Message = {
         id: Math.random().toString(),
@@ -278,8 +268,18 @@ export default function ChatBox() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error("Error communicating with chat server:", error);
+      const assistantMsg: Message = {
+        id: Math.random().toString(),
+        sender: "assistant",
+        content: "Sorry, I encountered an error connecting to the server.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   const handleClearChat = () => {
