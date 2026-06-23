@@ -1,8 +1,9 @@
-import { Mail, Lock, ArrowRight } from "lucide-react";
+import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
+import { ArrowRight, Lock, Mail } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
-import { AuthTextField } from "../AuthTextField";
 import { AuthButton } from "../AuthButton";
+import { AuthTextField } from "../AuthTextField";
 
 interface SignInFormProps {
   onSuccess: () => void;
@@ -10,6 +11,7 @@ interface SignInFormProps {
 }
 
 export function SignInForm({ onSuccess, onError }: SignInFormProps) {
+  const posthog = usePostHog();
   const form = useForm({
     defaultValues: {
       email: "",
@@ -24,9 +26,12 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
         if (error) {
           onError(error.message || "Invalid email or password");
         } else {
+          posthog.identify(value.email, { email: value.email });
+          posthog.capture("user_signed_in", { method: "email" });
           onSuccess();
         }
       } catch (err: any) {
+        posthog.captureException(err);
         onError(err.message || "An unexpected error occurred.");
       }
     },
@@ -46,7 +51,8 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
         validators={{
           onChange: ({ value }) => {
             if (!value) return "Email is required";
-            if (!/\S+@\S+\.\S+/.test(value)) return "Please enter a valid email address";
+            if (!/\S+@\S+\.\S+/.test(value))
+              return "Please enter a valid email address";
             return undefined;
           },
         }}
@@ -59,7 +65,11 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<Mail className="size-5" />}
             required
           />
@@ -83,7 +93,11 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<Lock className="size-5" />}
             required
           />
@@ -95,7 +109,9 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           type="button"
           className="text-xs font-semibold text-zinc-500 hover:underline outline-none cursor-pointer"
           onClick={() => {
-            onError("Password reset is not configured yet. Please contact your administrator.");
+            onError(
+              "Password reset is not configured yet. Please contact your administrator.",
+            );
           }}
         >
           Forgot Password?

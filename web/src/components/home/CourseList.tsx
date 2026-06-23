@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { usePostHog } from "@posthog/react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Compass,
+  HelpCircle,
   Lock,
   PlayCircle,
   Search,
-  HelpCircle,
-  Compass,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "#/lib/utils.ts";
-import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 export type ShortProblem = {
@@ -84,8 +85,12 @@ export default function CourseList() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
-  const [selectedStatus, setSelectedStatus] = useState<ShortProblem["status"] | "all">("all");
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>({});
+  const [selectedStatus, setSelectedStatus] = useState<
+    ShortProblem["status"] | "all"
+  >("all");
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>(
+    {},
+  );
 
   if (questions === undefined) {
     return (
@@ -97,7 +102,10 @@ export default function CourseList() {
         <div className="h-24 bg-zinc-200/50 rounded-xl border border-line"></div>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-zinc-200/30 rounded-xl border border-line"></div>
+            <div
+              key={i}
+              className="h-16 bg-zinc-200/30 rounded-xl border border-line"
+            ></div>
           ))}
         </div>
       </div>
@@ -123,25 +131,27 @@ export default function CourseList() {
     const matchesSearch =
       problem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       problem.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      problem.tags.some((tag) =>
+        tag.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
 
     const matchesWeek = selectedWeek === "all" || problem.week === selectedWeek;
-    const matchesStatus = selectedStatus === "all" || problem.status === selectedStatus;
+    const matchesStatus =
+      selectedStatus === "all" || problem.status === selectedStatus;
 
     return matchesSearch && matchesWeek && matchesStatus;
   });
 
   // Group filtered problems by week
-  const problemsByWeek = filteredProblems.reduce<Record<number, ShortProblem[]>>(
-    (groups, problem) => {
-      if (!groups[problem.week]) {
-        groups[problem.week] = [];
-      }
-      groups[problem.week].push(problem);
-      return groups;
-    },
-    {}
-  );
+  const problemsByWeek = filteredProblems.reduce<
+    Record<number, ShortProblem[]>
+  >((groups, problem) => {
+    if (!groups[problem.week]) {
+      groups[problem.week] = [];
+    }
+    groups[problem.week].push(problem);
+    return groups;
+  }, {});
 
   // Get sorted list of active weeks
   const sortedWeeks = Object.keys(problemsByWeek)
@@ -164,8 +174,8 @@ export default function CourseList() {
           <span>Python Programming Syllabus</span>
         </h2>
         <p className="text-sm text-sea-ink-soft mt-1">
-          Complete the challenges below sequentially. Use the workspace editor to run and submit
-          your solutions.
+          Complete the challenges below sequentially. Use the workspace editor
+          to run and submit your solutions.
         </p>
       </div>
 
@@ -186,20 +196,22 @@ export default function CourseList() {
 
           {/* Status filter tabs */}
           <div className="flex bg-sand/40 border border-line rounded-lg p-1 shrink-0">
-            {(["all", "completed", "in-progress", "pending"] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={cn(
-                  "px-3 py-1 text-xs font-semibold capitalize rounded-md transition-colors cursor-pointer",
-                  selectedStatus === status
-                    ? "bg-white text-sea-ink shadow-sm border border-line/20"
-                    : "text-sea-ink-soft hover:text-sea-ink"
-                )}
-              >
-                {status === "all" ? "All Status" : status.replace("-", " ")}
-              </button>
-            ))}
+            {(["all", "completed", "in-progress", "pending"] as const).map(
+              (status) => (
+                <button
+                  key={status}
+                  onClick={() => setSelectedStatus(status)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-semibold capitalize rounded-md transition-colors cursor-pointer",
+                    selectedStatus === status
+                      ? "bg-white text-sea-ink shadow-sm border border-line/20"
+                      : "text-sea-ink-soft hover:text-sea-ink",
+                  )}
+                >
+                  {status === "all" ? "All Status" : status.replace("-", " ")}
+                </button>
+              ),
+            )}
           </div>
         </div>
 
@@ -211,7 +223,7 @@ export default function CourseList() {
               "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
               selectedWeek === "all"
                 ? "bg-sea-ink text-white border-sea-ink"
-                : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
+                : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65",
             )}
           >
             All Weeks
@@ -224,7 +236,7 @@ export default function CourseList() {
                 "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
                 selectedWeek === wk
                   ? "bg-sea-ink text-white border-sea-ink"
-                  : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
+                  : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65",
               )}
             >
               Week {wk}
@@ -271,7 +283,9 @@ export default function CourseList() {
       ) : (
         <div className="island-shell rounded-xl p-10 text-center border border-line">
           <HelpCircle className="size-8 text-sea-ink-soft/40 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-sea-ink">No exercises found</p>
+          <p className="text-sm font-semibold text-sea-ink">
+            No exercises found
+          </p>
           <p className="text-xs text-sea-ink-soft mt-1">
             Try adjusting your search criteria or selected filters.
           </p>
@@ -291,6 +305,7 @@ function ShortProblemCard({
   difficulty,
   tags,
 }: ShortProblem) {
+  const posthog = usePostHog();
   const difficultyStyles = {
     Easy: "text-emerald-600 bg-emerald-50 border-emerald-200/50",
     Medium: "text-amber-600 bg-amber-50 border-amber-200/50",
@@ -328,7 +343,7 @@ function ShortProblemCard({
             <span
               className={cn(
                 "border text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0",
-                difficultyStyles[difficulty]
+                difficultyStyles[difficulty],
               )}
             >
               {difficulty}
@@ -360,16 +375,34 @@ function ShortProblemCard({
         <Link
           to="/course"
           search={{ problemId: id }}
+          onClick={() =>
+            posthog.capture("problem_started", {
+              problem_id: id,
+              problem_name: name,
+              week,
+              difficulty,
+              action:
+                status === "completed"
+                  ? "review"
+                  : status === "in-progress"
+                    ? "resume"
+                    : "start",
+            })
+          }
           className={cn(
             "text-xs font-bold px-3 py-1.5 rounded-lg border text-center transition-colors flex items-center gap-1 cursor-pointer",
             status === "completed"
               ? "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
               : status === "in-progress"
                 ? "bg-palm text-white border-palm hover:bg-palm/90"
-                : "bg-white border-line text-sea-ink hover:bg-sand/35"
+                : "bg-white border-line text-sea-ink hover:bg-sand/35",
           )}
         >
-          {status === "completed" ? "Review" : status === "in-progress" ? "Resume" : "Start"}
+          {status === "completed"
+            ? "Review"
+            : status === "in-progress"
+              ? "Resume"
+              : "Start"}
         </Link>
       </div>
     </div>

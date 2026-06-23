@@ -4,6 +4,8 @@ from model.student_code import StudentCode
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import sentry_sdk
+from sentry_sdk import metrics
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -12,6 +14,15 @@ from slowapi.middleware import SlowAPIMiddleware
 # logging with rich
 import logging
 from rich.logging import RichHandler
+
+
+
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 log = logging.getLogger("rich")
 log.setLevel(logging.INFO)
@@ -42,6 +53,7 @@ app.add_middleware(
 
 
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -53,6 +65,11 @@ is_rapidapi = os.getenv("IS_RAPIDAPI") == "True"
 # todo: prob need question id to do this, testing
 # code execution for now
 @app.post('/execute')
+def judge0_execution(student_code: StudentCode):
+    # count to sentry for analytics
+    metrics.count("code.execution", 1)
+    # print student code
+
 @limiter.limit("10/minute")
 async def judge0_execution(student_code: StudentCode, request: Request):
     # send the code to judge0

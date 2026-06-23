@@ -1,16 +1,17 @@
-import * as React from "react";
+import { usePostHog } from "@posthog/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useConvex } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { authClient } from "#/lib/auth-client";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import * as React from "react";
+import { AlreadySignedIn } from "#/components/auth/AlreadySignedIn";
 import { AuthCard } from "#/components/auth/AuthCard";
 import { AuthTabs } from "#/components/auth/AuthTabs";
-import { AlreadySignedIn } from "#/components/auth/AlreadySignedIn";
-import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
+import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
 import { SignInForm } from "#/components/auth/forms/SignInForm";
 import { SignUpForm } from "#/components/auth/forms/SignUpForm";
-import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
+import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
+import { authClient } from "#/lib/auth-client";
+import { api } from "../../convex/_generated/api";
 
 interface AuthSearch {
   redirect?: string;
@@ -48,7 +49,8 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
   validateSearch: (search: Record<string, unknown>): AuthSearch => {
     return {
-      redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+      redirect:
+        typeof search.redirect === "string" ? search.redirect : undefined,
     };
   },
 });
@@ -56,10 +58,14 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
-  const { data: session, isPending: isSessionLoading } = authClient.useSession();
+  const { data: session, isPending: isSessionLoading } =
+    authClient.useSession();
   const convex = useConvex();
+  const posthog = usePostHog();
 
-  const [activeTab, setActiveTab] = React.useState<"signin" | "signup" | "magiclink">("signin");
+  const [activeTab, setActiveTab] = React.useState<
+    "signin" | "signup" | "magiclink"
+  >("signin");
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [globalError, setGlobalError] = React.useState("");
@@ -98,9 +104,10 @@ function AuthPage() {
       if (error) {
         setModalError(error.message || "Failed to send magic link.");
       } else {
+        posthog.capture("invitation_code_submitted", { email: magicEmail });
         setShowMagicCodeModal(false);
         setSuccessMessage(
-          "Magic link sent! Once you click it in your email, your account will be created."
+          "Magic link sent! Once you click it in your email, your account will be created.",
         );
       }
     } catch (err: any) {
@@ -119,6 +126,8 @@ function AuthPage() {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
+      posthog.capture("user_signed_out");
+      posthog.reset();
       await authClient.signOut();
       navigate({ to: "/auth" });
     } catch (err: any) {
@@ -147,7 +156,9 @@ function AuthPage() {
     return (
       <AlreadySignedIn
         session={session}
-        onGoToDashboard={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
+        onGoToDashboard={() =>
+          navigate({ to: sanitizeRedirect(redirect || "/") })
+        }
         onSignOut={handleSignOut}
         isSigningOut={isSigningOut}
       />
@@ -195,21 +206,29 @@ function AuthPage() {
         {/* Render appropriate form component */}
         {activeTab === "signin" && (
           <SignInForm
-            onSuccess={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
+            onSuccess={() =>
+              navigate({ to: sanitizeRedirect(redirect || "/") })
+            }
             onError={setGlobalError}
           />
         )}
 
         {activeTab === "signup" && (
           <SignUpForm
-            onSuccess={() => navigate({ to: sanitizeRedirect(redirect || "/") })}
+            onSuccess={() =>
+              navigate({ to: sanitizeRedirect(redirect || "/") })
+            }
             onError={setGlobalError}
           />
         )}
 
         {activeTab === "magiclink" && (
           <MagicLinkForm
-            onSuccess={() => setSuccessMessage("Magic link sent! Please check your email inbox.")}
+            onSuccess={() =>
+              setSuccessMessage(
+                "Magic link sent! Please check your email inbox.",
+              )
+            }
             onUserNotFound={(email) => {
               setMagicEmail(email);
               setModalError("");

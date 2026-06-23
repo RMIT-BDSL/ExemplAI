@@ -1,10 +1,11 @@
-import { Mail, Lock, User, ShieldCheck, ArrowRight } from "lucide-react";
+import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
 import { useConvex, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { ArrowRight, Lock, Mail, ShieldCheck, User } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
-import { AuthTextField } from "../AuthTextField";
+import { api } from "../../../../convex/_generated/api";
 import { AuthButton } from "../AuthButton";
+import { AuthTextField } from "../AuthTextField";
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -12,8 +13,11 @@ interface SignUpFormProps {
 }
 
 export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
+  const posthog = usePostHog();
   const convex = useConvex();
-  const createUserAndUseCode = useMutation(api.invitationCodes.createUserAndUseCode);
+  const createUserAndUseCode = useMutation(
+    api.invitationCodes.createUserAndUseCode,
+  );
 
   const form = useForm({
     defaultValues: {
@@ -25,7 +29,10 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
     onSubmit: async ({ value }) => {
       try {
         // 1. Validate invitation code in Convex
-        const validation = await convex.query(api.invitationCodes.validateCode, { code: value.code });
+        const validation = await convex.query(
+          api.invitationCodes.validateCode,
+          { code: value.code },
+        );
         if (!validation.isValid) {
           onError(validation.reason || "Invalid invitation code.");
           return;
@@ -51,10 +58,16 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
               code: value.code,
               tokenIdentifier: user.id,
             });
+            posthog.identify(user.email, {
+              email: user.email,
+              name: user.name || undefined,
+            });
+            posthog.capture("user_signed_up", { method: "email" });
           }
           onSuccess();
         }
       } catch (err: any) {
+        posthog.captureException(err);
         onError(err.message || "An unexpected error occurred.");
       }
     },
@@ -86,7 +99,11 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<User className="size-5" />}
             required
           />
@@ -98,7 +115,8 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
         validators={{
           onChange: ({ value }) => {
             if (!value) return "Email is required";
-            if (!/\S+@\S+\.\S+/.test(value)) return "Please enter a valid email address";
+            if (!/\S+@\S+\.\S+/.test(value))
+              return "Please enter a valid email address";
             return undefined;
           },
         }}
@@ -111,7 +129,11 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<Mail className="size-5" />}
             required
           />
@@ -123,7 +145,8 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
         validators={{
           onChange: ({ value }) => {
             if (!value) return "Password is required";
-            if (value.length < 8) return "Password must be at least 8 characters";
+            if (value.length < 8)
+              return "Password must be at least 8 characters";
             return undefined;
           },
         }}
@@ -136,7 +159,11 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<Lock className="size-5" />}
             required
           />
@@ -160,7 +187,11 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
             value={field.state.value}
             onBlur={field.handleBlur}
             onChange={(e) => field.handleChange(e.target.value)}
-            error={field.state.meta.errors ? field.state.meta.errors.join(", ") : undefined}
+            error={
+              field.state.meta.errors
+                ? field.state.meta.errors.join(", ")
+                : undefined
+            }
             leadingIcon={<ShieldCheck className="size-5" />}
             required
           />

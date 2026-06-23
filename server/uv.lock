@@ -758,6 +758,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "rich" },
+    { name = "sentry-sdk" },
     { name = "slowapi" },
 ]
 
@@ -768,6 +769,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "rich", specifier = ">=15.0.0" },
+    { name = "sentry-sdk", specifier = ">=2.62.0" },
     { name = "slowapi", specifier = ">=0.1.9" },
 ]
 
