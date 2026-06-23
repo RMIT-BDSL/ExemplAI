@@ -7,13 +7,24 @@ export interface ChatMessagePayload {
   content: string;
 }
 
+export interface LangGraphMessage {
+  content: string;
+  type: string;
+  id?: string;
+  [key: string]: any;
+}
+
+export interface LangGraphResponse {
+  messages: LangGraphMessage[];
+}
+
 export async function sendChatMessage(
   conversation: ChatMessagePayload[],
-  userId = 1,
-): Promise<string> {
-  const response = await axios.post<{ response: string }>(`${BACKEND_URL}/chat`, {
+  userId = 1
+): Promise<LangGraphResponse> {
+  const response = await axios.post<LangGraphResponse>(`${BACKEND_URL}/chat`, {
     user_id: userId,
     conversation,
   });
-  return response.data.response;
+  return response.data;
 }
