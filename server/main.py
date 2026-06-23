@@ -10,6 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from model.chat import Chat
 
 # logging with rich
 import logging
@@ -138,3 +139,14 @@ async def judge0_execution(student_code: StudentCode, request: Request):
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: str | None = None):
     return {"item_id": item_id, "q": q}
+
+@app.post("/chat")
+def chat(chat: Chat):
+    # Extract the last user message
+    user_message = ""
+    for msg in reversed(chat.conversation):
+        if msg.get("sender") == "user":
+            user_message = msg.get("content", "")
+            break
+
+    return {"response": f"AI Assistant received: {user_message}"}
