@@ -2,13 +2,21 @@
 
 ### 🚀 Features
 
+- Configure telemetry for data collection
+- *(server)* Initial sentry implementation for observability
+- *(server)* Count student code execution number
 - Add rapidapi support for judge0
 - *(server)* Improve Judge0 code execution service with FastAPI and rate limiting
 
 ### ⚙️ Miscellaneous Tasks
 
+- Stop logging client side
 - Add validation for empty configuration
 ## [0.1.6] - 2026-06-21
+
+### 🚀 Features
+
+- Initial posthog observability
 
 ### 🐛 Bug Fixes
 
