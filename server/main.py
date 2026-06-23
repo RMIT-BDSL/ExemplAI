@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from model.chat import Chat
-from ai.teacher import graph
+from ai.graph import graph
 
 # logging with rich
 import logging
