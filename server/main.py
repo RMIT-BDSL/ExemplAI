@@ -154,4 +154,12 @@ def chat(chat: Chat):
         langgraph_messages = [{"role": "user", "content": "hi!"}]
 
     result = graph.invoke({"messages": langgraph_messages})
-    return result
+    # return result
+    try:
+        return graph.invoke({"messages": langgraph_messages})
+    except Exception as e:
+        log.error(f"AI service error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service temporarily unavailable"
+        )
