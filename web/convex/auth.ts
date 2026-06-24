@@ -33,7 +33,9 @@ export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     database: authComponent.adapter(ctx),
-    baseURL: process.env.BETTER_AUTH_URL || process.env.SITE_URL,
+    baseURL: process.env.BETTER_AUTH_URL || 
+             process.env.SITE_URL || 
+             (process.env.CONVEX_SITE_URL ? `${process.env.CONVEX_SITE_URL}/api/auth` : undefined),
     secret: process.env.BETTER_AUTH_SECRET || "dev-secret-key-at-least-32-chars-long-exemplai",
     trustedOrigins: process.env.VITE_TRUSTED_ORIGINS?.split(","),
     emailAndPassword: {
