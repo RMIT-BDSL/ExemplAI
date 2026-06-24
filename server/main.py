@@ -152,9 +152,6 @@ def chat(chat: Chat):
     # Fallback to a default greeting if conversation is empty
     if not langgraph_messages:
         langgraph_messages = [{"role": "user", "content": "hi!"}]
-
-    result = graph.invoke({"messages": langgraph_messages})
-    # return result
     try:
         return graph.invoke({"messages": langgraph_messages})
     except Exception as e:
