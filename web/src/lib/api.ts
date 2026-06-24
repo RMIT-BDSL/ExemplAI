@@ -25,6 +25,8 @@ export async function sendChatMessage(
   const response = await axios.post<LangGraphResponse>(`${BACKEND_URL}/chat`, {
     user_id: userId,
     conversation,
+  }, {
+    timeout: 60000
   });
   return response.data;
 }
