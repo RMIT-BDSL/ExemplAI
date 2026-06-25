@@ -1,5 +1,3 @@
-"use server";
-
 import { mutation } from "./_generated/server";
 import { createAuth } from "./auth";
 
@@ -17,9 +15,7 @@ export const createAdminUser = mutation({
       );
     }
 
-    const auth = createAuth(ctx, {
-      emailAndPassword: { enabled: true, disableSignUp: false },
-    });
+    const auth = createAuth(ctx);
 
     const user = await auth.api.signUpEmail({
       body: {
@@ -28,6 +24,18 @@ export const createAdminUser = mutation({
         name: "Staff Member",
       },
     });
+
+    // Retrieve user in Convex and assign the admin role
+    const dbUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+
+    if (dbUser) {
+      await ctx.db.patch(dbUser._id, {
+        role: "admin",
+      });
+    }
 
     return { success: true, userId: user.user.id };
   },
