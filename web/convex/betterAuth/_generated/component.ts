@@ -48,7 +48,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   updatedAt: number;
                   userId?: null | string;
                 };
-                model: "users";
+                model: "user";
               }
             | {
                 data: {
@@ -61,7 +61,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   userAgent?: null | string;
                   userId: string;
                 };
-                model: "sessions";
+                model: "session";
               }
             | {
                 data: {
@@ -78,7 +78,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   updatedAt: number;
                   userId: string;
                 };
-                model: "accounts";
+                model: "account";
               }
             | {
                 data: {
@@ -88,7 +88,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   updatedAt: number;
                   value: string;
                 };
-                model: "verifications";
+                model: "verification";
               }
             | {
                 data: {
@@ -111,7 +111,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           input:
             | {
-                model: "users";
+                model: "user";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -155,7 +155,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "sessions";
+                model: "session";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -191,7 +191,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "accounts";
+                model: "account";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -231,7 +231,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "verifications";
+                model: "verification";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -314,7 +314,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           input:
             | {
-                model: "users";
+                model: "user";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -358,7 +358,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "sessions";
+                model: "session";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -394,7 +394,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "accounts";
+                model: "account";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -434,7 +434,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "verifications";
+                model: "verification";
                 where?: Array<{
                   connector?: "AND" | "OR";
                   field:
@@ -509,7 +509,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           join?: any;
           limit?: number;
-          model: "users" | "sessions" | "accounts" | "verifications" | "jwks";
+          model: "user" | "session" | "account" | "verification" | "jwks";
           offset?: number;
           paginationOpts: {
             cursor: string | null;
@@ -554,7 +554,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         {
           join?: any;
-          model: "users" | "sessions" | "accounts" | "verifications" | "jwks";
+          model: "user" | "session" | "account" | "verification" | "jwks";
           select?: Array<string>;
           where?: Array<{
             connector?: "AND" | "OR";
@@ -590,7 +590,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           input:
             | {
-                model: "users";
+                model: "user";
                 update: {
                   banExpires?: null | number;
                   banReason?: null | string;
@@ -652,7 +652,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "sessions";
+                model: "session";
                 update: {
                   createdAt?: number;
                   expiresAt?: number;
@@ -698,7 +698,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "accounts";
+                model: "account";
                 update: {
                   accessToken?: null | string;
                   accessTokenExpiresAt?: null | number;
@@ -752,7 +752,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "verifications";
+                model: "verification";
                 update: {
                   createdAt?: number;
                   expiresAt?: number;
@@ -848,7 +848,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           input:
             | {
-                model: "users";
+                model: "user";
                 update: {
                   banExpires?: null | number;
                   banReason?: null | string;
@@ -910,7 +910,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "sessions";
+                model: "session";
                 update: {
                   createdAt?: number;
                   expiresAt?: number;
@@ -956,7 +956,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "accounts";
+                model: "account";
                 update: {
                   accessToken?: null | string;
                   accessTokenExpiresAt?: null | number;
@@ -1010,7 +1010,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 }>;
               }
             | {
-                model: "verifications";
+                model: "verification";
                 update: {
                   createdAt?: number;
                   expiresAt?: number;
