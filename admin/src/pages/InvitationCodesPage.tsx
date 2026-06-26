@@ -13,25 +13,33 @@ const InvitationCodesPage: Component = () => {
   const [codes, { refetch }] = createResource<InvitationCode[]>(fetchCodes);
 
   return (
-    <div class="max-w-5xl mx-auto px-6 py-10 space-y-8">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-white">Invitation Codes</h1>
-        <p class="text-sm text-slate-400 mt-1">Create and manage single-use invitation codes for student access.</p>
-      </div>
+    <div class="max-w-4xl mx-auto px-5 sm:px-8 lg:px-10 py-9 sm:py-12 space-y-7">
+      <header class="border-b border-line pb-7">
+        <p class="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">Student access</p>
+        <h1 class="mt-3 font-display text-[30px] sm:text-[36px] leading-tight tracking-[-0.01em] text-ink">
+          Invitation codes
+        </h1>
+        <p class="mt-2 max-w-xl text-[15px] text-body">
+          Create single-use codes and manage who can sign up. Each code works once.
+        </p>
+      </header>
 
       <CreateCodeForm onCreated={refetch} />
 
       <Show when={codes.error}>
-        <div class="bg-red-900/30 border border-red-700/50 rounded-lg px-4 py-3 text-sm text-red-400">
-          Failed to load codes. Check VITE_CONVEX_URL.
+        <div class="rounded-md border border-brass/30 bg-brass/[0.06] px-4 py-3 text-sm text-brass">
+          Failed to load codes. Check your connection (VITE_CONVEX_URL) and refresh.
         </div>
       </Show>
 
-      <Show when={!codes.loading} fallback={
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl px-6 py-12 text-center text-slate-500 text-sm">
-          Loading…
-        </div>
-      }>
+      <Show
+        when={!codes.loading}
+        fallback={
+          <div class="rounded-md border border-line bg-white px-6 py-16 text-center text-sm text-muted">
+            Loading codes…
+          </div>
+        }
+      >
         <Show when={codes()}>
           <InvitationCodesTable data={codes()!} onRefetch={refetch} />
         </Show>
