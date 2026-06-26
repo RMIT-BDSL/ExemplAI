@@ -64,7 +64,7 @@ export const createAuth = (
     plugins: [
       convex({ authConfig, jwtExpirationSeconds: 60 * 60 * 24 }),
       crossDomain({
-        siteUrl: process.env.SITE_URL || "http://localhost:5173",
+        siteUrl: process.env.SITE_URL || "http://localhost:3000",
       }),
       magicLink({
         sendMagicLink: async ({ email, url }) => {

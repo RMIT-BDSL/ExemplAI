@@ -190,6 +190,38 @@ export const invalidateCode = mutation({
 });
 
 /**
+ * Lists all invitation codes. Intended for admin use.
+ */
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("invitationCodes").collect();
+  },
+});
+
+/**
+ * Deletes an invitation code by its string code value.
+ */
+export const remove = mutation({
+  args: {
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const invitation = await ctx.db
+      .query("invitationCodes")
+      .withIndex("by_code", (q) => q.eq("code", args.code))
+      .unique();
+
+    if (!invitation) {
+      throw new Error(`Invitation code "${args.code}" not found.`);
+    }
+
+    await ctx.db.delete(invitation._id);
+    return { success: true };
+  },
+});
+
+/**
  * Validates an invitation code, returning its current state and availability.
  */
 export const validateCode = query({
