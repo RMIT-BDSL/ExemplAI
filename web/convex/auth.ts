@@ -21,7 +21,9 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
           name: authUser.name || undefined,
           email: authUser.email,
           image: authUser.image || undefined,
-          tokenIdentifier: authUser.id,
+          // safeGetAuthUser returns the raw Convex doc, whose id is `_id`
+          // (there is no `.id` field) — using `.id` here wrote undefined.
+          tokenIdentifier: authUser._id,
         });
       },
     },
@@ -88,7 +90,8 @@ export const getSessionUser = query({
     if (!authUser) return null;
     return {
       user: {
-        id: authUser.id,
+        // safeGetAuthUser returns the raw Convex doc; its id is `_id`.
+        id: authUser._id,
         email: authUser.email,
         name: authUser.name || undefined,
         image: authUser.image || undefined,
@@ -97,7 +100,7 @@ export const getSessionUser = query({
         updatedAt: authUser.updatedAt,
       },
       session: {
-        userId: authUser.id,
+        userId: authUser._id,
       },
     };
   },
