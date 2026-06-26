@@ -3,7 +3,9 @@ import { Router, Route, Navigate, A } from '@solidjs/router';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Login';
 import Loading from './components/Loading';
-import Dashboard from './components/home/Dashboard';
+import Layout from './components/Layout';
+import DashboardPage from './pages/DashboardPage';
+import InvitationCodesPage from './pages/InvitationCodesPage';
 
 const ProtectedRoute: Component<{ children?: any }> = (props) => {
   const { user, loading } = useAuth();

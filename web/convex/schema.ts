@@ -22,6 +22,7 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     tokenIdentifier: v.optional(v.string()),
+    role: v.optional(v.string()),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
