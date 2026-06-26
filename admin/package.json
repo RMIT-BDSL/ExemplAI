@@ -22,6 +22,7 @@
     "@convex-dev/better-auth": "^0.12.4",
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-form": "^1.33.0",
+    "@tanstack/solid-table": "^8.21.3",
     "better-auth": "^1.6.20",
     "convex": "^1.42.0",
     "solid-js": "^1.9.9"
