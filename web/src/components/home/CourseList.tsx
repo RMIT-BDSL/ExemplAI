@@ -5,13 +5,14 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Circle,
   Compass,
   HelpCircle,
-  Lock,
   PlayCircle,
   Search,
 } from "lucide-react";
 import { useState } from "react";
+import { authClient } from "#/lib/auth-client";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../convex/_generated/api";
 
@@ -83,6 +84,20 @@ const MOCK_METADATA: Record<string, Partial<ShortProblem>> = {
 export default function CourseList() {
   const questions = useQuery(api.courses.getAllCourses);
 
+  // The Convex client isn't authenticated, so read the session from the
+  // Better Auth client (same pattern as the rest of the app).
+  const { data: session } = authClient.useSession();
+  const tokenIdentifier = session?.user?.id;
+  const lessonProgress = useQuery(
+    api.courses.getLessonProgress,
+    tokenIdentifier ? { tokenIdentifier } : "skip",
+  );
+
+  // lessonId -> status. Lessons absent from the map are "pending".
+  const progressByLesson = new Map(
+    (lessonProgress ?? []).map((p) => [p.lessonId, p.status]),
+  );
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
   const [selectedStatus, setSelectedStatus] = useState<
@@ -118,7 +133,7 @@ export default function CourseList() {
       name: q.problem_name,
       description: q.problem_description,
       week: q.week,
-      status: "pending",
+      status: progressByLesson.get(q._id) ?? "pending",
       language: "Python",
       difficulty: "Easy",
       tags: [],
@@ -251,21 +266,41 @@ export default function CourseList() {
           {sortedWeeks.map((weekNum) => {
             const isCollapsed = collapsedWeeks[weekNum];
             const weekProblems = problemsByWeek[weekNum];
+            const completedCount = weekProblems.filter(
+              (p) => p.status === "completed",
+            ).length;
+            const completedPct = Math.round(
+              (completedCount / weekProblems.length) * 100,
+            );
 
             return (
               <div key={weekNum} className="space-y-3">
                 <button
                   onClick={() => toggleWeek(weekNum)}
-                  className="w-full flex items-center justify-between border-b border-line pb-1.5 hover:border-lagoon-deep text-left cursor-pointer group transition-colors"
+                  className="w-full flex items-center gap-3 border-b border-line pb-1.5 hover:border-lagoon-deep text-left cursor-pointer group transition-colors"
                 >
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-sea-ink-soft group-hover:text-sea-ink">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-sea-ink-soft group-hover:text-sea-ink shrink-0">
                     Week {weekNum} ({weekProblems.length}{" "}
                     {weekProblems.length === 1 ? "exercise" : "exercises"})
                   </h3>
+
+                  {/* Week progress bar + count */}
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <div className="h-1.5 flex-1 rounded-full bg-sand/60 overflow-hidden max-w-[160px]">
+                      <div
+                        className="h-full rounded-full bg-palm transition-all"
+                        style={{ width: `${completedPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold text-sea-ink-soft tabular-nums shrink-0">
+                      {completedCount}/{weekProblems.length}
+                    </span>
+                  </div>
+
                   {isCollapsed ? (
-                    <ChevronRight className="size-4 text-sea-ink-soft group-hover:text-sea-ink" />
+                    <ChevronRight className="size-4 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
                   ) : (
-                    <ChevronDown className="size-4 text-sea-ink-soft group-hover:text-sea-ink" />
+                    <ChevronDown className="size-4 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
                   )}
                 </button>
 
@@ -312,31 +347,89 @@ function ShortProblemCard({
     Hard: "text-rose-600 bg-rose-50 border-rose-200/50",
   };
 
+  // Per-status visual language: each state gets a distinct rail color, icon,
+  // pill, card treatment and call-to-action so progress is readable at a glance.
+  const statusStyles = {
+    completed: {
+      Icon: CheckCircle2,
+      label: "Completed",
+      rail: "bg-palm",
+      iconClass: "text-palm",
+      pill: "bg-palm/10 text-palm border-palm/30",
+      card: "border-palm/30",
+      cta: "bg-white border-line text-sea-ink hover:bg-sand/55",
+      ctaLabel: "Review",
+    },
+    "in-progress": {
+      Icon: PlayCircle,
+      label: "In progress",
+      rail: "bg-lagoon-deep",
+      iconClass: "text-lagoon-deep",
+      pill: "bg-lagoon/15 text-lagoon-deep border-lagoon/40",
+      card: "border-lagoon-deep/40 ring-1 ring-lagoon-deep/15 bg-lagoon/[0.05]",
+      cta: "bg-palm text-white border-palm hover:bg-palm/90",
+      ctaLabel: "Resume",
+    },
+    pending: {
+      Icon: Circle,
+      label: "Not started",
+      rail: "bg-line",
+      iconClass: "text-sea-ink-soft/40",
+      pill: "bg-sand/50 text-sea-ink-soft border-line",
+      card: "border-line",
+      cta: "bg-white border-line text-sea-ink hover:bg-sand/35",
+      ctaLabel: "Start",
+    },
+  } as const;
+
+  const s = statusStyles[status];
+  const StatusIcon = s.Icon;
+
   return (
-    <div className="feature-card rounded-xl border border-line p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div
+      className={cn(
+        "feature-card relative overflow-hidden rounded-xl border p-4 pl-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors",
+        s.card,
+        status === "completed" && "opacity-[0.92]",
+      )}
+    >
+      {/* Status accent rail */}
+      <span
+        className={cn("absolute inset-y-0 left-0 w-1.5", s.rail)}
+        aria-hidden="true"
+      />
+
       {/* Left side: status icon, title, details */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="shrink-0">
-          {status === "completed" && (
-            <span title="Completed">
-              <CheckCircle2 className="size-5 text-palm" />
-            </span>
-          )}
-          {status === "in-progress" && (
-            <span title="In Progress">
-              <PlayCircle className="size-5 text-amber-600" />
-            </span>
-          )}
-          {status === "pending" && (
-            <span title="Locked">
-              <Lock className="size-5 text-sea-ink-soft/40" />
-            </span>
-          )}
+        <div className="shrink-0" title={s.label}>
+          <StatusIcon
+            className={cn(
+              "size-5",
+              s.iconClass,
+              status === "in-progress" && "animate-pulse",
+            )}
+          />
         </div>
 
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-bold text-sm text-sea-ink truncate">{name}</h3>
+            <h3
+              className={cn(
+                "font-bold text-sm truncate",
+                status === "completed" ? "text-sea-ink-soft" : "text-sea-ink",
+              )}
+            >
+              {name}
+            </h3>
+            {/* Status pill — the primary at-a-glance cue */}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 border text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0",
+                s.pill,
+              )}
+            >
+              {s.label}
+            </span>
             <span className="bg-lagoon/10 text-lagoon-deep border border-lagoon/20 text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0">
               W{week}
             </span>
@@ -391,18 +484,10 @@ function ShortProblemCard({
           }
           className={cn(
             "text-xs font-bold px-3 py-1.5 rounded-lg border text-center transition-colors flex items-center gap-1 cursor-pointer",
-            status === "completed"
-              ? "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
-              : status === "in-progress"
-                ? "bg-palm text-white border-palm hover:bg-palm/90"
-                : "bg-white border-line text-sea-ink hover:bg-sand/35",
+            s.cta,
           )}
         >
-          {status === "completed"
-            ? "Review"
-            : status === "in-progress"
-              ? "Resume"
-              : "Start"}
+          {s.ctaLabel}
         </Link>
       </div>
     </div>

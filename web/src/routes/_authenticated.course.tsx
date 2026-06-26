@@ -1,14 +1,15 @@
 import { usePostHog } from "@posthog/react";
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import axios from "axios";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { BookOpen, ChevronLeft } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CodeEditor from "#/components/student/CodeEditor";
 import CodingBar from "#/components/student/InteractionBar";
 import Problem from "#/components/student/problem/Problem";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
 import SidePanel from "#/components/student/SidePane";
+import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/_authenticated/course")({
@@ -37,6 +38,12 @@ function Course() {
     problemId ? { id: problemId } : "skip",
   );
 
+  // The Convex client isn't authenticated, so read the session from the
+  // Better Auth client (same pattern as the rest of the app).
+  const { data: session } = authClient.useSession();
+  const tokenIdentifier = session?.user?.id;
+  const setLessonStatus = useMutation(api.courses.setLessonStatus);
+
   const [language, setLanguage] = useState<string>("python");
   const [fontSize, setFontSize] = useState<number>(14);
   const [codeTemplates, setCodeTemplates] = useState(CODE_TEMPLATES);
@@ -53,6 +60,19 @@ function Course() {
     : questions && questions.length > 0
       ? questions[0]
       : null;
+
+  // Opening a problem marks it "in-progress" (the server keeps it "completed"
+  // if it already was, so reviewing a finished problem won't downgrade it).
+  const activeQuestionId = activeQuestion?._id;
+  useEffect(() => {
+    if (tokenIdentifier && activeQuestionId) {
+      setLessonStatus({
+        tokenIdentifier,
+        lessonId: activeQuestionId,
+        status: "in-progress",
+      }).catch(() => {});
+    }
+  }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
 
   if (activeQuestion === undefined) {
     return (
@@ -126,13 +146,35 @@ function Course() {
         code: submissionCode,
       });
       setExecutionResult(response.data);
+      const succeeded = !response.data?.error;
       posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {
         problem_id: problemId,
         language,
-        success: !response.data?.error,
+        success: succeeded,
       });
+
+      // Record progress on submit: a successful submission completes the
+      // lesson; a failed attempt keeps it "in-progress" (the server won't
+      // downgrade a lesson that's already completed).
+      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
+        setLessonStatus({
+          tokenIdentifier,
+          lessonId: activeQuestionId,
+          status: succeeded ? "completed" : "in-progress",
+        }).catch(() => {});
+      }
     } catch (error: any) {
       posthog.captureException(error);
+
+      // A submit that errors out is still a failed attempt → in-progress.
+      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
+        setLessonStatus({
+          tokenIdentifier,
+          lessonId: activeQuestionId,
+          status: "in-progress",
+        }).catch(() => {});
+      }
+
       setExecutionResult({
         error: true,
         message: error.message || "Execution failed",
