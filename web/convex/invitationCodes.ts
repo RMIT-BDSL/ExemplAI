@@ -10,6 +10,7 @@ export const add = mutation({
     code: v.string(),
     createdBy: v.optional(v.string()),
     expiryDate: v.optional(v.string()),
+    quantity: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Check if code already exists
@@ -25,7 +26,7 @@ export const add = mutation({
     const invitationCodeId = await ctx.db.insert("invitationCodes", {
       code: args.code,
       isValid: true,
-      quantity: 1, // Hardcoded usage amount limit of 1
+      quantity: args.quantity ?? 1,
       usesCount: 0,
       createdBy: args.createdBy,
       whoUsed: [],
@@ -286,3 +287,65 @@ export const createUserAndUseCode = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Lists all invitation codes, sorted by creation time descending.
+ */
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("invitationCodes").order("desc").collect();
+  },
+});
+
+/**
+ * Deletes an invitation code.
+ */
+export const deleteCode = mutation({
+  args: {
+    id: v.id("invitationCodes"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { success: true };
+  },
+});
+
+/**
+ * Updates an invitation code's details.
+ */
+export const update = mutation({
+  args: {
+    id: v.id("invitationCodes"),
+    code: v.optional(v.string()),
+    isValid: v.optional(v.boolean()),
+    quantity: v.optional(v.number()),
+    expiryDate: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...patchData } = args;
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Invitation code not found");
+    }
+
+    if (patchData.code && patchData.code !== existing.code) {
+      const duplicate = await ctx.db
+        .query("invitationCodes")
+        .withIndex("by_code", (q) => q.eq("code", patchData.code!))
+        .unique();
+      if (duplicate) {
+        throw new Error(`Invitation code "${patchData.code}" already exists.`);
+      }
+    }
+
+    const updateData: any = { ...patchData };
+    if (updateData.expiryDate === null) {
+      updateData.expiryDate = undefined;
+    }
+
+    await ctx.db.patch(id, updateData);
+    return { success: true };
+  },
+});
+
