@@ -17,6 +17,7 @@ interface CodeEditorProps {
 	setIsConsoleOpen: (open: boolean) => void;
 	onRun: () => void;
 	onSubmit: () => void;
+	onSendErrorToChat?: (error: string) => void;
 }
 
 export default function CodeEditor({
@@ -32,6 +33,7 @@ export default function CodeEditor({
 	setIsConsoleOpen,
 	onRun,
 	onSubmit,
+	onSendErrorToChat,
 }: CodeEditorProps) {
 	const [activeTab, setActiveTab] = useState<"result" | "stdout">("result");
 
@@ -134,6 +136,7 @@ export default function CodeEditor({
 							activeTab={activeTab}
 							setIsConsoleOpen={setIsConsoleOpen}
 							renderStatusBadge={renderStatusBadge}
+							onSendErrorToChat={onSendErrorToChat}
 						/>
 					)}
 				</div>

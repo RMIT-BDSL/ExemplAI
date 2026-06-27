@@ -65,13 +65,10 @@ is_rapidapi = os.getenv("IS_RAPIDAPI") == "True"
 # todo: prob need question id to do this, testing
 # code execution for now
 @app.post('/execute')
-def judge0_execution(student_code: StudentCode):
-    # count to sentry for analytics
-    metrics.count("code.execution", 1)
-    # print student code
-
 @limiter.limit("10/minute")
 async def judge0_execution(student_code: StudentCode, request: Request):
+    # count to sentry for analytics
+    metrics.count("code.execution", 1)
     # send the code to judge0
     endpoint = os.getenv('JUDGE0_ENDPOINT')
     if not endpoint:
@@ -103,6 +100,7 @@ async def judge0_execution(student_code: StudentCode, request: Request):
         headers['X-RapidAPI-Host'] = host
     
     # make async request with httpx and timeout
+    log.info(request)
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(exec_url, json=payload, headers=headers, timeout=15.0)

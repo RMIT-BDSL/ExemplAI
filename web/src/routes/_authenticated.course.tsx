@@ -54,6 +54,12 @@ function Course() {
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
   const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true);
+  // A message pushed into the AI chat from the terminal "Ask AI" button. The
+  // key changes on every push so the same error can be sent more than once.
+  const [chatPrompt, setChatPrompt] = useState<{
+    key: number;
+    content: string;
+  } | null>(null);
 
   const activeQuestion = problemId
     ? fetchedQuestion
@@ -189,6 +195,36 @@ function Course() {
     }
   }
 
+  // Build a prompt from the current error + the student's code + the problem
+  // id, open the chat, and hand it to the AI assistant (which posts it to the
+  // /chat route on the backend).
+  function handleSendErrorToChat(error: string) {
+    const code = editorRef.current?.getValue() ?? currentCode;
+    const content = [
+      `I ran into an error on problem \`${activeQuestionId}\` (${activeQuestion?.problem_name ?? "this problem"}).`,
+      "",
+      "Here is my code:",
+      "```python",
+      code,
+      "```",
+      "",
+      "And here is the error I got:",
+      "```",
+      error,
+      "```",
+      "",
+      "Can you help me understand what went wrong and how to fix it?",
+    ].join("\n");
+
+    posthog.capture("error_sent_to_chat", {
+      problem_id: problemId,
+      language,
+    });
+
+    setIsChatCollapsed(false);
+    setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
+  }
+
   const currentCode =
     codeTemplates[language as keyof typeof codeTemplates] || "";
 
@@ -256,6 +292,7 @@ function Course() {
                 setIsConsoleOpen={setIsConsoleOpen}
                 onRun={() => handleExecute("run")}
                 onSubmit={() => handleExecute("submit")}
+                onSendErrorToChat={handleSendErrorToChat}
               />
             </div>
           </div>
@@ -263,7 +300,10 @@ function Course() {
           {/* Chat Panel */}
           {!isChatCollapsed && (
             <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
-              <SidePanel onCollapse={() => setIsChatCollapsed(true)} />
+              <SidePanel
+                onCollapse={() => setIsChatCollapsed(true)}
+                pendingMessage={chatPrompt}
+              />
             </div>
           )}
         </div>
