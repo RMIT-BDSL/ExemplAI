@@ -6,18 +6,19 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  plugins: [
-    devtools({
-      consolePiping: {
-        enabled: false,
-      },
-    }),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-  ],
+  plugins: [devtools({
+    consolePiping: {
+      enabled: false,
+    },
+  }), tailwindcss(), tanstackStart(), viteReact(), cloudflare({
+    viteEnvironment: {
+      name: "ssr"
+    }
+  })],
   server: {
     proxy: {
       "^/api/v1/static": {
