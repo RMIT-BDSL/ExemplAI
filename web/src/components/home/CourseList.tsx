@@ -90,22 +90,16 @@ export default function CourseList() {
   const tokenIdentifier = session?.user?.id;
   const lessonProgress = useQuery(
     api.courses.getLessonProgress,
-    tokenIdentifier ? { tokenIdentifier } : "skip",
+    tokenIdentifier ? { tokenIdentifier } : "skip"
   );
 
   // lessonId -> status. Lessons absent from the map are "pending".
-  const progressByLesson = new Map(
-    (lessonProgress ?? []).map((p) => [p.lessonId, p.status]),
-  );
+  const progressByLesson = new Map((lessonProgress ?? []).map((p) => [p.lessonId, p.status]));
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
-  const [selectedStatus, setSelectedStatus] = useState<
-    ShortProblem["status"] | "all"
-  >("all");
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>(
-    {},
-  );
+  const [selectedStatus, setSelectedStatus] = useState<ShortProblem["status"] | "all">("all");
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>({});
 
   if (questions === undefined) {
     return (
@@ -117,10 +111,7 @@ export default function CourseList() {
         <div className="h-24 bg-zinc-200/50 rounded-xl border border-line"></div>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 bg-zinc-200/30 rounded-xl border border-line"
-            ></div>
+            <div key={i} className="h-16 bg-zinc-200/30 rounded-xl border border-line"></div>
           ))}
         </div>
       </div>
@@ -146,27 +137,25 @@ export default function CourseList() {
     const matchesSearch =
       problem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       problem.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.tags.some((tag) =>
-        tag.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+      problem.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesWeek = selectedWeek === "all" || problem.week === selectedWeek;
-    const matchesStatus =
-      selectedStatus === "all" || problem.status === selectedStatus;
+    const matchesStatus = selectedStatus === "all" || problem.status === selectedStatus;
 
     return matchesSearch && matchesWeek && matchesStatus;
   });
 
   // Group filtered problems by week
-  const problemsByWeek = filteredProblems.reduce<
-    Record<number, ShortProblem[]>
-  >((groups, problem) => {
-    if (!groups[problem.week]) {
-      groups[problem.week] = [];
-    }
-    groups[problem.week].push(problem);
-    return groups;
-  }, {});
+  const problemsByWeek = filteredProblems.reduce<Record<number, ShortProblem[]>>(
+    (groups, problem) => {
+      if (!groups[problem.week]) {
+        groups[problem.week] = [];
+      }
+      groups[problem.week].push(problem);
+      return groups;
+    },
+    {}
+  );
 
   // Get sorted list of active weeks
   const sortedWeeks = Object.keys(problemsByWeek)
@@ -189,8 +178,8 @@ export default function CourseList() {
           <span>Python Programming Syllabus</span>
         </h2>
         <p className="text-sm text-sea-ink-soft mt-1">
-          Complete the challenges below sequentially. Use the workspace editor
-          to run and submit your solutions.
+          Complete the challenges below sequentially. Use the workspace editor to run and submit
+          your solutions.
         </p>
       </div>
 
@@ -211,22 +200,20 @@ export default function CourseList() {
 
           {/* Status filter tabs */}
           <div className="flex bg-sand/40 border border-line rounded-lg p-1 shrink-0">
-            {(["all", "completed", "in-progress", "pending"] as const).map(
-              (status) => (
-                <button
-                  key={status}
-                  onClick={() => setSelectedStatus(status)}
-                  className={cn(
-                    "px-3 py-1 text-xs font-semibold capitalize rounded-md transition-colors cursor-pointer",
-                    selectedStatus === status
-                      ? "bg-white text-sea-ink shadow-sm border border-line/20"
-                      : "text-sea-ink-soft hover:text-sea-ink",
-                  )}
-                >
-                  {status === "all" ? "All Status" : status.replace("-", " ")}
-                </button>
-              ),
-            )}
+            {(["all", "completed", "in-progress", "pending"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setSelectedStatus(status)}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold capitalize rounded-md transition-colors cursor-pointer",
+                  selectedStatus === status
+                    ? "bg-white text-sea-ink shadow-sm border border-line/20"
+                    : "text-sea-ink-soft hover:text-sea-ink"
+                )}
+              >
+                {status === "all" ? "All Status" : status.replace("-", " ")}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -238,7 +225,7 @@ export default function CourseList() {
               "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
               selectedWeek === "all"
                 ? "bg-sea-ink text-white border-sea-ink"
-                : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65",
+                : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
             )}
           >
             All Weeks
@@ -251,7 +238,7 @@ export default function CourseList() {
                 "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
                 selectedWeek === wk
                   ? "bg-sea-ink text-white border-sea-ink"
-                  : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65",
+                  : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
               )}
             >
               Week {wk}
@@ -266,12 +253,8 @@ export default function CourseList() {
           {sortedWeeks.map((weekNum) => {
             const isCollapsed = collapsedWeeks[weekNum];
             const weekProblems = problemsByWeek[weekNum];
-            const completedCount = weekProblems.filter(
-              (p) => p.status === "completed",
-            ).length;
-            const completedPct = Math.round(
-              (completedCount / weekProblems.length) * 100,
-            );
+            const completedCount = weekProblems.filter((p) => p.status === "completed").length;
+            const completedPct = Math.round((completedCount / weekProblems.length) * 100);
 
             return (
               <div key={weekNum} className="space-y-3">
@@ -318,9 +301,7 @@ export default function CourseList() {
       ) : (
         <div className="island-shell rounded-xl p-10 text-center border border-line">
           <HelpCircle className="size-8 text-sea-ink-soft/40 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-sea-ink">
-            No exercises found
-          </p>
+          <p className="text-sm font-semibold text-sea-ink">No exercises found</p>
           <p className="text-xs text-sea-ink-soft mt-1">
             Try adjusting your search criteria or selected filters.
           </p>
@@ -367,7 +348,7 @@ function ShortProblemCard({
       iconClass: "text-lagoon-deep",
       pill: "bg-lagoon/15 text-lagoon-deep border-lagoon/40",
       card: "border-lagoon-deep/40 ring-1 ring-lagoon-deep/15 bg-lagoon/[0.05]",
-      cta: "bg-palm text-white border-palm hover:bg-palm/90",
+      cta: "bg-lagoon-deep text-white dark:text-foam border-lagoon-deep hover:bg-lagoon-deep/90",
       ctaLabel: "Resume",
     },
     pending: {
@@ -390,24 +371,17 @@ function ShortProblemCard({
       className={cn(
         "feature-card relative overflow-hidden rounded-xl border p-4 pl-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors",
         s.card,
-        status === "completed" && "opacity-[0.92]",
+        status === "completed" && "opacity-[0.92]"
       )}
     >
       {/* Status accent rail */}
-      <span
-        className={cn("absolute inset-y-0 left-0 w-1.5", s.rail)}
-        aria-hidden="true"
-      />
+      <span className={cn("absolute inset-y-0 left-0 w-1.5", s.rail)} aria-hidden="true" />
 
       {/* Left side: status icon, title, details */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="shrink-0" title={s.label}>
           <StatusIcon
-            className={cn(
-              "size-5",
-              s.iconClass,
-              status === "in-progress" && "animate-pulse",
-            )}
+            className={cn("size-5", s.iconClass, status === "in-progress" && "animate-pulse")}
           />
         </div>
 
@@ -416,7 +390,7 @@ function ShortProblemCard({
             <h3
               className={cn(
                 "font-bold text-sm truncate",
-                status === "completed" ? "text-sea-ink-soft" : "text-sea-ink",
+                status === "completed" ? "text-sea-ink-soft" : "text-sea-ink"
               )}
             >
               {name}
@@ -425,7 +399,7 @@ function ShortProblemCard({
             <span
               className={cn(
                 "inline-flex items-center gap-1 border text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0",
-                s.pill,
+                s.pill
               )}
             >
               {s.label}
@@ -436,7 +410,7 @@ function ShortProblemCard({
             <span
               className={cn(
                 "border text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0",
-                difficultyStyles[difficulty],
+                difficultyStyles[difficulty]
               )}
             >
               {difficulty}
@@ -475,16 +449,12 @@ function ShortProblemCard({
               week,
               difficulty,
               action:
-                status === "completed"
-                  ? "review"
-                  : status === "in-progress"
-                    ? "resume"
-                    : "start",
+                status === "completed" ? "review" : status === "in-progress" ? "resume" : "start",
             })
           }
           className={cn(
             "text-xs font-bold px-3 py-1.5 rounded-lg border text-center transition-colors flex items-center gap-1 cursor-pointer",
-            s.cta,
+            s.cta
           )}
         >
           {s.ctaLabel}

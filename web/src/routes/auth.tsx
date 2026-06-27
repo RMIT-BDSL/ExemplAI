@@ -10,6 +10,7 @@ import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
 import { SignInForm } from "#/components/auth/forms/SignInForm";
 import { SignUpForm } from "#/components/auth/forms/SignUpForm";
 import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
+import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
@@ -92,9 +93,12 @@ function AuthPage() {
         return;
       }
 
-      // 2. Request magic link with the invitation code attached to callback URL
+      // 2. Request magic link with the invitation code attached to callback URL.
+      //    `magic=1` lets the destination route detect the completed sign-in.
       const redirectUrl = sanitizeRedirect(redirect || "/");
-      const finalCallback = `${redirectUrl}${redirectUrl.includes("?") ? "&" : "?"}code=${encodeURIComponent(codeToSubmit)}`;
+      const finalCallback = buildMagicLinkCallback(redirectUrl, {
+        code: codeToSubmit,
+      });
 
       const { error } = await authClient.signIn.magicLink({
         email: magicEmail,
@@ -111,6 +115,7 @@ function AuthPage() {
         );
       }
     } catch (err: any) {
+      posthog.captureException(err);
       setModalError(err.message || "An error occurred.");
     } finally {
       setIsSubmittingModal(false);
@@ -126,11 +131,16 @@ function AuthPage() {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
+      // Capture while the user is still identified, then sign out. Only reset
+      // PostHog (which clears the distinct id) once sign-out actually succeeds —
+      // resetting before would orphan the event and, on a failed sign-out, would
+      // wrongly de-identify a still-logged-in user.
       posthog.capture("user_signed_out");
-      posthog.reset();
       await authClient.signOut();
+      posthog.reset();
       navigate({ to: "/auth" });
     } catch (err: any) {
+      posthog.captureException(err);
       setGlobalError("Failed to sign out. Please try again.");
     } finally {
       setIsSigningOut(false);
