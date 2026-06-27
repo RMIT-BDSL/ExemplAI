@@ -1,4 +1,6 @@
 data/csedm-2019/
+**/node_modules/
+**/dist/
 **/.venv/
 **/.env
 **/__pycache__/
