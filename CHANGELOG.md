@@ -1,3 +1,8 @@
+## [0.2.1] - 2026-06-27
+
+### ⚙️ Miscellaneous Tasks
+
+- Ignore node_modules and dist at any depth
 ## [0.2.0] - 2026-06-23
 
 ### 🚀 Features
