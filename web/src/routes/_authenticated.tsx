@@ -3,6 +3,7 @@ import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { getSession } from "#/lib/auth.functions";
+import Navbar from "#/components/nav/Navbar";
 
 interface AuthenticatedSearch {
   code?: string;
@@ -63,5 +64,10 @@ function AuthenticatedLayout() {
     }
   }, [session, code, createUserAndUseCode, navigate]);
 
-  return <Outlet />;
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  );
 }
