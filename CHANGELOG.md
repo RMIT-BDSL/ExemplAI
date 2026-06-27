@@ -1,3 +1,8 @@
+## [0.3.0] - 2026-06-27
+
+### 🚀 Features
+
+- Add tracking to generated folder
 ## [0.2.1] - 2026-06-27
 
 ### ⚙️ Miscellaneous Tasks
