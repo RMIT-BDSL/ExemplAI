@@ -1,4 +1,6 @@
 allowBuilds:
   core-js: false
   esbuild: false
+  sharp: true
+  workerd: true
 minimumReleaseAge: 600
