@@ -5,6 +5,78 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { zid } from "convex-helpers/server/zod4";
+import { zMutation, zQuery } from "./functions";
+import { courseFields } from "./validators";
+
+// ---------------------------------------------------------------------------
+// Course CRUD
+// ---------------------------------------------------------------------------
+
+/** Lists all courses, newest first. */
+export const listCourses = zQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("course").order("desc").collect();
+  },
+});
+
+/** Fetches a single course by id (null if it doesn't exist). */
+export const getCourse = zQuery({
+  args: { id: zid("course") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+/** Creates a course. Returns the new course id. */
+export const createCourse = zMutation({
+  args: courseFields,
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("course", args);
+  },
+});
+
+/** Updates a course's name and/or language. */
+export const updateCourse = zMutation({
+  args: {
+    id: zid("course"),
+    course_name: courseFields.course_name.optional(),
+    course_language: courseFields.course_language.optional(),
+  },
+  handler: async (ctx, { id, ...patch }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("Course not found.");
+    await ctx.db.patch(id, patch);
+    return { success: true };
+  },
+});
+
+/**
+ * Deletes a course and cascades: every lesson in the course (and each
+ * lesson's progress rows) is removed so nothing is left orphaned.
+ */
+export const deleteCourse = zMutation({
+  args: { id: zid("course") },
+  handler: async (ctx, { id }) => {
+    const lessons = await ctx.db
+      .query("questions")
+      .withIndex("by_course", (q) => q.eq("course", id))
+      .collect();
+
+    for (const lesson of lessons) {
+      const progress = await ctx.db
+        .query("lessonProgress")
+        .withIndex("by_lesson", (q) => q.eq("lessonId", lesson._id))
+        .collect();
+      for (const row of progress) await ctx.db.delete(row._id);
+      await ctx.db.delete(lesson._id);
+    }
+
+    await ctx.db.delete(id);
+    return { success: true };
+  },
+});
 
 // Return the last 100 tasks in a given task list.
 export const getAllCourses = query({
