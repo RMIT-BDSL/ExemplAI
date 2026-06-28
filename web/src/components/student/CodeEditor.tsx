@@ -20,6 +20,7 @@ interface CodeEditorProps {
 	onSendErrorToChat?: (error: string) => void;
 	isSaved: boolean;
 	onSave: () => void;
+	testCases: any[];
 }
 
 export default function CodeEditor({
@@ -38,8 +39,9 @@ export default function CodeEditor({
 	onSendErrorToChat,
 	isSaved,
 	onSave,
+	testCases,
 }: CodeEditorProps) {
-	const [activeTab, setActiveTab] = useState<"result" | "stdout">("result");
+	const [activeTab, setActiveTab] = useState<"result" | "stdout" | "testcases">("testcases");
 
 	// Set default tab when new execution results arrive
 	const hasStdout = executionResult && executionResult.stdout;
@@ -141,6 +143,7 @@ export default function CodeEditor({
 							setIsConsoleOpen={setIsConsoleOpen}
 							renderStatusBadge={renderStatusBadge}
 							onSendErrorToChat={onSendErrorToChat}
+							testCases={testCases}
 						/>
 					)}
 				</div>

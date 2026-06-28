@@ -132,7 +132,6 @@ function Course() {
         const storageKey = `exemplai_code_${problemId}_${language}`;
         localStorage.setItem(storageKey, currentVal);
         setIsSaved(true);
-        toast.info("Autosaved progress locally.");
       }
     }, 5000);
 
@@ -380,6 +379,7 @@ function Course() {
                 onSendErrorToChat={handleSendErrorToChat}
                 isSaved={isSaved}
                 onSave={handleSave}
+                testCases={activeQuestion?.testCases || []}
               />
             </div>
           </div>
