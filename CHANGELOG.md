@@ -1,3 +1,28 @@
+## [0.5.0] - 2026-06-28
+
+### 🚀 Features
+
+- Initialize new solidstart project
+- Admin dashboard with authentication and dashboard mock
+- Initial invitation code creation
+- Redesigned dashboard for ux and ui
+- Course status
+- Navigation bar for user
+- Added button to ask ai when test got error.
+
+### 🐛 Bug Fixes
+
+- Web not working
+- *(admin)* Stuck on loading screen after authentication
+- *(ui)* Invisible button label when student currently doing the application
+
+### 🚜 Refactor
+
+- Moved authentication logic to web instead of admin
+
+### ⚙️ Miscellaneous Tasks
+
+- Convex's generated schema
 ## [0.4.0] - 2026-06-28
 
 ### 🚀 Features
