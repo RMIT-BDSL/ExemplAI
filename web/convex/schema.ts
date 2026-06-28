@@ -6,13 +6,29 @@ export default defineSchema({
     course_name: v.string(),
     course_language: v.string(),
   }),
+  // A "lesson". `detail`/`testCases` are optional so rows created before those
+  // fields existed remain valid.
   questions: defineTable({
     week: v.number(),
     course: v.id("course"),
     problem_name: v.string(),
     problem_description: v.string(),
+    detail: v.optional(v.string()),
+    testCases: v.optional(
+      v.array(
+        v.object({
+          input: v.string(),
+          expectedOutput: v.string(),
+          description: v.optional(v.string()),
+          hidden: v.optional(v.boolean()),
+        }),
+      ),
+    ),
     // todo implement solution (not for now)
-  }).index("by_week", ["week"]), // week are fixed to 12 weeks
+  })
+    .index("by_week", ["week"]) // week are fixed to 12 weeks
+    .index("by_course", ["course"])
+    .index("by_course_week", ["course", "week"]),
   users: defineTable({
     name: v.optional(v.string()),
     email: v.optional(v.string()),
