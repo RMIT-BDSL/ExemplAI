@@ -1,4 +1,4 @@
-import { Component, For, Show } from 'solid-js';
+import { Component, Index, Show } from 'solid-js';
 
 export interface TestCase {
   input: string;
@@ -49,12 +49,12 @@ const TestCaseManager: Component<Props> = (props) => {
         }
       >
         <div class="space-y-3.5">
-          <For each={props.testCases}>
+          <Index each={props.testCases}>
             {(tc, idx) => (
               <div class="rounded-md border border-white/10 bg-[#151d2d]/60 p-4 space-y-3 relative">
                 <button
                   type="button"
-                  onClick={() => removeTestCase(idx())}
+                  onClick={() => removeTestCase(idx)}
                   class="absolute top-3.5 right-3.5 text-slate-400 hover:text-garnet transition"
                   title="Remove test case"
                 >
@@ -64,7 +64,7 @@ const TestCaseManager: Component<Props> = (props) => {
                 </button>
 
                 <div class="font-mono text-[10px] text-slate-400 uppercase tracking-widest">
-                  Test case #{idx() + 1}
+                  Test case #{idx + 1}
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -73,8 +73,8 @@ const TestCaseManager: Component<Props> = (props) => {
                     <textarea
                       rows="1"
                       placeholder="e.g. 15"
-                      value={tc.input}
-                      onInput={(e) => updateTestCase(idx(), 'input', e.currentTarget.value)}
+                      value={tc().input}
+                      onInput={(e) => updateTestCase(idx, 'input', e.currentTarget.value)}
                       class="mt-1 w-full rounded border border-white/10 bg-[#151d2d] px-2.5 py-1.5 font-mono text-xs text-white outline-none focus:border-garnet transition"
                       required
                     />
@@ -84,8 +84,8 @@ const TestCaseManager: Component<Props> = (props) => {
                     <textarea
                       rows="1"
                       placeholder="e.g. FizzBuzz"
-                      value={tc.expectedOutput}
-                      onInput={(e) => updateTestCase(idx(), 'expectedOutput', e.currentTarget.value)}
+                      value={tc().expectedOutput}
+                      onInput={(e) => updateTestCase(idx, 'expectedOutput', e.currentTarget.value)}
                       class="mt-1 w-full rounded border border-white/10 bg-[#151d2d] px-2.5 py-1.5 font-mono text-xs text-white outline-none focus:border-garnet transition"
                       required
                     />
@@ -98,8 +98,8 @@ const TestCaseManager: Component<Props> = (props) => {
                     <input
                       type="text"
                       placeholder="e.g. Test divisible by both 3 and 5"
-                      value={tc.description || ''}
-                      onInput={(e) => updateTestCase(idx(), 'description', e.currentTarget.value)}
+                      value={tc().description || ''}
+                      onInput={(e) => updateTestCase(idx, 'description', e.currentTarget.value)}
                       class="mt-1 w-full rounded border border-white/10 bg-[#151d2d] px-2.5 py-1.5 text-xs text-white outline-none focus:border-garnet transition"
                     />
                   </div>
@@ -107,8 +107,8 @@ const TestCaseManager: Component<Props> = (props) => {
                     <label class="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
-                        checked={!!tc.hidden}
-                        onChange={(e) => updateTestCase(idx(), 'hidden', e.currentTarget.checked)}
+                        checked={!!tc().hidden}
+                        onChange={(e) => updateTestCase(idx, 'hidden', e.currentTarget.checked)}
                         class="rounded bg-[#151d2d] border-white/10 text-garnet focus:ring-garnet/35 w-4 h-4"
                       />
                       <span class="font-mono text-[10px] uppercase tracking-wider text-slate-400">Hidden from student</span>
@@ -117,7 +117,7 @@ const TestCaseManager: Component<Props> = (props) => {
                 </div>
               </div>
             )}
-          </For>
+          </Index>
         </div>
       </Show>
     </div>

@@ -70,7 +70,7 @@ const EditCourseModal: Component<Props> = (props) => {
           </p>
         </header>
 
-        <form onSubmit={handleUpdate} class="mt-5 space-y-5">
+        <form onsubmit={handleUpdate} class="mt-5 space-y-5">
           <div>
             <label for="edit_name" class="block font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400 font-semibold">
               Course Name
