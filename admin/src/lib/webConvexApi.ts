@@ -5,6 +5,20 @@ export const api: PublicApiType = anyApi as unknown as PublicApiType;
 export const internal: InternalApiType = anyApi as unknown as InternalApiType;
 
 export type PublicApiType = {
+  auth: {
+    checkUserExistsQuery: FunctionReference<
+      "query",
+      "public",
+      { email: string },
+      any
+    >;
+    getSessionUser: FunctionReference<
+      "query",
+      "public",
+      Record<string, never>,
+      any
+    >;
+  };
   courses: {
     getAllCourses: FunctionReference<
       "query",
@@ -13,12 +27,39 @@ export type PublicApiType = {
       any
     >;
     getQuestionById: FunctionReference<"query", "public", { id: string }, any>;
+    getLessonProgress: FunctionReference<
+      "query",
+      "public",
+      { tokenIdentifier: string },
+      any
+    >;
+    setLessonStatus: FunctionReference<
+      "mutation",
+      "public",
+      {
+        lessonId: Id<"questions">;
+        status: "in-progress" | "completed" | "pending";
+        tokenIdentifier: string;
+      },
+      any
+    >;
+    getLessonCompletionStats: FunctionReference<
+      "query",
+      "public",
+      { lessonId: Id<"questions"> },
+      any
+    >;
   };
   invitationCodes: {
     add: FunctionReference<
       "mutation",
       "public",
-      { code: string; createdBy?: string; expiryDate?: string },
+      {
+        code: string;
+        createdBy?: string;
+        expiryDate?: string;
+        quantity?: number;
+      },
       any
     >;
     useCode: FunctionReference<
@@ -48,16 +89,29 @@ export type PublicApiType = {
       },
       any
     >;
-  };
-  auth: {
-    checkUserExistsQuery: FunctionReference<
-      "query",
+    list: FunctionReference<"query", "public", Record<string, never>, any>;
+    deleteCode: FunctionReference<
+      "mutation",
       "public",
-      { email: string },
+      { id: Id<"invitationCodes"> },
       any
     >;
-    getSessionUser: FunctionReference<
-      "query",
+    update: FunctionReference<
+      "mutation",
+      "public",
+      {
+        code?: string;
+        expiryDate?: string | null;
+        id: Id<"invitationCodes">;
+        isValid?: boolean;
+        quantity?: number;
+      },
+      any
+    >;
+  };
+  init: {
+    createAdminUser: FunctionReference<
+      "mutation",
       "public",
       Record<string, never>,
       any
