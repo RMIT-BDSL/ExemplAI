@@ -59,7 +59,7 @@ const CreateCourseForm: Component<Props> = (props) => {
         </p>
       </div>
 
-      <form onSubmit={handleCreate} class="p-6 space-y-6">
+      <form onsubmit={handleCreate} class="p-6 space-y-6">
         <div>
           <label for="course_name" class="block font-mono text-[10px] uppercase tracking-[0.16em] text-muted font-semibold">
             Course Name

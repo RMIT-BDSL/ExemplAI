@@ -104,7 +104,7 @@ const LessonFormModal: Component<Props> = (props) => {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} class="mt-5 space-y-6 overflow-y-auto flex-1 pr-2">
+        <form onsubmit={handleSubmit} class="mt-5 space-y-6 overflow-y-auto flex-1 pr-2">
           {/* Row 1: Week & Problem Name */}
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
