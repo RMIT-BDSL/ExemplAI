@@ -11,6 +11,8 @@ import ResetCodeForm from "#/components/student/ResetCodeForm";
 import SidePanel from "#/components/student/SidePane";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
@@ -35,7 +37,7 @@ function Course() {
   const questions = useQuery(api.courses.getAllCourses);
   const fetchedQuestion = useQuery(
     api.courses.getQuestionById,
-    problemId ? { id: problemId } : "skip",
+    problemId ? { id: problemId } : "skip"
   );
 
   // The Convex client isn't authenticated, so read the session from the
@@ -67,6 +69,8 @@ function Course() {
       ? questions[0]
       : null;
 
+  const [isSaved, setIsSaved] = useState<boolean>(true);
+
   // Opening a problem marks it "in-progress" (the server keeps it "completed"
   // if it already was, so reviewing a finished problem won't downgrade it).
   const activeQuestionId = activeQuestion?._id;
@@ -80,30 +84,83 @@ function Course() {
     }
   }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
 
+  // Load code template from localStorage, falling back to starter_code or defaults
+  useEffect(() => {
+    if (activeQuestion && problemId) {
+      const storageKey = `exemplai_code_${problemId}_${language}`;
+      const savedCode = localStorage.getItem(storageKey);
+
+      if (savedCode) {
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: savedCode,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(savedCode);
+        }
+        setIsSaved(true);
+      } else if (activeQuestion.starter_code) {
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: activeQuestion.starter_code,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(activeQuestion.starter_code);
+        }
+        setIsSaved(true);
+      } else {
+        const defaultCode = CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: defaultCode,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(defaultCode);
+        }
+        setIsSaved(true);
+      }
+    }
+  }, [activeQuestionId, language, problemId]);
+
+  // Autosave code to localStorage every 5 seconds if there are changes
+  useEffect(() => {
+    if (!problemId) return;
+
+    const interval = setInterval(() => {
+      if (!isSaved && editorRef.current) {
+        const currentVal = editorRef.current.getValue();
+        const storageKey = `exemplai_code_${problemId}_${language}`;
+        localStorage.setItem(storageKey, currentVal);
+        setIsSaved(true);
+        toast.info("Autosaved progress locally.");
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [problemId, language, isSaved]);
+
   if (activeQuestion === undefined) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <div className="text-center space-y-4">
-          <p className="text-zinc-500 text-sm animate-pulse">
-            Loading workspace...
-          </p>
-        </div>
+        <Loader2 className="size-8 animate-spin text-emerald-500" />
       </div>
     );
   }
 
   if (activeQuestion === null) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <p className="text-zinc-400">No problems available in the database.</p>
+      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-400">
+        No questions found.
       </div>
     );
   }
 
+  const sidebarProblems = questions || [];
   const mappedProblem = {
     id: activeQuestion._id,
     title: activeQuestion.problem_name,
     description: activeQuestion.problem_description,
+    detail: activeQuestion.detail,
     tags: ["Python"],
   };
 
@@ -117,20 +174,31 @@ function Course() {
         ...prev,
         [language]: value,
       }));
+      setIsSaved(false);
     }
   }
 
+  const handleSave = () => {
+    if (!problemId || !editorRef.current) return;
+    const currentVal = editorRef.current.getValue();
+    const storageKey = `exemplai_code_${problemId}_${language}`;
+    localStorage.setItem(storageKey, currentVal);
+    setIsSaved(true);
+    toast.success("Progress saved locally.");
+  };
+
   function handleReset() {
     posthog.capture("code_reset", { problem_id: problemId, language });
+    const defaultCode =
+      activeQuestion?.starter_code || CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
     setCodeTemplates((prev) => ({
       ...prev,
-      [language]: CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES],
+      [language]: defaultCode,
     }));
     if (editorRef.current) {
-      editorRef.current.setValue(
-        CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES],
-      );
+      editorRef.current.setValue(defaultCode);
     }
+    setIsSaved(false);
   }
 
   async function handleExecute(actionType: "run" | "submit") {
@@ -147,9 +215,31 @@ function Course() {
 
     const submissionCode = editorRef.current.getValue();
 
+    const LANGUAGE_IDS = {
+      python: 71,
+      javascript: 63,
+      typescript: 74,
+      cpp: 54,
+      java: 62,
+      go: 60,
+      rust: 73,
+      sql: 82,
+    };
+    const activeLang = language.toLowerCase();
+    const languageId = LANGUAGE_IDS[activeLang as keyof typeof LANGUAGE_IDS] || 71;
+
+    // Filter test cases based on actionType
+    const allTestCases = activeQuestion?.testCases || [];
+    const testCasesToRun =
+      actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
+
     try {
       const response = await axios.post(`${url}/execute`, {
         code: submissionCode,
+        language_id: languageId,
+        starter_code: activeQuestion?.starter_code,
+        solution_code: activeQuestion?.solution_code,
+        test_cases: testCasesToRun,
       });
       setExecutionResult(response.data);
       const succeeded = !response.data?.error;
@@ -184,10 +274,7 @@ function Course() {
       setExecutionResult({
         error: true,
         message: error.message || "Execution failed",
-        stderr:
-          error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message,
+        stderr: error.response?.data?.detail || error.response?.data?.message || error.message,
       });
     } finally {
       setIsRunning(false);
@@ -225,8 +312,7 @@ function Course() {
     setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
   }
 
-  const currentCode =
-    codeTemplates[language as keyof typeof codeTemplates] || "";
+  const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
 
   return (
     <ClientOnly>
@@ -271,8 +357,7 @@ function Course() {
               setIsProblemCollapsed={setIsProblemCollapsed}
               isChatCollapsed={isChatCollapsed}
               setIsChatCollapsed={(collapsed) => {
-                if (!collapsed)
-                  posthog.capture("ai_chat_opened", { problem_id: problemId });
+                if (!collapsed) posthog.capture("ai_chat_opened", { problem_id: problemId });
                 setIsChatCollapsed(collapsed);
               }}
             />
@@ -293,6 +378,8 @@ function Course() {
                 onRun={() => handleExecute("run")}
                 onSubmit={() => handleExecute("submit")}
                 onSendErrorToChat={handleSendErrorToChat}
+                isSaved={isSaved}
+                onSave={handleSave}
               />
             </div>
           </div>
@@ -300,20 +387,14 @@ function Course() {
           {/* Chat Panel */}
           {!isChatCollapsed && (
             <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
-              <SidePanel
-                onCollapse={() => setIsChatCollapsed(true)}
-                pendingMessage={chatPrompt}
-              />
+              <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} />
             </div>
           )}
         </div>
 
         {/* Solid Reset Confirmation Modal */}
         {showResetModal && (
-          <ResetCodeForm
-            setShowResetModal={setShowResetModal}
-            handleReset={handleReset}
-          />
+          <ResetCodeForm setShowResetModal={setShowResetModal} handleReset={handleReset} />
         )}
       </div>
     </ClientOnly>

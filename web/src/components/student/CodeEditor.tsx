@@ -18,6 +18,8 @@ interface CodeEditorProps {
 	onRun: () => void;
 	onSubmit: () => void;
 	onSendErrorToChat?: (error: string) => void;
+	isSaved: boolean;
+	onSave: () => void;
 }
 
 export default function CodeEditor({
@@ -34,6 +36,8 @@ export default function CodeEditor({
 	onRun,
 	onSubmit,
 	onSendErrorToChat,
+	isSaved,
+	onSave,
 }: CodeEditorProps) {
 	const [activeTab, setActiveTab] = useState<"result" | "stdout">("result");
 
@@ -157,6 +161,19 @@ export default function CodeEditor({
 					</button>
 
 					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={onSave}
+							disabled={isSaved}
+							className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold border transition-all ${
+								isSaved
+									? "bg-zinc-950 text-zinc-600 border-zinc-900 cursor-not-allowed select-none"
+									: "bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500 active:scale-95"
+							}`}
+						>
+							<span>{isSaved ? "Saved" : "Save"}</span>
+						</button>
+
 						<button
 							type="button"
 							onClick={onRun}

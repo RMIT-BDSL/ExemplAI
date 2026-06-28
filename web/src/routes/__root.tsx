@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
+import { Toaster } from "#/components/ui/sonner";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
@@ -63,6 +64,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         >
           <ConvexProvider client={convex}>{children}</ConvexProvider>
         </PostHogProvider>
+        <Toaster position="top-center" />
         {import.meta.env.DEV && (
           <TanStackDevtools
             config={{

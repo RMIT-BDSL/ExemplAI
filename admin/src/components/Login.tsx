@@ -196,7 +196,7 @@ export default function Login() {
         <div class="bg-[#0e121e] border border-slate-800 p-8 rounded-xl shadow-2xl">
           <form
             class="space-y-6"
-            onSubmit={(e) => {
+            onsubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
               form.handleSubmit();
