@@ -1,0 +1,60 @@
+name: Deploy Development
+
+on:
+  push:
+    branches:
+      - dev
+      - develop # Runs whenever code is merged into dev or develop
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Development
+    runs-on: ubuntu-latest
+    environment:
+      name: development # Marks this job's deployment environment in GitHub UI
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: 'web/pnpm-lock.yaml'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+#      - name: Lint and Format Check
+#        run: pnpm check
+#        working-directory: web
+
+#      - name: Run Tests
+#        run: pnpm test
+#        working-directory: web
+
+      - name: Deploy Convex Backend (Dev)
+        run: npx convex deploy
+        working-directory: web
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }} # Uses the development deploy key
+
+      - name: Build Web Frontend (Dev)
+        run: pnpm build
+        working-directory: web
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_DEV }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_DEV }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_DEV }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_DEV }}
