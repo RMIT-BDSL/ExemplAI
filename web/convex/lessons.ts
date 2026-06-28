@@ -56,6 +56,8 @@ export const updateLesson = zMutation({
     problem_description: lessonFields.problem_description.optional(),
     detail: lessonFields.detail,
     testCases: lessonFields.testCases,
+    starter_code: lessonFields.starter_code,
+    solution_code: lessonFields.solution_code,
   },
   handler: async (ctx, { id, ...patch }) => {
     const existing = await ctx.db.get(id);

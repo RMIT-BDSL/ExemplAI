@@ -20,6 +20,31 @@ export type PublicApiType = {
     >;
   };
   courses: {
+    createCourse: FunctionReference<
+      "mutation",
+      "public",
+      { course_language: string; course_name: string },
+      any
+    >;
+    deleteCourse: FunctionReference<
+      "mutation",
+      "public",
+      { id: Id<"course"> },
+      any
+    >;
+    getCourse: FunctionReference<"query", "public", { id: Id<"course"> }, any>;
+    listCourses: FunctionReference<
+      "query",
+      "public",
+      Record<string, never>,
+      any
+    >;
+    updateCourse: FunctionReference<
+      "mutation",
+      "public",
+      { course_language?: string; course_name?: string; id: Id<"course"> },
+      any
+    >;
     getAllCourses: FunctionReference<
       "query",
       "public",
@@ -114,6 +139,67 @@ export type PublicApiType = {
       "mutation",
       "public",
       Record<string, never>,
+      any
+    >;
+  };
+  lessons: {
+    createLesson: FunctionReference<
+      "mutation",
+      "public",
+      {
+        course: Id<"course">;
+        detail?: string;
+        problem_description: string;
+        problem_name: string;
+        solution_code?: string;
+        starter_code?: string;
+        testCases?: Array<{
+          description?: string;
+          expectedOutput: string;
+          hidden?: boolean;
+          input: string;
+        }>;
+        week: number;
+      },
+      any
+    >;
+    deleteLesson: FunctionReference<
+      "mutation",
+      "public",
+      { id: Id<"questions"> },
+      any
+    >;
+    getLesson: FunctionReference<
+      "query",
+      "public",
+      { id: Id<"questions"> },
+      any
+    >;
+    listLessonsByCourse: FunctionReference<
+      "query",
+      "public",
+      { course: Id<"course"> },
+      any
+    >;
+    updateLesson: FunctionReference<
+      "mutation",
+      "public",
+      {
+        course?: Id<"course">;
+        detail?: string;
+        id: Id<"questions">;
+        problem_description?: string;
+        problem_name?: string;
+        solution_code?: string;
+        starter_code?: string;
+        testCases?: Array<{
+          description?: string;
+          expectedOutput: string;
+          hidden?: boolean;
+          input: string;
+        }>;
+        week?: number;
+      },
       any
     >;
   };
