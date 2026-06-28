@@ -1,11 +1,12 @@
 import { MessageSquare, ChevronRight } from "lucide-react"
-import ChatBox from "./problem/ChatBox"
+import ChatBox, { type PendingMessage } from "./problem/ChatBox"
 
 interface SidePanelProps {
   onCollapse?: () => void
+  pendingMessage?: PendingMessage | null
 }
 
-export default function SidePanel({ onCollapse }: SidePanelProps) {
+export default function SidePanel({ onCollapse, pendingMessage }: SidePanelProps) {
   return (
     <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 animate-in fade-in duration-200">
       {/* Top Header */}
@@ -28,7 +29,7 @@ export default function SidePanel({ onCollapse }: SidePanelProps) {
 
       {/* Pane Content */}
       <div className="flex-1 min-h-0">
-        <ChatBox />
+        <ChatBox pendingMessage={pendingMessage} />
       </div>
     </div>
   )

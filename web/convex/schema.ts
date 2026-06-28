@@ -22,6 +22,7 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     tokenIdentifier: v.optional(v.string()),
+    role: v.optional(v.string()),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
@@ -33,6 +34,21 @@ export default defineSchema({
     .index("by_user_id", ["userId"])
     .index("by_token", ["tokenIdentifier"])
     .index("by_invitation_code", ["invitationCode"]),
+  // Per-student progress on each lesson (a row in `questions`).
+  // A lesson with no row here is treated as "pending" by the UI, so we only
+  // store lessons a student has started ("in-progress") or finished
+  // ("completed"). One row per (student, lesson) pair.
+  lessonProgress: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+    status: v.union(v.literal("in-progress"), v.literal("completed")),
+  })
+    // "give me everything this student has worked on" (render their list)
+    .index("by_user", ["userId"])
+    // "who has worked on / completed this lesson" (admin stats)
+    .index("by_lesson", ["lessonId"])
+    // exact (student, lesson) lookup for fast upserts
+    .index("by_user_lesson", ["userId", "lessonId"]),
   invitationCodes: defineTable({
     code: v.string(),
     isValid: v.boolean(),
