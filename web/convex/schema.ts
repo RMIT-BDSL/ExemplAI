@@ -24,7 +24,8 @@ export default defineSchema({
         }),
       ),
     ),
-    // todo implement solution (not for now)
+    starter_code: v.optional(v.string()),
+    solution_code: v.optional(v.string()),
   })
     .index("by_week", ["week"]) // week are fixed to 12 weeks
     .index("by_course", ["course"])

@@ -39,4 +39,6 @@ export const lessonFields = {
   // Long-form lesson content / instructions.
   detail: z.string().optional(),
   testCases: z.array(testCaseSchema).optional(),
+  starter_code: z.string().optional(),
+  solution_code: z.string().optional(),
 };
