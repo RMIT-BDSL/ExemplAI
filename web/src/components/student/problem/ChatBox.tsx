@@ -2,6 +2,7 @@ import { Bot, RefreshCw, Send, Sparkles, User } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
+import { sendChatMessage } from "#/lib/api.ts";
 
 // Types for Chat
 export interface Message {
@@ -54,19 +55,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.sender === "user";
 
   return (
-    <div
-      className={cn(
-        "flex w-full gap-3 text-sm",
-        isUser ? "flex-row-reverse" : "flex-row",
-      )}
-    >
+    <div className={cn("flex w-full gap-3 text-sm", isUser ? "flex-row-reverse" : "flex-row")}>
       {/* Avatar */}
       <div
         className={cn(
           "flex size-7 shrink-0 select-none items-center justify-center rounded-full text-xs font-semibold border",
           isUser
             ? "bg-zinc-800 border-zinc-700 text-zinc-300"
-            : "bg-indigo-950 border-indigo-800 text-indigo-400",
+            : "bg-indigo-950 border-indigo-800 text-indigo-400"
         )}
       >
         {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
@@ -79,20 +75,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             "rounded-2xl px-4 py-2.5 leading-relaxed shadow-sm",
             isUser
               ? "bg-indigo-600 text-white rounded-tr-none font-medium"
-              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2",
+              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2"
           )}
         >
-          {isUser ? (
-            message.content
-          ) : (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          )}
+          {isUser ? message.content : <ReactMarkdown>{message.content}</ReactMarkdown>}
         </div>
         {/* Timestamp */}
         <span
           className={cn(
             "text-[10px] text-zinc-500 px-1 select-none",
-            isUser ? "text-right" : "text-left",
+            isUser ? "text-right" : "text-left"
           )}
         >
           {message.timestamp.toLocaleTimeString([], {
@@ -127,19 +119,15 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
             <Sparkles className="size-5" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-zinc-300">
-              Start a conversation
-            </p>
+            <p className="text-sm font-semibold text-zinc-300">Start a conversation</p>
             <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
-              Ask questions about the problem description, request code hints,
-              or understand complexity.
+              Ask questions about the problem description, request code hints, or understand
+              complexity.
             </p>
           </div>
         </div>
       ) : (
-        messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))
+        messages.map((message) => <MessageBubble key={message.id} message={message} />)
       )}
 
       {isTyping && (
@@ -195,10 +183,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="border-t border-zinc-800 bg-zinc-900/40 p-4 space-y-3"
-    >
+    <form onSubmit={handleSubmit} className="border-t border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
       <div className="relative flex items-end gap-2 bg-zinc-950 border border-zinc-800 focus-within:border-zinc-700 rounded-xl px-3.5 py-2 transition-all">
         <textarea
           value={text}
@@ -216,7 +201,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             "inline-flex size-8 items-center justify-center rounded-lg transition-all select-none shrink-0",
             text.trim() && !disabled
               ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95"
-              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed",
+              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed"
           )}
         >
           <Send className="size-3.5" />
@@ -239,7 +224,7 @@ export default function ChatBox() {
   ]);
   const [isTyping, setIsTyping] = React.useState(false);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     // 1. Add User Message
     const userMsg: Message = {
       id: Math.random().toString(),
@@ -247,39 +232,45 @@ export default function ChatBox() {
       content: text,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setIsTyping(true);
 
-    // 2. Simulate AI response
-    setTimeout(() => {
-      let reply =
-        "I'm here to help! Could you explain your current approach, or would you like a hint about a brute force solution vs. using a hash map?";
+    try {
+      // Map messages to structure expected by server Pydantic model
+      const conversationPayload = updatedMessages.map((msg) => ({
+        sender: msg.sender,
+        content: msg.content,
+      }));
 
-      const lower = text.toLowerCase();
-      if (lower.includes("hint") || lower.includes("clue")) {
-        reply =
-          "Here's a hint: Think about how you can check if the complement (`target - nums[i]`) exists in the array as you iterate. Can we store seen numbers to find it in O(1) time?";
-      } else if (lower.includes("complexity") || lower.includes("o(n)")) {
-        reply =
-          "A brute force solution takes O(N²) time. However, using a Hash Map lets you search for the complement in O(1) average time, bringing the overall complexity down to O(N) time and O(N) space.";
-      } else if (
-        lower.includes("code") ||
-        lower.includes("solution") ||
-        lower.includes("answer")
-      ) {
-        reply =
-          "I can't write the final code for you, but I can guide you! Try creating a map that stores key-value pairs of `{ number: index }`. While iterating, check if `target - current_number` is already in the map.";
-      }
+      const response = await sendChatMessage(conversationPayload);
+
+      // Find the last AI assistant message content from the response messages
+      const aiMessages = response.messages.filter(
+        (msg) => msg.type === "ai" || msg.type === "assistant"
+      );
+      const lastAiMessage = aiMessages[aiMessages.length - 1];
+      const replyContent = lastAiMessage ? lastAiMessage.content : "Sorry, I couldn't get a response.";
 
       const assistantMsg: Message = {
-        id: Math.random().toString(),
+        id: lastAiMessage?.id || Math.random().toString(),
         sender: "assistant",
-        content: reply,
+        content: replyContent,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error("Error communicating with chat server:", error);
+      const assistantMsg: Message = {
+        id: Math.random().toString(),
+        sender: "assistant",
+        content: "Sorry, I encountered an error connecting to the server.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   const handleClearChat = () => {

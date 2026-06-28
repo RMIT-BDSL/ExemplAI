@@ -10,6 +10,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from model.chat import Chat
+from ai.graph import graph
 
 # logging with rich
 import logging
@@ -138,3 +140,23 @@ async def judge0_execution(student_code: StudentCode, request: Request):
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: str | None = None):
     return {"item_id": item_id, "q": q}
+
+@app.post("/chat")
+def chat(chat: Chat):
+    # Map the conversation messages to LangGraph role and content structure
+    langgraph_messages = []
+    for msg in chat.conversation:
+        role = "user" if msg.get("sender") == "user" else "assistant"
+        langgraph_messages.append({"role": role, "content": msg.get("content", "")})
+
+    # Fallback to a default greeting if conversation is empty
+    if not langgraph_messages:
+        langgraph_messages = [{"role": "user", "content": "hi!"}]
+    try:
+        return graph.invoke({"messages": langgraph_messages})
+    except Exception as e:
+        log.error(f"AI service error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service temporarily unavailable"
+        )
