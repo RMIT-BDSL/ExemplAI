@@ -63,6 +63,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "convex": "^1.41.0",
+    "convex-test": "^0.0.54",
     "jsdom": "^28.1.0",
     "prettier": "3.8.4",
     "typescript": "^6.0.2",
