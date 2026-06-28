@@ -211,8 +211,20 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   );
 }
 
+// A message pushed into the chat from outside (e.g. the "Ask AI about this
+// error" button in the terminal). The `key` changes each time so the same
+// content can be re-sent, and we only auto-send keys we haven't seen yet.
+export interface PendingMessage {
+  key: number;
+  content: string;
+}
+
 // 5. Chat Box default exported container
-export default function ChatBox() {
+export default function ChatBox({
+  pendingMessage,
+}: {
+  pendingMessage?: PendingMessage | null;
+}) {
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: "welcome",
@@ -272,6 +284,21 @@ export default function ChatBox() {
       setIsTyping(false);
     }
   };
+
+  // Auto-send a message that was pushed in from outside (terminal error,
+  // etc.). Guard on the key so re-renders don't re-send the same content.
+  const lastPendingKey = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    if (
+      pendingMessage &&
+      pendingMessage.content.trim() &&
+      pendingMessage.key !== lastPendingKey.current
+    ) {
+      lastPendingKey.current = pendingMessage.key;
+      handleSendMessage(pendingMessage.content);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMessage]);
 
   const handleClearChat = () => {
     setMessages([

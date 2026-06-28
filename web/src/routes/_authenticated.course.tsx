@@ -1,14 +1,15 @@
 import { usePostHog } from "@posthog/react";
 import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import axios from "axios";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { BookOpen, ChevronLeft } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CodeEditor from "#/components/student/CodeEditor";
 import CodingBar from "#/components/student/InteractionBar";
 import Problem from "#/components/student/problem/Problem";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
 import SidePanel from "#/components/student/SidePane";
+import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/_authenticated/course")({
@@ -37,6 +38,12 @@ function Course() {
     problemId ? { id: problemId } : "skip",
   );
 
+  // The Convex client isn't authenticated, so read the session from the
+  // Better Auth client (same pattern as the rest of the app).
+  const { data: session } = authClient.useSession();
+  const tokenIdentifier = session?.user?.id;
+  const setLessonStatus = useMutation(api.courses.setLessonStatus);
+
   const [language, setLanguage] = useState<string>("python");
   const [fontSize, setFontSize] = useState<number>(14);
   const [codeTemplates, setCodeTemplates] = useState(CODE_TEMPLATES);
@@ -47,12 +54,31 @@ function Course() {
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
   const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true);
+  // A message pushed into the AI chat from the terminal "Ask AI" button. The
+  // key changes on every push so the same error can be sent more than once.
+  const [chatPrompt, setChatPrompt] = useState<{
+    key: number;
+    content: string;
+  } | null>(null);
 
   const activeQuestion = problemId
     ? fetchedQuestion
     : questions && questions.length > 0
       ? questions[0]
       : null;
+
+  // Opening a problem marks it "in-progress" (the server keeps it "completed"
+  // if it already was, so reviewing a finished problem won't downgrade it).
+  const activeQuestionId = activeQuestion?._id;
+  useEffect(() => {
+    if (tokenIdentifier && activeQuestionId) {
+      setLessonStatus({
+        tokenIdentifier,
+        lessonId: activeQuestionId,
+        status: "in-progress",
+      }).catch(() => {});
+    }
+  }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
 
   if (activeQuestion === undefined) {
     return (
@@ -126,13 +152,35 @@ function Course() {
         code: submissionCode,
       });
       setExecutionResult(response.data);
+      const succeeded = !response.data?.error;
       posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {
         problem_id: problemId,
         language,
-        success: !response.data?.error,
+        success: succeeded,
       });
+
+      // Record progress on submit: a successful submission completes the
+      // lesson; a failed attempt keeps it "in-progress" (the server won't
+      // downgrade a lesson that's already completed).
+      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
+        setLessonStatus({
+          tokenIdentifier,
+          lessonId: activeQuestionId,
+          status: succeeded ? "completed" : "in-progress",
+        }).catch(() => {});
+      }
     } catch (error: any) {
       posthog.captureException(error);
+
+      // A submit that errors out is still a failed attempt → in-progress.
+      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
+        setLessonStatus({
+          tokenIdentifier,
+          lessonId: activeQuestionId,
+          status: "in-progress",
+        }).catch(() => {});
+      }
+
       setExecutionResult({
         error: true,
         message: error.message || "Execution failed",
@@ -145,6 +193,36 @@ function Course() {
       setIsRunning(false);
       setIsSubmitting(false);
     }
+  }
+
+  // Build a prompt from the current error + the student's code + the problem
+  // id, open the chat, and hand it to the AI assistant (which posts it to the
+  // /chat route on the backend).
+  function handleSendErrorToChat(error: string) {
+    const code = editorRef.current?.getValue() ?? currentCode;
+    const content = [
+      `I ran into an error on problem \`${activeQuestionId}\` (${activeQuestion?.problem_name ?? "this problem"}).`,
+      "",
+      "Here is my code:",
+      "```python",
+      code,
+      "```",
+      "",
+      "And here is the error I got:",
+      "```",
+      error,
+      "```",
+      "",
+      "Can you help me understand what went wrong and how to fix it?",
+    ].join("\n");
+
+    posthog.capture("error_sent_to_chat", {
+      problem_id: problemId,
+      language,
+    });
+
+    setIsChatCollapsed(false);
+    setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
   }
 
   const currentCode =
@@ -214,6 +292,7 @@ function Course() {
                 setIsConsoleOpen={setIsConsoleOpen}
                 onRun={() => handleExecute("run")}
                 onSubmit={() => handleExecute("submit")}
+                onSendErrorToChat={handleSendErrorToChat}
               />
             </div>
           </div>
@@ -221,7 +300,10 @@ function Course() {
           {/* Chat Panel */}
           {!isChatCollapsed && (
             <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
-              <SidePanel onCollapse={() => setIsChatCollapsed(true)} />
+              <SidePanel
+                onCollapse={() => setIsChatCollapsed(true)}
+                pendingMessage={chatPrompt}
+              />
             </div>
           )}
         </div>

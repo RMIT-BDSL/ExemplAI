@@ -16,6 +16,7 @@
     "check": "biome check"
   },
   "dependencies": {
+    "@convex-dev/better-auth": "latest",
     "@monaco-editor/react": "^4.7.0",
     "@posthog/react": "^1.10.2",
     "@tailwindcss/vite": "^4.1.18",
@@ -32,9 +33,9 @@
     "@tanstack/store": "latest",
     "axios": "^1.17.0",
     "better-auth": "^1.5.3",
-    "@convex-dev/better-auth": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "convex-helpers": "^0.1.120",
     "lucide-react": "^0.577.0",
     "posthog-node": "^5.38.2",
     "radix-ui": "^1.5.0",

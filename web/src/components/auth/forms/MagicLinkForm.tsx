@@ -1,6 +1,7 @@
 import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
 import { ArrowRight, Mail } from "lucide-react";
+import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { checkUserExists } from "#/lib/auth.functions";
 import { authClient } from "#/lib/auth-client";
 import { AuthButton } from "../AuthButton";
@@ -39,7 +40,7 @@ export function MagicLinkForm({
 
         const { error } = await authClient.signIn.magicLink({
           email: value.email,
-          callbackURL: redirectUrl || "/",
+          callbackURL: buildMagicLinkCallback(redirectUrl),
         });
 
         if (error) {
