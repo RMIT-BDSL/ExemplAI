@@ -1,3 +1,20 @@
+## [0.4.0] - 2026-06-28
+
+### 🚀 Features
+
+- *(ai)* Add stub route for chat
+- Ai chat now returns mock message
+- *(ai)* Returns langgraph mock message from chatting
+- *(ai)* Chat with OpenAI when asking programming question
+- Add handling exception to chat route
+
+### ⚙️ Miscellaneous Tasks
+
+- Initial schema for ai message
+- *(server)* Update configuration instruction
+- Add timeout
+- Instruction cleanup
+- Cleanup code
 ## [0.3.0] - 2026-06-27
 
 ### 🚀 Features
