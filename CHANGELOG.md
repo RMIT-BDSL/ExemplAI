@@ -1,3 +1,8 @@
+## [0.6.1] - 2026-06-29
+
+### ⚙️ Miscellaneous Tasks
+
+- Disable redundant production build and deploy in workflow
 ## [0.6.0] - 2026-06-29
 
 ### 🚀 Features
