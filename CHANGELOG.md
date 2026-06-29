@@ -1,3 +1,8 @@
+## [0.6.2] - 2026-06-29
+
+### 🐛 Bug Fixes
+
+- Workflows scripts
 ## [0.6.1] - 2026-06-29
 
 ### ⚙️ Miscellaneous Tasks
@@ -8,6 +13,10 @@
 ### 🚀 Features
 
 - Cloudflare deploy on pull request and on push to main (#18)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add new package requirements
 ## [0.5.0] - 2026-06-28
 
 ### 🚀 Features
