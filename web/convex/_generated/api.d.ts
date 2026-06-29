@@ -10,9 +10,12 @@
 
 import type * as auth from "../auth.js";
 import type * as courses from "../courses.js";
+import type * as functions from "../functions.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
+import type * as lessons from "../lessons.js";
+import type * as validators from "../validators.js";
 
 import type {
   ApiFromModules,
@@ -23,9 +26,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   courses: typeof courses;
+  functions: typeof functions;
   http: typeof http;
   init: typeof init;
   invitationCodes: typeof invitationCodes;
+  lessons: typeof lessons;
+  validators: typeof validators;
 }>;
 
 /**
