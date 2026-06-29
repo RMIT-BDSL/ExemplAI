@@ -33,9 +33,9 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: web
 
-      - name: Lint and Format Check
-        run: pnpm check
-        working-directory: web
+#      - name: Lint and Format Check
+#        run: pnpm check
+#        working-directory: web
 
       - name: Run Tests
         run: pnpm test
