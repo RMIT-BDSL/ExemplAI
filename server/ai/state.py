@@ -39,5 +39,9 @@ class TutorGraphState(TypedDict):
     # ── Internal: unvetted agent draft (Dean reads this) ──────────────
     draft_response: str
 
+    # ── Internal: input-safety gate (input_guardrail writes these) ────
+    guardrail_passed: bool
+    guardrail_violation: str
+
     # ── Internal: ACL management ───────────────────────
     orgId: str
