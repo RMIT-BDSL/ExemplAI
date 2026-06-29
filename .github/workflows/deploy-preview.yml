@@ -2,6 +2,10 @@ name: Deploy PR Preview
 
 on:
   pull_request:
+    branches:
+      - main
+      - dev
+      - develop
     types: [opened, synchronize, reopened]
     paths:
       - 'web/**'
@@ -35,9 +39,9 @@ jobs:
           node-version: 22
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 11.5.3
+          version: 11
 
       - name: Get pnpm store directory
         shell: bash
@@ -70,8 +74,18 @@ jobs:
           path: ${{ env.STORE_PATH }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
+      - name: Deploy Convex Backend (Preview)
+        run: npx convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
       - name: Build Application
         run: pnpm run build
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
 
       - name: Deploy to Cloudflare Workers (Upload Version)
         id: deploy
@@ -101,13 +115,15 @@ jobs:
         run: |
           PREVIEW_URL="${{ steps.extract_url.outputs.preview_url }}"
           if [ -z "$PREVIEW_URL" ]; then
-            BODY="🚀 **Version Uploaded Successfully!**
+            BODY="### 🚀 Preview Deployment Successful!
 
-            Preview alias \`pr-${{ github.event.pull_request.number }}\` has been assigned to this version.
-            Please verify the preview link on your Cloudflare dashboard."
+            - **Convex Backend**: Deployed preview backend.
+            - **Cloudflare Frontend**: Version uploaded successfully with alias \`pr-${{ github.event.pull_request.number }}\`."
           else
-            BODY="🚀 **Preview Deployed Successfully!**
+            BODY="### 🚀 Preview Deployment Successful!
 
-            🔗 **Deployment URL**: $PREVIEW_URL"
+            - **Convex Backend**: Deployed preview backend.
+            - **Cloudflare Frontend**: Deployed successfully!
+            - 🔗 **Deployment URL**: $PREVIEW_URL"
           fi
           gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
