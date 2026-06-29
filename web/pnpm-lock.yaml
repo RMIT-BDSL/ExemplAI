@@ -95,6 +95,9 @@ importers:
       tw-animate-css:
         specifier: ^1.3.6
         version: 1.4.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.5
@@ -135,6 +138,9 @@ importers:
       convex:
         specifier: ^1.41.0
         version: 1.41.0(react@19.2.7)
+      convex-test:
+        specifier: ^0.0.54
+        version: 0.0.54(convex@1.41.0(react@19.2.7))
       jsdom:
         specifier: ^28.1.0
         version: 28.1.0(@noble/hashes@2.2.0)
@@ -2756,6 +2762,11 @@ packages:
         optional: true
       zod:
         optional: true
+
+  convex-test@0.0.54:
+    resolution: {integrity: sha512-C0v2SQcuxrELAJRNzE6fQ686XDPor7UFoC22jcoJXeCRqhLo8ZIMZ4jyUHoo1UdAL2enCb0AbiprCVpLDN8u9Q==}
+    peerDependencies:
+      convex: ^1.32.0
 
   convex@1.41.0:
     resolution: {integrity: sha512-euxVf6yfpB7/VGKOobkLgjpbJidsUgW+b0ezonEyCUPqlpHFwR4/yIiI1hjjErzraiw91GxrtxpXQClMLNqU+w==}
@@ -6251,6 +6262,10 @@ snapshots:
       react: 19.2.7
       typescript: 6.0.3
       zod: 4.4.3
+
+  convex-test@0.0.54(convex@1.41.0(react@19.2.7)):
+    dependencies:
+      convex: 1.41.0(react@19.2.7)
 
   convex@1.41.0(react@19.2.7):
     dependencies:
