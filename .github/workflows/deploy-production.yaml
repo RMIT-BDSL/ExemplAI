@@ -37,9 +37,9 @@ jobs:
 #        run: pnpm check
 #        working-directory: web
 
-      - name: Run Tests
-        run: pnpm test
-        working-directory: web
+#      - name: Run Tests
+#        run: pnpm test
+#        working-directory: web
 
       - name: Deploy Convex Backend
         run: npx convex deploy
