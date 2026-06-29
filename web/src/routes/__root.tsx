@@ -7,12 +7,17 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "#/lib/auth-client";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 import { Toaster } from "#/components/ui/sonner";
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL, {
+  // Don't fire auth-dependent queries until the better-auth token is loaded.
+  expectAuth: true,
+});
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -62,7 +67,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             debug: typeof window !== "undefined" && import.meta.env.DEV,
           }}
         >
-          <ConvexProvider client={convex}>{children}</ConvexProvider>
+          <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+            {children}
+          </ConvexBetterAuthProvider>
         </PostHogProvider>
         <Toaster position="top-center" />
         {import.meta.env.DEV && (

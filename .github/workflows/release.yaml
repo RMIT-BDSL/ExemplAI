@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetches all history so git-cliff can read past commits
 
@@ -51,6 +51,7 @@ jobs:
         run: |
           git add CHANGELOG.md
           git commit -m "chore(release): prepare for ${{ steps.next_version.outputs.version }} [skip ci]" || echo "No changes to commit"
+          git pull --rebase origin main
           git push origin main
 
       # 5. Create the GitHub Release and paste the changelog into it
@@ -64,3 +65,32 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6. Build & Deploy Web App to Production
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      - name: Run Checks (Format & Lint)
+        run: pnpm check
+        working-directory: web
+
+      # - name: Build Web Application (Production)
+      #   run: pnpm build
+      #   working-directory: web
+
+      # - name: Deploy to Cloudflare Workers (Production)
+      #   run: |
+      #     pnpm dlx wrangler deploy --config dist/server/wrangler.json
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #   working-directory: web

@@ -8,9 +8,7 @@ from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import sentry_sdk
-from sentry_sdk import metrics
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from model.chat import Chat
@@ -20,6 +18,10 @@ from ai.graph import graph
 import logging
 from rich.logging import RichHandler
 
+from routers import router, limiter
+
+# load .env file (before anything reads env vars)
+load_dotenv()
 
 
 sentry_sdk.init(
@@ -38,10 +40,6 @@ log.addHandler(handler)
 log.propagate = False
 
 
-# load .env file
-load_dotenv()
-
-limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

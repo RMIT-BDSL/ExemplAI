@@ -147,8 +147,11 @@ function AuthPage() {
     }
   };
 
-  // Session loading skeleton
-  if (isSessionLoading) {
+  // Session loading skeleton — only block on the *initial* load (no session
+  // data yet). A background refetch (focus, polling, online/offline, cross-tab)
+  // also flips `isPending`, but once we already know the session we must not
+  // tear the form down to a full-screen spinner.
+  if (isSessionLoading && session === undefined) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-[var(--bg-base)] text-[var(--sea-ink)]">
         <div className="flex flex-col items-center gap-4">
