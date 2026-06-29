@@ -1,0 +1,113 @@
+name: Deploy PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-preview.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    # Gated under the single 'preview' environment for all PRs (main repository security approach)
+    environment:
+      name: preview
+      url: ${{ steps.extract_url.outputs.preview_url }}
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11.5.3
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies (Restore)
+        id: pnpm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('web/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache pnpm dependencies (Save)
+        uses: actions/cache/save@v4
+        # Only save cache if:
+        # 1. The PR is internal (not a fork)
+        # 2. It wasn't a cache hit
+        # 3. The build was successful
+        if: |
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          steps.pnpm-cache.outputs.cache-hit != 'true' &&
+          success()
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
+
+      - name: Build Application
+        run: pnpm run build
+
+      - name: Deploy to Cloudflare Workers (Upload Version)
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
+          workingDirectory: web
+
+      - name: Extract Preview URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          # Find the preview URL in the command output (e.g. ending in workers.dev)
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' | head -n 1)
+          if [ -z "$URL" ]; then
+            # Fallback regex to find any HTTP/HTTPS URL that isn't the API URL
+            URL=$(echo "$OUTPUT" | grep -oE 'https?://[a-zA-Z0-9./-]+' | grep -v 'api.cloudflare.com' | head -n 1)
+          fi
+          echo "preview_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREVIEW_URL="${{ steps.extract_url.outputs.preview_url }}"
+          if [ -z "$PREVIEW_URL" ]; then
+            BODY="🚀 **Version Uploaded Successfully!**
+
+            Preview alias \`pr-${{ github.event.pull_request.number }}\` has been assigned to this version.
+            Please verify the preview link on your Cloudflare dashboard."
+          else
+            BODY="🚀 **Preview Deployed Successfully!**
+
+            🔗 **Deployment URL**: $PREVIEW_URL"
+          fi
+          gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
