@@ -1,0 +1,57 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main # Runs whenever code is merged into main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: 'web/pnpm-lock.yaml'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+#      - name: Lint and Format Check
+#        run: pnpm check
+#        working-directory: web
+
+#      - name: Run Tests
+#        run: pnpm test
+#        working-directory: web
+
+      - name: Deploy Convex Backend
+        run: npx convex deploy
+        working-directory: web
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      - name: Build Web Frontend
+        run: pnpm build
+        working-directory: web
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}

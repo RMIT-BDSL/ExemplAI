@@ -6,6 +6,8 @@ import sentry_sdk
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from model.chat import Chat
+from ai.graph import graph
 
 # logging with rich
 import logging
