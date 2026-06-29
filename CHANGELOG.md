@@ -1,3 +1,10 @@
+## [0.6.3] - 2026-06-29
+
+### ⚙️ Miscellaneous Tasks
+
+- Initial development workflow (#20)
+- Remove lint for now
+- Update workflow
 ## [0.6.2] - 2026-06-29
 
 ### 🐛 Bug Fixes
