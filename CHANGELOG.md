@@ -1,3 +1,8 @@
+## [0.6.0] - 2026-06-29
+
+### 🚀 Features
+
+- Cloudflare deploy on pull request and on push to main (#18)
 ## [0.5.0] - 2026-06-28
 
 ### 🚀 Features
