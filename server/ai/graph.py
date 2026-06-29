@@ -1,16 +1,74 @@
-from ai.llm.openai import llm
-from langgraph.graph import StateGraph, MessagesState, START, END
+"""
+ExemplAI tutor graph.
 
-# def mock_llm(state: MessagesState):
-#     return {"messages": [{"role": "ai", "content": "hello world"}]}
+Topology (mirrors the target pipeline in CLAUDE.md):
 
-def chat(state: MessagesState):
-    # get the generation data from openai
-    response = llm.invoke(state["messages"])
-    return {"messages": [{"role": "ai", "content": response.content}]}
+    START → [experiment_router]
+        ├─ control      → control_agent_node ─────────────────┐
+        └─ experimental → orchestrator → [orchestrator_router] │
+                              ├─ complete_example_node  ───────┤
+                              ├─ faded_example_node     ───────┤
+                              └─ erroneous_example_node ───────┤
+                                                               ↓
+                                          dean_validation_node → END
 
-graph = StateGraph(MessagesState)
-graph.add_node(chat)
-graph.add_edge(START, "chat")
-graph.add_edge("chat", END)
+experiment_router and orchestrator_router are pure Python (no LLM). Every agent
+node routes through dean_validation_node — the research-integrity gate.
+"""
+
+from ai.nodes import (
+    complete_example_node,
+    control_agent_node,
+    dean_validation_node,
+    erroneous_example_node,
+    faded_example_node,
+)
+from ai.graph_router import experiment_router, orchestrator_router
+from ai.state import TutorGraphState
+from langgraph.graph import START, END, StateGraph
+
+
+def orchestrator(state: TutorGraphState):
+    """Pure pass-through branch point for the experimental group; the EBL node
+    is chosen by orchestrator_router on the outgoing conditional edge."""
+    return {}
+
+
+graph = StateGraph(TutorGraphState)
+
+graph.add_node("orchestrator", orchestrator)
+graph.add_node("control_agent_node", control_agent_node)
+graph.add_node("complete_example_node", complete_example_node)
+graph.add_node("faded_example_node", faded_example_node)
+graph.add_node("erroneous_example_node", erroneous_example_node)
+graph.add_node("dean_validation_node", dean_validation_node)
+
+# A/B split at entry (sticky condition read from state).
+graph.add_conditional_edges(
+    START,
+    experiment_router,
+    {
+        "control": "control_agent_node",
+        "experimental": "orchestrator",
+    },
+)
+
+# Experimental: BKT mastery → EBL modality.
+graph.add_conditional_edges(
+    "orchestrator",
+    orchestrator_router,
+    [
+        "complete_example_node",
+        "faded_example_node",
+        "erroneous_example_node",
+    ],
+)
+
+# Every drafted response is vetted by the Dean before reaching the student.
+graph.add_edge("control_agent_node", "dean_validation_node")
+graph.add_edge("complete_example_node", "dean_validation_node")
+graph.add_edge("faded_example_node", "dean_validation_node")
+graph.add_edge("erroneous_example_node", "dean_validation_node")
+graph.add_edge("dean_validation_node", END)
+
 graph = graph.compile()
