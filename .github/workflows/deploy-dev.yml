@@ -65,3 +65,13 @@ jobs:
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_DEV }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_DEV }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_DEV }}
+          VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_DEV }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_DEV }}
+
+      - name: Deploy to Cloudflare Workers (Dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          environment: dev
+          workingDirectory: web
