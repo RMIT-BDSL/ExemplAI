@@ -53,6 +53,10 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
             if (!value) return "Email is required";
             if (!/\S+@\S+\.\S+/.test(value))
               return "Please enter a valid email address";
+            const allowedDomain = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN;
+            if (allowedDomain && !value.toLowerCase().endsWith(`@${allowedDomain.toLowerCase()}`)) {
+              return `Only email addresses from ${allowedDomain} are allowed`;
+            }
             return undefined;
           },
         }}

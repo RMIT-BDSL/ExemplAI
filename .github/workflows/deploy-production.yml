@@ -101,6 +101,7 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          VITE_ALLOWED_EMAIL_DOMAIN: ${{ secrets.ALLOWED_EMAIL_DOMAIN }}
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -128,5 +129,8 @@ jobs:
           npx convex env set SITE_URL "${{ steps.extract_url.outputs.deployment_url }}"
           npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.deployment_url }}/api/auth"
           npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET }}"
+          npx convex env set RESEND_API_KEY "${{ secrets.RESEND_API_KEY }}"
+          npx convex env set RESEND_FROM_EMAIL "${{ secrets.RESEND_FROM_EMAIL }}"
+          npx convex env set ALLOWED_EMAIL_DOMAIN "${{ secrets.ALLOWED_EMAIL_DOMAIN }}"
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
