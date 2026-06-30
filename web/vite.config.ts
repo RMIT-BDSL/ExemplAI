@@ -19,28 +19,7 @@ const config = defineConfig({
       name: "ssr"
     }
   })],
-  server: {
-    proxy: {
-      "^/api/v1/static": {
-        target: "https://eu-assets.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
-      },
-      "^/api/v1/array": {
-        target: "https://eu-assets.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
-      },
-      "^/api/v1": {
-        target: "https://eu.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
-      },
-    },
-  },
+
 });
 
 export default config;

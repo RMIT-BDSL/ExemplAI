@@ -2,6 +2,10 @@ name: Deploy PR Preview
 
 on:
   pull_request:
+    branches:
+      - main
+      - dev
+      - develop
     types: [opened, synchronize, reopened]
     paths:
       - 'web/**'
@@ -10,16 +14,16 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  deployments: write
+  # deployments: write
 
 jobs:
   deploy:
     name: Deploy Preview
     runs-on: ubuntu-latest
     # Gated under the single 'preview' environment for all PRs (main repository security approach)
-    environment:
-      name: preview
-      url: ${{ steps.extract_url.outputs.preview_url }}
+    # environment:
+    #   name: preview
+    #   url: ${{ steps.extract_url.outputs.preview_url }}
 
     defaults:
       run:
@@ -35,9 +39,9 @@ jobs:
           node-version: 22
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 11.5.3
+          version: 11
 
       - name: Get pnpm store directory
         shell: bash
@@ -70,8 +74,15 @@ jobs:
           path: ${{ env.STORE_PATH }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
-      - name: Build Application
-        run: pnpm run build
+      - name: Deploy Convex Backend & Build Application (Preview)
+        run: npx convex deploy --cmd "node build-wrapper.js" --cmd-url-env-var-name VITE_CONVEX_URL
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+          CLOUDFLARE_ENV: preview
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_PREVIEW }}
 
       - name: Deploy to Cloudflare Workers (Upload Version)
         id: deploy
@@ -79,7 +90,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
+          command: versions upload --config dist/server/wrangler.json --preview-alias pr-${{ github.event.pull_request.number }}
           workingDirectory: web
 
       - name: Extract Preview URL
@@ -95,19 +106,29 @@ jobs:
           fi
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
 
+      - name: Update Convex Environment Variables
+        run: |
+          npx convex env set SITE_URL "${{ steps.extract_url.outputs.preview_url }}"
+          npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.preview_url }}/api/auth"
+          npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+
       - name: Comment on PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PREVIEW_URL="${{ steps.extract_url.outputs.preview_url }}"
           if [ -z "$PREVIEW_URL" ]; then
-            BODY="🚀 **Version Uploaded Successfully!**
+            BODY="### 🚀 Preview Deployment Successful!
 
-            Preview alias \`pr-${{ github.event.pull_request.number }}\` has been assigned to this version.
-            Please verify the preview link on your Cloudflare dashboard."
+            - **Convex Backend**: Deployed preview backend.
+            - **Cloudflare Frontend**: Version uploaded successfully with alias \`pr-${{ github.event.pull_request.number }}\`."
           else
-            BODY="🚀 **Preview Deployed Successfully!**
+            BODY="### 🚀 Preview Deployment Successful!
 
-            🔗 **Deployment URL**: $PREVIEW_URL"
+            - **Convex Backend**: Deployed preview backend.
+            - **Cloudflare Frontend**: Deployed successfully!
+            - 🔗 **Deployment URL**: $PREVIEW_URL"
           fi
           gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
