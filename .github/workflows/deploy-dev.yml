@@ -54,17 +54,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy Convex Backend (Dev)
-        run: npx convex deploy
+      - name: Deploy Convex Backend & Build Application (Dev)
+        run: npx convex deploy --cmd "node build-wrapper.js" --cmd-url-env-var-name VITE_CONVEX_URL
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}
-
-      - name: Build Web Frontend (Dev)
-        run: pnpm run build
-        env:
           CLOUDFLARE_ENV: dev
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
-          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}
           VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_PREVIEW }}
@@ -91,3 +85,11 @@ jobs:
             URL=$(echo "$OUTPUT" | grep -oE 'https?://[a-zA-Z0-9./-]+' | grep -v 'api.cloudflare.com' | head -n 1)
           fi
           echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Update Convex Environment Variables
+        run: |
+          npx convex env set SITE_URL "${{ steps.extract_url.outputs.deployment_url }}"
+          npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.deployment_url }}/api/auth"
+          npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}

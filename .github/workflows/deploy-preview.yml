@@ -74,17 +74,11 @@ jobs:
           path: ${{ env.STORE_PATH }}
           key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
 
-      - name: Deploy Convex Backend (Preview)
-        run: npx convex deploy
+      - name: Deploy Convex Backend & Build Application (Preview)
+        run: npx convex deploy --cmd "node build-wrapper.js" --cmd-url-env-var-name VITE_CONVEX_URL
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}
-
-      - name: Build Application
-        run: pnpm run build
-        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
           CLOUDFLARE_ENV: preview
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
-          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}
           VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_PREVIEW }}
@@ -111,6 +105,14 @@ jobs:
             URL=$(echo "$OUTPUT" | grep -oE 'https?://[a-zA-Z0-9./-]+' | grep -v 'api.cloudflare.com' | head -n 1)
           fi
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Update Convex Environment Variables
+        run: |
+          npx convex env set SITE_URL "${{ steps.extract_url.outputs.preview_url }}"
+          npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.preview_url }}/api/auth"
+          npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
 
       - name: Comment on PR
         env:
