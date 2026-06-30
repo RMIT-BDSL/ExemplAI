@@ -82,6 +82,7 @@ jobs:
       - name: Build Application
         run: pnpm run build
         env:
+          CLOUDFLARE_ENV: preview
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
@@ -96,7 +97,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           environment: preview
-          command: versions upload --env preview --preview-alias pr-${{ github.event.pull_request.number }}
+          command: versions upload --config dist/server/wrangler.json --preview-alias pr-${{ github.event.pull_request.number }}
           workingDirectory: web
 
       - name: Extract Preview URL

@@ -61,6 +61,7 @@ jobs:
       - name: Build Web Frontend (Dev)
         run: pnpm run build
         env:
+          CLOUDFLARE_ENV: dev
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
@@ -73,5 +74,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          environment: dev
+          command: deploy --config dist/server/wrangler.json
           workingDirectory: web
