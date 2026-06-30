@@ -49,7 +49,7 @@ const CreateCodeForm: Component<Props> = (props) => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} class="p-6 flex flex-col gap-5 lg:flex-row lg:items-end">
+      <form onsubmit={handleSubmit} class="p-6 flex flex-col gap-5 lg:flex-row lg:items-end">
         {/* Code */}
         <div class="flex-1">
           <label for="code" class="block font-mono text-[11px] uppercase tracking-[0.14em] text-muted">

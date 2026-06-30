@@ -12,6 +12,7 @@ import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { authClient } from "#/lib/auth-client";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
+import { Toaster } from "#/components/ui/sonner";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL, {
   // Don't fire auth-dependent queries until the better-auth token is loaded.
@@ -70,6 +71,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             {children}
           </ConvexBetterAuthProvider>
         </PostHogProvider>
+        <Toaster position="top-center" />
         {import.meta.env.DEV && (
           <TanStackDevtools
             config={{

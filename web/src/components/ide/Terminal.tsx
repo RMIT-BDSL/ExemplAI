@@ -1,4 +1,5 @@
 import { Loader2, Sparkles, X } from "lucide-react";
+import TestCasesView from "./TestCasesView";
 
 interface ExecutionResult {
     time?: string;
@@ -143,15 +144,15 @@ export function ConsolePlaceholder() {
 }
 
 interface TerminalProps {
-    setActiveTab: (tab: "result" | "stdout") => void;
+    setActiveTab: (tab: "result" | "stdout" | "testcases") => void;
     hasStdout: boolean;
     isLoading: boolean;
     executionResult: ExecutionResult | null | undefined;
-    activeTab: "result" | "stdout";
+    activeTab: "result" | "stdout" | "testcases";
     setIsConsoleOpen: (open: boolean) => void;
     renderStatusBadge: () => React.ReactNode;
-    // Hand the current error off to the AI chat (with code + problem context).
     onSendErrorToChat?: (error: string) => void;
+    testCases: any[];
 }
 
 export default function Terminal({
@@ -163,8 +164,8 @@ export default function Terminal({
     setIsConsoleOpen,
     renderStatusBadge,
     onSendErrorToChat,
+    testCases,
 }: TerminalProps) {
-    // The error text the student is looking at, if any.
     const errorText =
         executionResult?.compile_output || executionResult?.stderr || "";
     return (
@@ -174,14 +175,26 @@ export default function Terminal({
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={() => setActiveTab("result")}
-                        className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "result"
+                        onClick={() => setActiveTab("testcases")}
+                        className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "testcases"
                             ? "border-emerald-500 text-emerald-500"
                             : "border-transparent text-zinc-400 hover:text-zinc-200"
                             }`}
                     >
-                        Result
+                        Test Cases
                     </button>
+                    {executionResult && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("result")}
+                            className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "result"
+                                ? "border-emerald-500 text-emerald-500"
+                                : "border-transparent text-zinc-400 hover:text-zinc-200"
+                                }`}
+                        >
+                            Result
+                        </button>
+                    )}
                     {hasStdout && (
                         <button
                             type="button"
@@ -213,53 +226,55 @@ export default function Terminal({
                             Executing student code against testing harness...
                         </span>
                     </div>
-                ) : executionResult ? (
-                    activeTab === "result" ? (
-                        <div className="space-y-4">
-                            <ExecutionStatus
-                                executionResult={executionResult}
-                                renderStatusBadge={renderStatusBadge}
-                            />
+                ) : (
+                    activeTab === "testcases" ? (
+                        <TestCasesView testCases={testCases} executionResult={executionResult} />
+                    ) : executionResult ? (
+                        activeTab === "result" ? (
+                            <div className="space-y-4">
+                                <ExecutionStatus
+                                    executionResult={executionResult}
+                                    renderStatusBadge={renderStatusBadge}
+                                />
 
-                            {executionResult.compile_output && (
-                                <CompilerOutput output={executionResult.compile_output} />
-                            )}
-
-                            {executionResult.stderr && (
-                                <RuntimeStderr stderr={executionResult.stderr} />
-                            )}
-
-                            {!executionResult.compile_output &&
-                                !executionResult.stderr &&
-                                !executionResult.stdout && <SuccessEmptyOutput />}
-
-                            {!executionResult.compile_output &&
-                                !executionResult.stderr &&
-                                executionResult.stdout && (
-                                    <StdoutPreview
-                                        stdout={executionResult.stdout}
-                                        setActiveTab={setActiveTab}
-                                    />
+                                {executionResult.compile_output && (
+                                    <CompilerOutput output={executionResult.compile_output} />
                                 )}
 
-                            {/* Hand the error to the AI assistant, along with
-                                the student's code and the problem id. */}
-                            {errorText && onSendErrorToChat && (
-                                <button
-                                    type="button"
-                                    onClick={() => onSendErrorToChat(errorText)}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors active:scale-95"
-                                >
-                                    <Sparkles className="size-3.5" />
-                                    <span>Ask AI about this error</span>
-                                </button>
-                            )}
-                        </div>
+                                {executionResult.stderr && (
+                                    <RuntimeStderr stderr={executionResult.stderr} />
+                                )}
+
+                                {!executionResult.compile_output &&
+                                    !executionResult.stderr &&
+                                    !executionResult.stdout && <SuccessEmptyOutput />}
+
+                                {!executionResult.compile_output &&
+                                    !executionResult.stderr &&
+                                    executionResult.stdout && (
+                                        <StdoutPreview
+                                            stdout={executionResult.stdout}
+                                            setActiveTab={setActiveTab}
+                                        />
+                                    )}
+
+                                {errorText && onSendErrorToChat && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onSendErrorToChat(errorText)}
+                                        className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors active:scale-95"
+                                    >
+                                        <Sparkles className="size-3.5" />
+                                        <span>Ask AI about this error</span>
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <FullStdout stdout={executionResult.stdout} />
+                        )
                     ) : (
-                        <FullStdout stdout={executionResult.stdout} />
+                        <ConsolePlaceholder />
                     )
-                ) : (
-                    <ConsolePlaceholder />
                 )}
             </div>
         </div>

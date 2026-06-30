@@ -12,6 +12,9 @@
   "env": {
     "preview": {
       "name": "exemplai-preview"
+    },
+    "dev": {
+      "name": "exemplai-dev"
     }
   }
 }
