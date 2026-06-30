@@ -61,12 +61,12 @@ jobs:
       - name: Build Web Frontend (Dev)
         run: pnpm run build
         env:
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_DEV }}
-          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_DEV }}
-          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_DEV }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_DEV }}
-          VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_DEV }}
-          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_DEV }}
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_PREVIEW }}
 
       - name: Deploy to Cloudflare Workers (Dev)
         uses: cloudflare/wrangler-action@v3
