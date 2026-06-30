@@ -3,17 +3,18 @@ Database access layer (Supabase).
 
 Query functions only — no business logic (that's services.py) and no HTTP
 (that's routers.py). The Supabase client is created lazily on first use from
-SUPABASE_URL / SUPABASE_KEY.
+SUPABASE_URL / SUPABASE_SECRET_KEY.
 
 NOTE: the BKT table/column names below are assumptions — adjust the constants to
 match the actual schema once it's finalized.
 """
 
-import os
 import logging
 from typing import Optional
 
 from supabase import Client, create_client
+
+from config import settings
 
 log = logging.getLogger("rich")
 
@@ -30,10 +31,10 @@ def _get_client() -> Client:
     """Lazily create and cache the Supabase client."""
     global _client
     if _client is None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
+        url = settings.SUPABASE_URL
+        key = settings.SUPABASE_SECRET_KEY.get_secret_value()
         if not url or not key:
-            raise RuntimeError("SUPABASE_URL / SUPABASE_KEY are not configured.")
+            raise RuntimeError("SUPABASE_URL / SUPABASE_SECRET_KEY are not configured.")
         _client = create_client(url, key)
     return _client
 

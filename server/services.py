@@ -5,7 +5,6 @@ Routes in routers.py stay thin (HTTP wiring only) and delegate to these. DB
 access belongs in repository.py, not here.
 """
 
-import os
 import json
 import logging
 from typing import AsyncGenerator
@@ -14,14 +13,12 @@ import httpx
 from fastapi import HTTPException, status
 from sentry_sdk import metrics
 
+from config import settings
 from model.student_code import StudentCode
 from model.chat import Chat
 from ai.graph import graph
 
 log = logging.getLogger("rich")
-
-# todo: allow easy update of the following
-is_rapidapi = os.getenv("IS_RAPIDAPI") == "True"
 
 
 async def execute_code(student_code: StudentCode) -> dict:
@@ -29,7 +26,7 @@ async def execute_code(student_code: StudentCode) -> dict:
     # count to sentry for analytics
     metrics.count("code.execution", 1)
     # send the code to judge0
-    endpoint = os.getenv('JUDGE0_ENDPOINT')
+    endpoint = settings.JUDGE0_ENDPOINT
     if not endpoint:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -44,16 +41,16 @@ async def execute_code(student_code: StudentCode) -> dict:
     }
     # setup headers if auth key is provided
     headers = {}
-    auth_key = os.getenv('JUDGE0_AUTH_KEY')
-    if auth_key and not is_rapidapi:
+    auth_key = settings.JUDGE0_AUTH_KEY.get_secret_value()
+    if auth_key and not settings.IS_RAPIDAPI:
         headers['X-Auth-Token'] = auth_key
 
     # support for rapidapi and that both string is not empty
-    is_rapidapiconfig_valid = os.getenv('RAPIDAPI_KEY', '').strip() and os.getenv('RAPIDAPI_HOST', '').strip()
-    if is_rapidapi and is_rapidapiconfig_valid:
-        headers['X-RapidAPI-Key'] = os.getenv('RAPIDAPI_KEY', '')
+    is_rapidapiconfig_valid = settings.RAPIDAPI_KEY.get_secret_value().strip() and settings.RAPIDAPI_HOST.strip()
+    if settings.IS_RAPIDAPI and is_rapidapiconfig_valid:
+        headers['X-RapidAPI-Key'] = settings.RAPIDAPI_KEY.get_secret_value()
         # Clean protocol scheme from Host if present (e.g. 'https://host' -> 'host')
-        host = os.getenv('RAPIDAPI_HOST', '')
+        host = settings.RAPIDAPI_HOST
         if "://" in host:
             host = host.split("://")[-1]
         headers['X-RapidAPI-Host'] = host

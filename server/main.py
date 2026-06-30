@@ -1,12 +1,10 @@
 from typing import Optional
-import os
 import httpx
 import ast
 import asyncio
 from model.student_code import StudentCode
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 import sentry_sdk
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -18,14 +16,12 @@ from ai.graph import graph
 import logging
 from rich.logging import RichHandler
 
+from config import settings, log_config_summary
 from routers import router, limiter
-
-# load .env file (before anything reads env vars)
-load_dotenv()
 
 
 sentry_sdk.init(
-    dsn=os.getenv('SENTRY_DSN'),
+    dsn=settings.SENTRY_DSN.get_secret_value() or None,
     # Add data like request headers and IP for users,
     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
     send_default_pii=True,
@@ -38,6 +34,9 @@ handler = RichHandler(rich_tracebacks=True)
 handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
 log.addHandler(handler)
 log.propagate = False
+
+# Log which integrations are configured (booleans only — never secret values).
+log_config_summary()
 
 
 app = FastAPI()
@@ -61,8 +60,7 @@ app.add_middleware(
 def read_root():
     return {"Hello": "World"}
 
-# todo: allow easy update of the following
-is_rapidapi = os.getenv("IS_RAPIDAPI") == "True"
+is_rapidapi = settings.IS_RAPIDAPI
 
 def wrap_code_with_runner(student_code: str, starter_code: Optional[str], solution_code: Optional[str]) -> str:
     func_name = None
@@ -196,23 +194,23 @@ async def run_single_test_case(client, code, language_id, test_case, exec_url, h
 @limiter.limit("10/minute")
 async def judge0_execution(student_code: StudentCode, request: Request):
     metrics.count("code.execution", 1)
-    endpoint = os.getenv('JUDGE0_ENDPOINT')
+    endpoint = settings.JUDGE0_ENDPOINT
     if not endpoint:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="JUDGE0_ENDPOINT environment variable is not configured."
         )
     exec_url = endpoint.rstrip('/') + '/submissions?base64_encoded=false&wait=true'
-    
+
     headers = {}
-    auth_key = os.getenv('JUDGE0_AUTH_KEY')
+    auth_key = settings.JUDGE0_AUTH_KEY.get_secret_value()
     if auth_key and not is_rapidapi:
         headers['X-Auth-Token'] = auth_key
 
-    is_rapidapiconfig_valid = os.getenv('RAPIDAPI_KEY', '').strip() and os.getenv('RAPIDAPI_HOST', '').strip()
+    is_rapidapiconfig_valid = settings.RAPIDAPI_KEY.get_secret_value().strip() and settings.RAPIDAPI_HOST.strip()
     if is_rapidapi and is_rapidapiconfig_valid:
-        headers['X-RapidAPI-Key'] = os.getenv('RAPIDAPI_KEY', '')
-        host = os.getenv('RAPIDAPI_HOST', '')
+        headers['X-RapidAPI-Key'] = settings.RAPIDAPI_KEY.get_secret_value()
+        host = settings.RAPIDAPI_HOST
         if "://" in host:
             host = host.split("://")[-1]
         headers['X-RapidAPI-Host'] = host
