@@ -141,6 +141,12 @@ export type PublicApiType = {
       Record<string, never>,
       any
     >;
+    removeAllAdminAccounts: FunctionReference<
+      "mutation",
+      "public",
+      Record<string, never>,
+      any
+    >;
   };
   lessons: {
     createLesson: FunctionReference<

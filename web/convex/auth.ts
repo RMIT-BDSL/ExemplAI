@@ -49,6 +49,9 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>): BetterAuthOptions
       ...(process.env.VITE_TRUSTED_ORIGINS?.split(",") || []),
     ],
     user: {
+      deleteUser: {
+        enabled: true
+      },
       additionalFields: {
         isAnonymous: { type: "boolean", required: false },
         phone: { type: "string", required: false },
