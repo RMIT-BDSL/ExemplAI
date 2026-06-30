@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: development
-      url: ${{ steps.deploy.outputs.deployment-url }}
+      url: ${{ steps.extract_url.outputs.deployment_url }}
 
     defaults:
       run:
@@ -71,9 +71,23 @@ jobs:
           VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_PREVIEW }}
 
       - name: Deploy to Cloudflare Workers (Dev)
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config dist/server/wrangler.json
           workingDirectory: web
+
+      - name: Extract Deployment URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          # Find the deployment URL in the command output (e.g. ending in workers.dev)
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' | head -n 1)
+          if [ -z "$URL" ]; then
+            # Fallback regex to find any HTTP/HTTPS URL that isn't the API URL
+            URL=$(echo "$OUTPUT" | grep -oE 'https?://[a-zA-Z0-9./-]+' | grep -v 'api.cloudflare.com' | head -n 1)
+          fi
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
