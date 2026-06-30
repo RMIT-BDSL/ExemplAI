@@ -96,7 +96,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           environment: preview
-          command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
+          command: versions upload --env preview --preview-alias pr-${{ github.event.pull_request.number }}
           workingDirectory: web
 
       - name: Extract Preview URL
