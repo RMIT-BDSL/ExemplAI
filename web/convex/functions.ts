@@ -17,8 +17,15 @@ export const authenticatedQuery = customQuery(query, {
       throw new Error("Unauthenticated");
     }
 
+    const customUser = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", user._id))
+      .unique();
+
+    const isAdmin = user.role === "admin" || customUser?.role === "admin";
+
     // Admins bypass the student profile requirement
-    if (user.role !== "admin") {
+    if (!isAdmin) {
       const profile = await ctx.db
         .query("userProfiles")
         .withIndex("by_token", (q) => q.eq("tokenIdentifier", user._id))
@@ -28,7 +35,8 @@ export const authenticatedQuery = customQuery(query, {
       }
     }
 
-    return { ctx: { ...ctx, user }, args: {} };
+    // Attach customUser if needed, or just include isAdmin in context
+    return { ctx: { ...ctx, user, customUser, isAdmin }, args: {} };
   },
 });
 
@@ -46,8 +54,15 @@ export const authenticatedMutation = customMutation(mutation, {
       throw new Error("Unauthenticated");
     }
 
+    const customUser = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", user._id))
+      .unique();
+
+    const isAdmin = user.role === "admin" || customUser?.role === "admin";
+
     // Admins bypass the student profile requirement
-    if (user.role !== "admin") {
+    if (!isAdmin) {
       const profile = await ctx.db
         .query("userProfiles")
         .withIndex("by_token", (q) => q.eq("tokenIdentifier", user._id))
@@ -57,7 +72,7 @@ export const authenticatedMutation = customMutation(mutation, {
       }
     }
 
-    return { ctx: { ...ctx, user }, args: {} };
+    return { ctx: { ...ctx, user, customUser, isAdmin }, args: {} };
   },
 });
 
@@ -68,7 +83,7 @@ export const authenticatedMutation = customMutation(mutation, {
 export const adminQuery = customQuery(authenticatedQuery, {
   args: {},
   input: async (ctx) => {
-    if (ctx.user.role !== "admin") {
+    if (!ctx.isAdmin) {
       throw new Error("Unauthorized: Admin privilege required");
     }
     return { ctx, args: {} };
@@ -82,7 +97,7 @@ export const adminQuery = customQuery(authenticatedQuery, {
 export const adminMutation = customMutation(authenticatedMutation, {
   args: {},
   input: async (ctx) => {
-    if (ctx.user.role !== "admin") {
+    if (!ctx.isAdmin) {
       throw new Error("Unauthorized: Admin privilege required");
     }
     return { ctx, args: {} };

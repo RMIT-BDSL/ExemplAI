@@ -38,6 +38,14 @@ export const createAdminUser = internalMutation({
       });
     }
 
+    await ctx.runMutation(components.betterAuth.adapter.updateOne, {
+      input: {
+        model: "user",
+        where: [{ field: "_id", value: user.user.id }],
+        update: { role: "admin" },
+      },
+    });
+
     return { success: true, userId: user.user.id };
   },
 });
