@@ -6,8 +6,8 @@ on:
       - dev
       - develop
     paths:
-      - 'admin/**'
-      - '.github/workflows/deploy-admin-dev.yml'
+      - "admin/**"
+      - ".github/workflows/deploy-admin-dev.yml"
 
 permissions:
   contents: read
@@ -57,8 +57,8 @@ jobs:
       - name: Build Application
         run: pnpm run build
         env:
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_DEV }}
-          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_DEV }}
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
 
       - name: Deploy to Cloudflare Pages (Dev)
         id: deploy
