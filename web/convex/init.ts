@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { createAuth, authComponent } from "./auth";
+import { components } from "./_generated/api";
 
 export const createAdminUser = mutation({
   args: {},
@@ -44,76 +45,116 @@ export const createAdminUser = mutation({
 export const removeAllAdminAccounts = mutation({
   args: {},
   handler: async (ctx) => {
-    // Retrieve all users with "admin" role
-    const adminUsers = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("role"), "admin"))
-      .collect();
+    const email = process.env.ADMIN_EMAIL;
+
+    // 1. Fetch all Better Auth users (up to 100)
+    const betterAuthUsersPage = await ctx.runQuery(components.betterAuth.adapter.findMany, {
+      model: "user",
+      paginationOpts: { cursor: null, numItems: 100 },
+    });
+    const betterAuthUsers = betterAuthUsersPage.page;
+
+    // 2. Fetch all custom users
+    const customUsers = await ctx.db.query("users").collect();
+
+    // 3. Collect Better Auth IDs and custom user IDs that should be deleted
+    const betterAuthIdsToDelete = new Set<string>();
+    for (const u of betterAuthUsers) {
+      const isTargetEmail = email && u.email === email;
+      const isTargetRole = u.role === "admin";
+      const isTargetName = u.name === "Staff Member";
+      if (isTargetEmail || isTargetRole || isTargetName) {
+        betterAuthIdsToDelete.add(u._id);
+      }
+    }
+
+    const customUserIdsToDelete = new Set<any>();
+    for (const u of customUsers) {
+      const isTargetEmail = email && u.email === email;
+      const isTargetRole = u.role === "admin";
+      const isTargetName = u.name === "Staff Member";
+      const matchesBetterAuthId = u.tokenIdentifier && betterAuthIdsToDelete.has(u.tokenIdentifier);
+      if (isTargetEmail || isTargetRole || isTargetName || matchesBetterAuthId) {
+        customUserIdsToDelete.add(u._id);
+        if (u.tokenIdentifier) {
+          betterAuthIdsToDelete.add(u.tokenIdentifier);
+        }
+      }
+    }
+
+    // Double check mapping from custom users back to Better Auth IDs
+    for (const u of customUsers) {
+      if (u.tokenIdentifier && betterAuthIdsToDelete.has(u.tokenIdentifier)) {
+        customUserIdsToDelete.add(u._id);
+      }
+    }
 
     let deletedCount = 0;
-    const auth = createAuth(ctx);
-    const adapter = authComponent.adapter(ctx);
 
-    for (const adminUser of adminUsers) {
-      // 1. Delete profiles associated with this admin
+    // 4. Delete sessions, accounts, and users from Better Auth
+    for (const betterAuthId of betterAuthIdsToDelete) {
+      // Delete sessions
+      await ctx.runMutation(components.betterAuth.adapter.deleteMany, {
+        input: {
+          where: [{ field: "userId", value: betterAuthId }],
+          model: "session",
+        },
+        paginationOpts: { cursor: null, numItems: 100 },
+      });
+
+      // Delete accounts
+      await ctx.runMutation(components.betterAuth.adapter.deleteMany, {
+        input: {
+          where: [{ field: "userId", value: betterAuthId }],
+          model: "account",
+        },
+        paginationOpts: { cursor: null, numItems: 100 },
+      });
+
+      // Delete user
+      await ctx.runMutation(components.betterAuth.adapter.deleteOne, {
+        input: {
+          where: [{ field: "_id", value: betterAuthId }],
+          model: "user",
+        },
+      });
+
+      deletedCount++;
+    }
+
+    // 5. Delete from custom tables (profiles, progress, users)
+    for (const customUserId of customUserIdsToDelete) {
+      // Delete profiles
       const profiles = await ctx.db
         .query("userProfiles")
-        .withIndex("by_user_id", (q) => q.eq("userId", adminUser._id))
+        .withIndex("by_user_id", (q) => q.eq("userId", customUserId))
         .collect();
       for (const profile of profiles) {
         await ctx.db.delete(profile._id);
       }
 
-      // 2. Delete lesson progress associated with this admin
+      // Delete lesson progress
       const progress = await ctx.db
         .query("lessonProgress")
-        .withIndex("by_user", (q) => q.eq("userId", adminUser._id))
+        .withIndex("by_user", (q) => q.eq("userId", customUserId))
         .collect();
       for (const prog of progress) {
         await ctx.db.delete(prog._id);
       }
 
-      // 3. Delete from Better Auth using the official deleteUser API if tokenIdentifier is set
-      if (adminUser.tokenIdentifier) {
-        // Query sessions for the admin
-        const sessions = await adapter.findMany({
-          model: "session",
-          where: [
-            {
-              field: "userId",
-              value: adminUser.tokenIdentifier,
-            },
-          ],
-        });
+      // Delete user
+      await ctx.db.delete(customUserId);
+    }
 
-        let sessionToken: string;
-        if (sessions && sessions.length > 0) {
-          sessionToken = sessions[0].token;
-        } else {
-          sessionToken = "temp-admin-delete-session-" + adminUser._id + "-" + Date.now();
-          await adapter.create({
-            model: "session",
-            data: {
-              userId: adminUser.tokenIdentifier,
-              token: sessionToken,
-              expiresAt: Date.now() + 60 * 1000, // 1 minute
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            },
-          });
-        }
-
-        const headers = new Headers();
-        headers.set("Authorization", `Bearer ${sessionToken}`);
-
-        await auth.api.deleteUser({
-          headers,
-        });
+    // 6. Delete orphan profiles that might match any deleted Better Auth IDs
+    for (const betterAuthId of betterAuthIdsToDelete) {
+      const profilesByToken = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", betterAuthId))
+        .collect();
+      for (const profile of profilesByToken) {
+        await ctx.db.delete(profile._id);
       }
-
-      // 4. Delete the user from the custom users table
-      await ctx.db.delete(adminUser._id);
-      deletedCount++;
     }
 
     return { success: true, count: deletedCount };
@@ -123,17 +164,21 @@ export const removeAllAdminAccounts = mutation({
 export const listBetterAuthData = mutation({
   args: {},
   handler: async (ctx) => {
-    const adapter = authComponent.adapter(ctx);
-    const users = await adapter.findMany({
+    const paginationOpts = { cursor: null, numItems: 100 };
+    const users = await ctx.runQuery(components.betterAuth.adapter.findMany, {
       model: "user",
+      paginationOpts,
     });
-    const accounts = await adapter.findMany({
+    const accounts = await ctx.runQuery(components.betterAuth.adapter.findMany, {
       model: "account",
+      paginationOpts,
     });
-    const sessions = await adapter.findMany({
+    const sessions = await ctx.runQuery(components.betterAuth.adapter.findMany, {
       model: "session",
+      paginationOpts,
     });
-    return { users, accounts, sessions };
+    const customUsers = await ctx.db.query("users").collect();
+    return { users, accounts, sessions, customUsers };
   },
 });
 
