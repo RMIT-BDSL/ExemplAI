@@ -1,0 +1,78 @@
+name: Deploy Admin Development
+
+on:
+  push:
+    branches:
+      - dev
+      - develop
+    paths:
+      - 'admin/**'
+      - '.github/workflows/deploy-admin-dev.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Admin Development
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ steps.extract_url.outputs.deployment_url }}
+
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-admin-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-admin-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Application
+        run: pnpm run build
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_DEV }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_DEV }}
+
+      - name: Deploy to Cloudflare Pages (Dev)
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name admin-exemplai-dev --branch dev
+          workingDirectory: admin
+
+      - name: Extract Deployment URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | head -n 1)
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
