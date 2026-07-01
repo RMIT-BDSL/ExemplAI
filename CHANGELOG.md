@@ -1,3 +1,8 @@
+## [0.6.4] - 2026-06-29
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove pr preview metadata
 ## [0.6.3] - 2026-06-29
 
 ### ⚙️ Miscellaneous Tasks
