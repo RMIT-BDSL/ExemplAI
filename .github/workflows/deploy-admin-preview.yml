@@ -95,6 +95,22 @@ jobs:
           URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | head -n 1)
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
 
+      - name: Whitelist Admin Origin in Convex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+        run: |
+          NEW_URL="${{ steps.extract_url.outputs.preview_url }}"
+          if [ -n "$NEW_URL" ]; then
+            CURRENT_ORIGINS=$(npx convex env get VITE_TRUSTED_ORIGINS || echo "")
+            if [[ ! "$CURRENT_ORIGINS" == *"$NEW_URL"* ]]; then
+              NEW_ORIGINS="${CURRENT_ORIGINS:+$CURRENT_ORIGINS,}$NEW_URL"
+              npx convex env set VITE_TRUSTED_ORIGINS "$NEW_ORIGINS"
+              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS"
+            else
+              echo "URL $NEW_URL is already whitelisted in Convex"
+            fi
+          fi
+
       - name: Comment on PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
