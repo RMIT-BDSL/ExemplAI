@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getPostHogClient } from "#/utils/posthog-server";
+// import { getPostHogClient } from "#/utils/posthog-server";
 import { fetchAuthQuery } from "./auth-server";
 import { api } from "../../convex/_generated/api";
 
@@ -16,6 +16,12 @@ export const checkUserExists = createServerFn({ method: "POST" })
     return { exists };
   });
 
+export const validateInvitationCode = createServerFn({ method: "POST" })
+  .validator((code: string) => code)
+  .handler(async ({ data: code }) => {
+    return await fetchAuthQuery(api.invitationCodes.validateCode, { code });
+  });
+
 /**
  * Server-side capture of a completed sign-in.
  *
@@ -25,6 +31,7 @@ export const checkUserExists = createServerFn({ method: "POST" })
  * `posthog-node` guarantees it is recorded even if the client disconnects before
  * its own event flushes, and lets us attribute it to the authenticated user id.
  */
+/*
 export const captureSignIn = createServerFn({ method: "POST" })
   .validator(
     (data: { distinctId: string; method: string; email?: string }) => data,
@@ -40,4 +47,5 @@ export const captureSignIn = createServerFn({ method: "POST" })
     await posthog.flush();
     return { ok: true };
   });
+*/
 

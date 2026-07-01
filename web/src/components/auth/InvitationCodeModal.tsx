@@ -1,3 +1,4 @@
+/*
 import * as React from "react";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 import { AuthTextField } from "./AuthTextField";
@@ -84,3 +85,4 @@ export function InvitationCodeModal({
     </div>
   );
 }
+*/

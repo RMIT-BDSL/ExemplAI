@@ -4,19 +4,19 @@ import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { stripSearchParams } from "#/lib/auth-callback";
-import { captureSignIn, getSession } from "#/lib/auth.functions";
+import { /* captureSignIn, */ getSession } from "#/lib/auth.functions";
 import Navbar from "#/components/nav/Navbar";
 
 interface AuthenticatedSearch {
   code?: string;
-  magic?: boolean;
+  // magic?: boolean;
 }
 
 export const Route = createFileRoute("/_authenticated")({
   validateSearch: (search: Record<string, unknown>): AuthenticatedSearch => {
     return {
       code: typeof search.code === "string" ? search.code : undefined,
-      magic: search.magic === "1" || search.magic === true,
+      // magic: search.magic === "1" || search.magic === true,
     };
   },
   beforeLoad: async ({ location }) => {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const { session } = Route.useRouteContext();
-  const { code, magic } = Route.useSearch();
+  const { code /*, magic */ } = Route.useSearch();
   const navigate = useNavigate();
   const posthog = usePostHog();
   const createUserAndUseCode = useMutation(api.invitationCodes.createUserAndUseCode);
@@ -46,6 +46,7 @@ function AuthenticatedLayout() {
   // Magic-link sign-in completion: the user followed the link in their email and
   // landed here authenticated. This is the only point where a magic-link sign-in
   // is observable, so identify the user and capture the event (client + server).
+  /*
   useEffect(() => {
     if (!session?.user || !magic) return;
 
@@ -73,6 +74,7 @@ function AuthenticatedLayout() {
       replace: true,
     });
   }, [session, magic, posthog, navigate]);
+  */
 
   useEffect(() => {
     if (session?.user && code) {

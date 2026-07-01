@@ -6,11 +6,11 @@ import * as React from "react";
 import { AlreadySignedIn } from "#/components/auth/AlreadySignedIn";
 import { AuthCard } from "#/components/auth/AuthCard";
 import { AuthTabs } from "#/components/auth/AuthTabs";
-import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
+// import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
 import { SignInForm } from "#/components/auth/forms/SignInForm";
 import { SignUpForm } from "#/components/auth/forms/SignUpForm";
-import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
-import { buildMagicLinkCallback } from "#/lib/auth-callback";
+// import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
+// import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
@@ -65,19 +65,20 @@ function AuthPage() {
   const posthog = usePostHog();
 
   const [activeTab, setActiveTab] = React.useState<
-    "signin" | "signup" | "magiclink"
+    "signin" | "signup" // | "magiclink"
   >("signin");
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [globalError, setGlobalError] = React.useState("");
 
   // Magic Link Invitation Code Modal States
-  const [showMagicCodeModal, setShowMagicCodeModal] = React.useState(false);
-  const [magicEmail, setMagicEmail] = React.useState("");
-  const [modalError, setModalError] = React.useState("");
-  const [isSubmittingModal, setIsSubmittingModal] = React.useState(false);
+  // const [showMagicCodeModal, setShowMagicCodeModal] = React.useState(false);
+  // const [magicEmail, setMagicEmail] = React.useState("");
+  // const [modalError, setModalError] = React.useState("");
+  // const [isSubmittingModal, setIsSubmittingModal] = React.useState(false);
 
   // Handle invitation code submission for magic link new users
+  /*
   const handleModalSubmit = async (codeToSubmit: string) => {
     setModalError("");
     setIsSubmittingModal(true);
@@ -121,6 +122,7 @@ function AuthPage() {
       setIsSubmittingModal(false);
     }
   };
+  */
 
   // Reset message states when tab changes
   React.useEffect(() => {
@@ -185,16 +187,22 @@ function AuthPage() {
         title={
           activeTab === "signin"
             ? "Welcome Back"
+            : "Create Account"
+            /*
             : activeTab === "magiclink"
               ? "Magic Link"
               : "Create Account"
+            */
         }
         subtitle={
           activeTab === "signin"
             ? "Sign in with your email and password to access the platform."
+            : "Sign up to start tracking your learning progress and assignments."
+            /*
             : activeTab === "magiclink"
               ? "Enter your email to receive a passwordless sign-in link."
               : "Sign up to start tracking your learning progress and assignments."
+            */
         }
       >
         {/* M3 Segmented Tabs */}
@@ -235,6 +243,7 @@ function AuthPage() {
           />
         )}
 
+        {/*
         {activeTab === "magiclink" && (
           <MagicLinkForm
             onSuccess={() =>
@@ -251,9 +260,10 @@ function AuthPage() {
             redirectUrl={sanitizeRedirect(redirect || "/")}
           />
         )}
+        */}
       </AuthCard>
 
-      {/* Magic Link Invitation Code Popup Modal */}
+      {/* Magic Link Invitation Code Popup Modal
       <InvitationCodeModal
         isOpen={showMagicCodeModal}
         email={magicEmail}
@@ -262,6 +272,7 @@ function AuthPage() {
         isSubmitting={isSubmittingModal}
         error={modalError}
       />
+      */}
     </div>
   );
 }
