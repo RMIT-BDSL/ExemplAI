@@ -11,7 +11,7 @@ export const convex = new ConvexClient(convexUrl);
 
 convex.setAuth(async () => {
   try {
-    const { data, error } = await authClient.convex.getToken();
+    const { data, error } = await authClient.$fetch<{ token: string }>('/convex/token', { method: 'GET' });
     if (error) {
       console.error('Error fetching Convex token:', error);
       return null;
