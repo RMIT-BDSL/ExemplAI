@@ -43,9 +43,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-admin-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-admin-v2-${{ hashFiles('admin/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-admin-
+            ${{ runner.os }}-pnpm-store-admin-v2-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -89,9 +89,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-admin-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-admin-v2-${{ hashFiles('admin/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-admin-
+            ${{ runner.os }}-pnpm-store-admin-v2-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
