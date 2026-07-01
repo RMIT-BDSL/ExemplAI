@@ -182,4 +182,27 @@ export const listBetterAuthData = mutation({
   },
 });
 
+export const clearJwks = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const jwksPage = await ctx.runQuery(components.betterAuth.adapter.findMany, {
+      model: "jwks",
+      paginationOpts: { cursor: null, numItems: 100 },
+    });
+
+    let deletedCount = 0;
+    for (const row of jwksPage.page) {
+      await ctx.runMutation(components.betterAuth.adapter.deleteOne, {
+        input: {
+          where: [{ field: "_id", value: row._id }],
+          model: "jwks",
+        },
+      });
+      deletedCount++;
+    }
+
+    return { success: true, deletedCount };
+  },
+});
+
 
