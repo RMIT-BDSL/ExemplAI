@@ -1,0 +1,125 @@
+name: Deploy Admin PR Preview
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - develop
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'admin/**'
+      - '.github/workflows/deploy-admin-preview.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy Admin Preview
+    runs-on: ubuntu-latest
+    environment:
+      name: preview
+      url: ${{ steps.extract_url.outputs.preview_url }}
+
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies (Restore)
+        id: pnpm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-admin-v2-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-admin-v2-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache pnpm dependencies (Save)
+        uses: actions/cache/save@v4
+        if: |
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          steps.pnpm-cache.outputs.cache-hit != 'true' &&
+          success()
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ steps.pnpm-cache.outputs.cache-primary-key }}
+
+      - name: Build Application
+        run: pnpm run build
+        env:
+          # Assuming you set VITE_CONVEX_URL_PREVIEW and VITE_CONVEX_SITE_URL_PREVIEW in your GitHub Secrets
+          # since we are skipping the redundant npx convex deploy step.
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL_PREVIEW }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL_PREVIEW }}
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The project name should match your Cloudflare Pages project for the admin SPA
+          command: pages deploy dist --project-name admin-exemplai-preview --branch pr-${{ github.event.pull_request.number }}
+          workingDirectory: admin
+
+      - name: Extract Preview URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | head -n 1)
+          echo "preview_url=$URL" >> $GITHUB_OUTPUT
+
+      # - name: Whitelist Admin Origin in Convex
+      #   env:
+      #     CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+      #   run: |
+      #     NEW_URL="${{ steps.extract_url.outputs.preview_url }}"
+      #     if [ -n "$NEW_URL" ]; then
+      #       CURRENT_ORIGINS=$(npx convex env get VITE_TRUSTED_ORIGINS || echo "")
+      #       if [[ ! "$CURRENT_ORIGINS" == *"$NEW_URL"* ]]; then
+      #         NEW_ORIGINS="${CURRENT_ORIGINS:+$CURRENT_ORIGINS,}$NEW_URL"
+      #         npx convex env set VITE_TRUSTED_ORIGINS "$NEW_ORIGINS"
+      #         echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS"
+      #       else
+      #         echo "URL $NEW_URL is already whitelisted in Convex"
+      #       fi
+      #     fi
+
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREVIEW_URL="${{ steps.extract_url.outputs.preview_url }}"
+          if [ -n "$PREVIEW_URL" ]; then
+            BODY="### 🚀 Admin Preview Deployment Successful!
+
+            - **Cloudflare Pages**: Deployed successfully!
+            - 🔗 **Deployment URL**: $PREVIEW_URL"
+            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+          fi
