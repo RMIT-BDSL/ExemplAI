@@ -14,16 +14,16 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  # deployments: write
+  deployments: write
 
 jobs:
   deploy:
     name: Deploy Preview
     runs-on: ubuntu-latest
     # Gated under the single 'preview' environment for all PRs (main repository security approach)
-    # environment:
-    #   name: preview
-    #   url: ${{ steps.extract_url.outputs.preview_url }}
+    environment:
+      name: preview
+      url: ${{ steps.extract_url.outputs.preview_url }}
 
     defaults:
       run:
