@@ -77,7 +77,6 @@ function Course() {
   useEffect(() => {
     if (tokenIdentifier && activeQuestionId) {
       setLessonStatus({
-        tokenIdentifier,
         lessonId: activeQuestionId,
         status: "in-progress",
       }).catch(() => {});
@@ -253,7 +252,6 @@ function Course() {
       // downgrade a lesson that's already completed).
       if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
         setLessonStatus({
-          tokenIdentifier,
           lessonId: activeQuestionId,
           status: succeeded ? "completed" : "in-progress",
         }).catch(() => {});
@@ -264,7 +262,6 @@ function Course() {
       // A submit that errors out is still a failed attempt → in-progress.
       if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
         setLessonStatus({
-          tokenIdentifier,
           lessonId: activeQuestionId,
           status: "in-progress",
         }).catch(() => {});

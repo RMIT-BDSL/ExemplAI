@@ -1,8 +1,8 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { createAuth, authComponent } from "./auth";
 import { components } from "./_generated/api";
 
-export const createAdminUser = mutation({
+export const createAdminUser = internalMutation({
   args: {},
   handler: async (ctx) => {
     const email = process.env.ADMIN_EMAIL;
@@ -42,7 +42,7 @@ export const createAdminUser = mutation({
   },
 });
 
-export const removeAllAdminAccounts = mutation({
+export const removeAllAdminAccounts = internalMutation({
   args: {},
   handler: async (ctx) => {
     const email = process.env.ADMIN_EMAIL;
@@ -161,7 +161,7 @@ export const removeAllAdminAccounts = mutation({
   },
 });
 
-export const listBetterAuthData = mutation({
+export const listBetterAuthData = internalMutation({
   args: {},
   handler: async (ctx) => {
     const paginationOpts = { cursor: null, numItems: 100 };
@@ -182,7 +182,7 @@ export const listBetterAuthData = mutation({
   },
 });
 
-export const clearJwks = mutation({
+export const clearJwks = internalMutation({
   args: {},
   handler: async (ctx) => {
     const jwksPage = await ctx.runQuery(components.betterAuth.adapter.findMany, {

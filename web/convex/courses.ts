@@ -1,12 +1,17 @@
 import {
-  mutation,
-  query,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { zid } from "convex-helpers/server/zod4";
-import { zMutation, zQuery } from "./functions";
+import { 
+  zAuthenticatedQuery, 
+  zAuthenticatedMutation, 
+  zAdminMutation, 
+  authenticatedQuery, 
+  authenticatedMutation,
+  adminQuery 
+} from "./functions";
 import { courseFields } from "./validators";
 
 // ---------------------------------------------------------------------------
@@ -14,7 +19,7 @@ import { courseFields } from "./validators";
 // ---------------------------------------------------------------------------
 
 /** Lists all courses, newest first. */
-export const listCourses = zQuery({
+export const listCourses = zAuthenticatedQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("course").order("desc").collect();
@@ -22,7 +27,7 @@ export const listCourses = zQuery({
 });
 
 /** Fetches a single course by id (null if it doesn't exist). */
-export const getCourse = zQuery({
+export const getCourse = zAuthenticatedQuery({
   args: { id: zid("course") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.id);
@@ -30,7 +35,7 @@ export const getCourse = zQuery({
 });
 
 /** Creates a course. Returns the new course id. */
-export const createCourse = zMutation({
+export const createCourse = zAdminMutation({
   args: courseFields,
   handler: async (ctx, args) => {
     return await ctx.db.insert("course", args);
@@ -38,7 +43,7 @@ export const createCourse = zMutation({
 });
 
 /** Updates a course's name and/or language. */
-export const updateCourse = zMutation({
+export const updateCourse = zAdminMutation({
   args: {
     id: zid("course"),
     course_name: courseFields.course_name.optional(),
@@ -56,7 +61,7 @@ export const updateCourse = zMutation({
  * Deletes a course and cascades: every lesson in the course (and each
  * lesson's progress rows) is removed so nothing is left orphaned.
  */
-export const deleteCourse = zMutation({
+export const deleteCourse = zAdminMutation({
   args: { id: zid("course") },
   handler: async (ctx, { id }) => {
     const lessons = await ctx.db
@@ -79,7 +84,7 @@ export const deleteCourse = zMutation({
 });
 
 // Return the last 100 tasks in a given task list.
-export const getAllCourses = query({
+export const getAllCourses = authenticatedQuery({
   args: {},
   handler: async (ctx, _args) => {
     // take is not 100 - all
@@ -88,7 +93,7 @@ export const getAllCourses = query({
   },
 });
 
-export const getQuestionById = query({
+export const getQuestionById = authenticatedQuery({
   args: { id: v.string() },
   handler: async (ctx, args) => {
     const id = ctx.db.normalizeId("questions", args.id);
@@ -115,10 +120,10 @@ async function getUserByToken(
  * Returns a student's progress for every lesson they've started or completed.
  * Each entry is { lessonId, status }. Lessons not present are "pending".
  */
-export const getLessonProgress = query({
-  args: { tokenIdentifier: v.string() },
-  handler: async (ctx, args) => {
-    const user = await getUserByToken(ctx, args.tokenIdentifier);
+export const getLessonProgress = authenticatedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getUserByToken(ctx, ctx.user._id);
     if (!user) return [];
 
     const rows = await ctx.db
@@ -136,9 +141,8 @@ export const getLessonProgress = query({
  * - "pending": removes the row (the UI default for lessons with no record).
  * Looked up via the by_user_lesson index so it's a single-row upsert.
  */
-export const setLessonStatus = mutation({
+export const setLessonStatus = authenticatedMutation({
   args: {
-    tokenIdentifier: v.string(),
     lessonId: v.id("questions"),
     status: v.union(
       v.literal("in-progress"),
@@ -147,7 +151,7 @@ export const setLessonStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const user = await getUserByToken(ctx, args.tokenIdentifier);
+    const user = await getUserByToken(ctx, ctx.user._id);
     if (!user) {
       throw new Error("Student not found.");
     }
@@ -191,7 +195,7 @@ export const setLessonStatus = mutation({
  * Admin view: how many students are in-progress vs completed for a lesson.
  * Uses the by_lesson index so it scans only this lesson's progress rows.
  */
-export const getLessonCompletionStats = query({
+export const getLessonCompletionStats = adminQuery({
   args: { lessonId: v.id("questions") },
   handler: async (ctx, args) => {
     const rows = await ctx.db

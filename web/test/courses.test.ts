@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, it, expect } from "vitest";
-import { api } from "../convex/_generated/api";
+import { api, components } from "../convex/_generated/api";
 import schema from "../convex/schema";
 
 // convex-test needs every Convex module so it can resolve function references.
@@ -8,6 +8,42 @@ import schema from "../convex/schema";
 const modules = import.meta.glob("../convex/**/*.ts");
 
 const setup = () => convexTest(schema, modules);
+
+async function createMockAdmin(t: ReturnType<typeof setup>) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "user",
+      document: {
+        name: "Admin User",
+        email: "admin@rmit.edu.vn",
+        emailVerified: true,
+        role: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const sessionId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "session",
+      document: {
+        userId,
+        expiresAt: Date.now() + 1000 * 60 * 60,
+        token: `token-${userId}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    await ctx.db.insert("users", {
+      name: "Admin User",
+      email: "admin@rmit.edu.vn",
+      tokenIdentifier: userId,
+      role: "admin",
+    });
+
+    return t.withIdentity({ subject: userId, sessionId });
+  });
+}
 
 const sampleTestCases = [
   { input: "2 3", expectedOutput: "5" },
@@ -18,13 +54,14 @@ const sampleTestCases = [
 describe("course CRUD", () => {
   it("creates a course and reads it back", async () => {
     const t = setup();
+    const client = await createMockAdmin(t);
 
-    const id = await t.mutation(api.courses.createCourse, {
+    const id = await client.mutation(api.courses.createCourse, {
       course_name: "Intro to Python",
       course_language: "python",
     });
 
-    const course = await t.query(api.courses.getCourse, { id });
+    const course = await client.query(api.courses.getCourse, { id });
     expect(course).toMatchObject({
       course_name: "Intro to Python",
       course_language: "python",
@@ -33,32 +70,34 @@ describe("course CRUD", () => {
 
   it("lists courses newest first", async () => {
     const t = setup();
+    const client = await createMockAdmin(t);
 
-    await t.mutation(api.courses.createCourse, {
+    await client.mutation(api.courses.createCourse, {
       course_name: "First",
       course_language: "python",
     });
-    await t.mutation(api.courses.createCourse, {
+    await client.mutation(api.courses.createCourse, {
       course_name: "Second",
       course_language: "javascript",
     });
 
-    const courses = await t.query(api.courses.listCourses, {});
+    const courses = await client.query(api.courses.listCourses, {});
     expect(courses).toHaveLength(2);
     expect(courses[0].course_name).toBe("Second");
   });
 
   it("updates only the provided fields", async () => {
     const t = setup();
+    const client = await createMockAdmin(t);
 
-    const id = await t.mutation(api.courses.createCourse, {
+    const id = await client.mutation(api.courses.createCourse, {
       course_name: "Old name",
       course_language: "python",
     });
 
-    await t.mutation(api.courses.updateCourse, { id, course_name: "New name" });
+    await client.mutation(api.courses.updateCourse, { id, course_name: "New name" });
 
-    const course = await t.query(api.courses.getCourse, { id });
+    const course = await client.query(api.courses.getCourse, { id });
     expect(course).toMatchObject({
       course_name: "New name",
       course_language: "python", // untouched
@@ -67,23 +106,25 @@ describe("course CRUD", () => {
 
   it("rejects an empty course name (Zod validation)", async () => {
     const t = setup();
+    const client = await createMockAdmin(t);
 
     await expect(
-      t.mutation(api.courses.createCourse, {
+      client.mutation(api.courses.createCourse, {
         course_name: "",
         course_language: "python",
-      }),
+      })
     ).rejects.toThrow();
   });
 
   it("deleting a course cascades to its lessons and their progress", async () => {
     const t = setup();
+    const client = await createMockAdmin(t);
 
-    const courseId = await t.mutation(api.courses.createCourse, {
+    const courseId = await client.mutation(api.courses.createCourse, {
       course_name: "Course to delete",
       course_language: "python",
     });
-    const lessonId = await t.mutation(api.lessons.createLesson, {
+    const lessonId = await client.mutation(api.lessons.createLesson, {
       course: courseId,
       week: 1,
       problem_name: "Sum two numbers",
@@ -93,39 +134,40 @@ describe("course CRUD", () => {
 
     // Give a student some progress on the lesson, then delete the course.
     const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { tokenIdentifier: "tok-1" }),
+      ctx.db.insert("users", { tokenIdentifier: "tok-1" })
     );
     await t.run(async (ctx) =>
       ctx.db.insert("lessonProgress", {
         userId,
         lessonId,
         status: "in-progress",
-      }),
+      })
     );
 
-    await t.mutation(api.courses.deleteCourse, { id: courseId });
+    await client.mutation(api.courses.deleteCourse, { id: courseId });
 
-    expect(await t.query(api.courses.getCourse, { id: courseId })).toBeNull();
-    expect(await t.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
+    expect(await client.query(api.courses.getCourse, { id: courseId })).toBeNull();
+    expect(await client.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
     const remainingProgress = await t.run(async (ctx) =>
-      ctx.db.query("lessonProgress").collect(),
+      ctx.db.query("lessonProgress").collect()
     );
     expect(remainingProgress).toHaveLength(0);
   });
 });
 
 describe("lesson CRUD", () => {
-  const makeCourse = async (t: ReturnType<typeof setup>) =>
-    t.mutation(api.courses.createCourse, {
+  const makeCourse = async (client: ReturnType<typeof setup>["withIdentity"]) =>
+    client.mutation(api.courses.createCourse, {
       course_name: "Host course",
       course_language: "python",
     });
 
   it("creates a lesson with test cases", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
 
-    const id = await t.mutation(api.lessons.createLesson, {
+    const id = await client.mutation(api.lessons.createLesson, {
       course,
       week: 3,
       problem_name: "Sum",
@@ -134,7 +176,7 @@ describe("lesson CRUD", () => {
       testCases: sampleTestCases,
     });
 
-    const lesson = await t.query(api.lessons.getLesson, { id });
+    const lesson = await client.query(api.lessons.getLesson, { id });
     expect(lesson).toMatchObject({
       week: 3,
       problem_name: "Sum",
@@ -146,25 +188,27 @@ describe("lesson CRUD", () => {
 
   it("defaults testCases to an empty array when omitted", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
 
-    const id = await t.mutation(api.lessons.createLesson, {
+    const id = await client.mutation(api.lessons.createLesson, {
       course,
       week: 1,
       problem_name: "No tests yet",
       problem_description: "todo",
     });
 
-    const lesson = await t.query(api.lessons.getLesson, { id });
+    const lesson = await client.query(api.lessons.getLesson, { id });
     expect(lesson?.testCases).toEqual([]);
   });
 
   it("lists lessons of a course ordered by week", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
 
     for (const week of [3, 1, 2]) {
-      await t.mutation(api.lessons.createLesson, {
+      await client.mutation(api.lessons.createLesson, {
         course,
         week,
         problem_name: `Week ${week}`,
@@ -172,32 +216,33 @@ describe("lesson CRUD", () => {
       });
     }
 
-    const lessons = await t.query(api.lessons.listLessonsByCourse, { course });
+    const lessons = await client.query(api.lessons.listLessonsByCourse, { course });
     expect(lessons.map((l) => l.week)).toEqual([1, 2, 3]);
   });
 
   it("does not return lessons from other courses", async () => {
     const t = setup();
-    const courseA = await makeCourse(t);
-    const courseB = await t.mutation(api.courses.createCourse, {
+    const client = await createMockAdmin(t);
+    const courseA = await makeCourse(client);
+    const courseB = await client.mutation(api.courses.createCourse, {
       course_name: "Other",
       course_language: "javascript",
     });
 
-    await t.mutation(api.lessons.createLesson, {
+    await client.mutation(api.lessons.createLesson, {
       course: courseA,
       week: 1,
       problem_name: "A1",
       problem_description: "x",
     });
-    await t.mutation(api.lessons.createLesson, {
+    await client.mutation(api.lessons.createLesson, {
       course: courseB,
       week: 1,
       problem_name: "B1",
       problem_description: "x",
     });
 
-    const lessons = await t.query(api.lessons.listLessonsByCourse, {
+    const lessons = await client.query(api.lessons.listLessonsByCourse, {
       course: courseA,
     });
     expect(lessons).toHaveLength(1);
@@ -206,61 +251,65 @@ describe("lesson CRUD", () => {
 
   it("updates a lesson's fields", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
 
-    const id = await t.mutation(api.lessons.createLesson, {
+    const id = await client.mutation(api.lessons.createLesson, {
       course,
       week: 1,
       problem_name: "Original",
       problem_description: "x",
     });
 
-    await t.mutation(api.lessons.updateLesson, {
+    await client.mutation(api.lessons.updateLesson, {
       id,
       week: 5,
       problem_name: "Renamed",
       testCases: [{ input: "1", expectedOutput: "1" }],
     });
 
-    const lesson = await t.query(api.lessons.getLesson, { id });
+    const lesson = await client.query(api.lessons.getLesson, { id });
     expect(lesson).toMatchObject({ week: 5, problem_name: "Renamed" });
     expect(lesson?.testCases).toHaveLength(1);
   });
 
   it("rejects a week outside the 1-12 range (Zod validation)", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
 
     await expect(
-      t.mutation(api.lessons.createLesson, {
+      client.mutation(api.lessons.createLesson, {
         course,
         week: 13,
         problem_name: "Too late",
         problem_description: "x",
-      }),
+      })
     ).rejects.toThrow();
   });
 
   it("rejects creating a lesson for a missing course", async () => {
     const t = setup();
-    const course = await makeCourse(t);
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
     // Create then delete so we hold a real-but-dangling id.
-    await t.mutation(api.courses.deleteCourse, { id: course });
+    await client.mutation(api.courses.deleteCourse, { id: course });
 
     await expect(
-      t.mutation(api.lessons.createLesson, {
+      client.mutation(api.lessons.createLesson, {
         course,
         week: 1,
         problem_name: "Orphan",
         problem_description: "x",
-      }),
+      })
     ).rejects.toThrow("Course not found");
   });
 
   it("deletes a lesson and its progress rows", async () => {
     const t = setup();
-    const course = await makeCourse(t);
-    const lessonId = await t.mutation(api.lessons.createLesson, {
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+    const lessonId = await client.mutation(api.lessons.createLesson, {
       course,
       week: 1,
       problem_name: "Bye",
@@ -268,21 +317,21 @@ describe("lesson CRUD", () => {
     });
 
     const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { tokenIdentifier: "tok-2" }),
+      ctx.db.insert("users", { tokenIdentifier: "tok-2" })
     );
     await t.run(async (ctx) =>
       ctx.db.insert("lessonProgress", {
         userId,
         lessonId,
         status: "completed",
-      }),
+      })
     );
 
-    await t.mutation(api.lessons.deleteLesson, { id: lessonId });
+    await client.mutation(api.lessons.deleteLesson, { id: lessonId });
 
-    expect(await t.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
+    expect(await client.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
     const progress = await t.run(async (ctx) =>
-      ctx.db.query("lessonProgress").collect(),
+      ctx.db.query("lessonProgress").collect()
     );
     expect(progress).toHaveLength(0);
   });
