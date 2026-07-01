@@ -106,13 +106,13 @@ jobs:
           fi
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
 
-      - name: Update Convex Environment Variables
-        run: |
-          npx convex env set SITE_URL "${{ steps.extract_url.outputs.preview_url }}"
-          npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.preview_url }}/api/auth"
-          npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
+       # - name: Update Convex Environment Variables
+       #   run: |
+       #     npx convex env set SITE_URL "${{ steps.extract_url.outputs.preview_url }}"
+       #     npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.preview_url }}/api/auth"
+       #     npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
+       #   env:
+       #     CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PREVIEW }}
 
       - name: Comment on PR
         env:
