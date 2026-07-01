@@ -10,6 +10,7 @@
  * Append a query parameter to a (possibly already-parameterised) path.
  * Picks `?` or `&` based on whether the path already has a query string.
  */
+/*
 export function appendQueryParam(
   path: string,
   key: string,
@@ -18,6 +19,7 @@ export function appendQueryParam(
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}${key}=${encodeURIComponent(value)}`;
 }
+*/
 
 /**
  * Build the callbackURL for a magic-link request.
@@ -26,6 +28,7 @@ export function appendQueryParam(
  * completed magic-link sign-in and emit identify + `user_signed_in`. Optionally
  * carries an invitation `code` for the new-user (sign-up) flow.
  */
+/*
 export function buildMagicLinkCallback(
   redirectUrl: string | undefined,
   options?: { code?: string },
@@ -36,6 +39,7 @@ export function buildMagicLinkCallback(
   }
   return appendQueryParam(callback, "magic", "1");
 }
+*/
 
 /**
  * Remove the given keys from a search-params object, returning a new object.

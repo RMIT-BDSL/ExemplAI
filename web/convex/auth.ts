@@ -1,7 +1,8 @@
 import { createClient, type AuthFunctions } from "@convex-dev/better-auth";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
-import { magicLink, admin } from "better-auth/plugins";
+import { admin } from "better-auth/plugins";
+// import { magicLink } from "better-auth/plugins";
 import { components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
@@ -68,14 +69,14 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>): BetterAuthOptions
       crossDomain({
         siteUrl: process.env.SITE_URL || "http://localhost:5173",
       }),
-      magicLink({
+      /* magicLink({
         sendMagicLink: async ({ email, url }) => {
           console.log(`\n==================================================`);
           console.log(`[Dev Mailer] Magic Link for: ${email}`);
           console.log(`URL: ${url}`);
           console.log(`==================================================\n`);
         },
-      }),
+      }), */
       admin(),
     ],
   };
