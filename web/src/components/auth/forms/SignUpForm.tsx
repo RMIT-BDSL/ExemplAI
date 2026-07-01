@@ -42,7 +42,8 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           email: value.email,
           password: value.password,
           name: value.name,
-        });
+          code: value.code, // Pass code to Better Auth signup body
+        } as any);
 
         if (signUpRes.error) {
           onError(signUpRes.error.message || "Failed to create account");

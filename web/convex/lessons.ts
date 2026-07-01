@@ -1,5 +1,5 @@
 import { zid } from "convex-helpers/server/zod4";
-import { zMutation, zQuery } from "./functions";
+import { zAdminMutation, zAuthenticatedQuery } from "./functions";
 import { lessonFields } from "./validators";
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@ import { lessonFields } from "./validators";
 // ---------------------------------------------------------------------------
 
 /** Lists every lesson in a course, ordered by week (ascending). */
-export const listLessonsByCourse = zQuery({
+export const listLessonsByCourse = zAuthenticatedQuery({
   args: { course: zid("course") },
   handler: async (ctx, args) => {
     return await ctx.db
@@ -22,7 +22,7 @@ export const listLessonsByCourse = zQuery({
 });
 
 /** Fetches a single lesson by id (null if it doesn't exist). */
-export const getLesson = zQuery({
+export const getLesson = zAuthenticatedQuery({
   args: { id: zid("questions") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.id);
@@ -30,7 +30,7 @@ export const getLesson = zQuery({
 });
 
 /** Creates a lesson under an existing course. Returns the new lesson id. */
-export const createLesson = zMutation({
+export const createLesson = zAdminMutation({
   args: lessonFields,
   handler: async (ctx, args) => {
     const course = await ctx.db.get(args.course);
@@ -47,7 +47,7 @@ export const createLesson = zMutation({
  * Updates a lesson. Every field is optional; only the fields provided are
  * patched. If `course` is changed, the new course must exist.
  */
-export const updateLesson = zMutation({
+export const updateLesson = zAdminMutation({
   args: {
     id: zid("questions"),
     course: lessonFields.course.optional(),
@@ -74,7 +74,7 @@ export const updateLesson = zMutation({
 });
 
 /** Deletes a lesson and its students' progress rows. */
-export const deleteLesson = zMutation({
+export const deleteLesson = zAdminMutation({
   args: { id: zid("questions") },
   handler: async (ctx, { id }) => {
     const progress = await ctx.db
