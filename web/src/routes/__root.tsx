@@ -1,11 +1,7 @@
 import { PostHogProvider } from "@posthog/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
-import {
-  createRootRouteWithContext,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ConvexReactClient } from "convex/react";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
@@ -34,7 +30,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: "ExemplAI",
       },
     ],
     links: [
@@ -59,9 +55,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           options={{
             api_host: "/api/v1",
             api_transport: "XHR",
-            ui_host:
-              import.meta.env.VITE_PUBLIC_POSTHOG_HOST ||
-              "https://eu.posthog.com",
+            ui_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST || "https://eu.posthog.com",
             defaults: "2025-05-24",
             capture_exceptions: true,
             debug: typeof window !== "undefined" && import.meta.env.DEV,
