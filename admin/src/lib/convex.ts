@@ -11,6 +11,9 @@ export const convex = new ConvexClient(convexUrl);
 
 convex.setAuth(async () => {
   try {
+    // Wait for the Better Auth session (including cross-domain plugins) to initialize
+    await authClient.getSession();
+
     // The official non-hacky way from the Better Auth Convex plugin:
     const { data, error } = await authClient.convex.token();
     
