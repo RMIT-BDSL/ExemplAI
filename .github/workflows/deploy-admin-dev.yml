@@ -83,13 +83,21 @@ jobs:
         run: |
           NEW_URL="${{ steps.extract_url.outputs.deployment_url }}"
           if [ -n "$NEW_URL" ]; then
+            # NEW_URL is like https://1234abcd.my-project-name.pages.dev
+            DOMAIN="${NEW_URL#https://}"
+            # Extract the base project domain (e.g. my-project-name.pages.dev)
+            PROJECT_DOMAIN="${DOMAIN#*.}"
+            # Escape dots for the regex
+            REGEX_DOMAIN="\."$(echo "$PROJECT_DOMAIN" | sed 's/\./\\./g')
+            
             CURRENT_ORIGINS=$(npx convex env get VITE_TRUSTED_ORIGINS || echo "")
-            # Remove existing dev URLs to prevent unbounded growth
-            CLEANED_ORIGINS=$(echo "$CURRENT_ORIGINS" | tr ',' '\n' | grep -v 'admin-exemplai-dev.pages.dev' | paste -sd, - || echo "")
+            # Remove existing Pages URLs with a hash/branch prefix, preserving the root domain
+            CLEANED_ORIGINS=$(echo "$CURRENT_ORIGINS" | tr ',' '\n' | grep -vE "$REGEX_DOMAIN" | paste -sd, - || echo "")
+            
             if [[ ! "$CLEANED_ORIGINS" == *"$NEW_URL"* ]]; then
               NEW_ORIGINS="${CLEANED_ORIGINS:+$CLEANED_ORIGINS,}$NEW_URL"
               npx convex env set VITE_TRUSTED_ORIGINS "$NEW_ORIGINS"
-              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS (replacing older dev URLs)"
+              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS (replacing older prefixed URLs)"
             else
               echo "URL $NEW_URL is already whitelisted in Convex"
             fi
