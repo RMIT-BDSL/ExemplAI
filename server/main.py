@@ -1,3 +1,4 @@
+from sentry_sdk import metrics
 from typing import Optional
 import httpx
 import ast
