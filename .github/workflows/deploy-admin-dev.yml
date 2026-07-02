@@ -84,10 +84,12 @@ jobs:
           NEW_URL="${{ steps.extract_url.outputs.deployment_url }}"
           if [ -n "$NEW_URL" ]; then
             CURRENT_ORIGINS=$(npx convex env get VITE_TRUSTED_ORIGINS || echo "")
-            if [[ ! "$CURRENT_ORIGINS" == *"$NEW_URL"* ]]; then
-              NEW_ORIGINS="${CURRENT_ORIGINS:+$CURRENT_ORIGINS,}$NEW_URL"
+            # Remove existing dev URLs to prevent unbounded growth
+            CLEANED_ORIGINS=$(echo "$CURRENT_ORIGINS" | tr ',' '\n' | grep -v 'admin-exemplai-dev.pages.dev' | paste -sd, - || echo "")
+            if [[ ! "$CLEANED_ORIGINS" == *"$NEW_URL"* ]]; then
+              NEW_ORIGINS="${CLEANED_ORIGINS:+$CLEANED_ORIGINS,}$NEW_URL"
               npx convex env set VITE_TRUSTED_ORIGINS "$NEW_ORIGINS"
-              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS"
+              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS (replacing older dev URLs)"
             else
               echo "URL $NEW_URL is already whitelisted in Convex"
             fi
