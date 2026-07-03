@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_PUBLIC_KEY: str = ""            # anon key — public by design
     SUPABASE_SECRET_KEY: SecretStr = SecretStr("")  # service-role key
+    CONVEX_URL: str = ""
 
     # ── Observability ──────────────────────────────────────────────────
     SENTRY_DSN: SecretStr = SecretStr("")          # DSN embeds a project key
@@ -86,7 +87,7 @@ def log_config_summary() -> None:
     """
     log.info(
         "config loaded — openai=%s judge0=%s rapidapi=%s supabase=%s "
-        "database_url=%s sentry=%s langfuse=%s",
+        "database_url=%s sentry=%s langfuse=%s convex_url=%s",
         _is_set(settings.OPENAI_API_KEY),
         _is_set(settings.JUDGE0_ENDPOINT),
         settings.IS_RAPIDAPI,
@@ -94,9 +95,13 @@ def log_config_summary() -> None:
         _is_set(settings.DATABASE_URL),
         _is_set(settings.SENTRY_DSN),
         _is_set(settings.LANGFUSE_PUBLIC_KEY) and _is_set(settings.LANGFUSE_SECRET_KEY),
+        _is_set(settings.CONVEX_URL),
     )
 
     if not _is_set(settings.OPENAI_API_KEY):
         log.warning("config — OPENAI_API_KEY is not set; LLM calls will fail")
     if not _is_set(settings.JUDGE0_ENDPOINT):
         log.warning("config — JUDGE0_ENDPOINT is not set; /execute will return 500")
+    if not _is_set(settings.CONVEX_URL):
+        log.warning("config — CONVEX_URL is not set; backend security authentication checks will fail")
+

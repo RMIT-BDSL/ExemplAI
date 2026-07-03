@@ -232,13 +232,22 @@ function Course() {
       actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
 
     try {
-      const response = await axios.post(`${url}/execute`, {
-        code: submissionCode,
-        language_id: languageId,
-        starter_code: activeQuestion?.starter_code,
-        solution_code: activeQuestion?.solution_code,
-        test_cases: testCasesToRun,
-      });
+      const tokenRes = await authClient.convex.token();
+      const token = tokenRes.data?.token;
+
+      const response = await axios.post(
+        `${url}/execute`,
+        {
+          code: submissionCode,
+          language_id: languageId,
+          starter_code: activeQuestion?.starter_code,
+          solution_code: activeQuestion?.solution_code,
+          test_cases: testCasesToRun,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
       setExecutionResult(response.data);
       const succeeded = !response.data?.error;
       posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {

@@ -7,7 +7,7 @@ services.py, DB access in repository.py. (Graph edge-routing functions are a
 separate concern — see ai/graph_router.py.)
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 from model.student_code import StudentCode
 from model.chat import Chat
 import services
+from dependencies import get_current_user
 
 # Shared with main.py for app.state + SlowAPIMiddleware wiring.
 limiter = Limiter(key_func=get_remote_address)
@@ -29,7 +30,7 @@ def read_root():
 
 @router.post('/execute')
 @limiter.limit("10/minute")
-async def judge0_execution(student_code: StudentCode, request: Request):
+async def judge0_execution(student_code: StudentCode, request: Request, current_user: dict = Depends(get_current_user)):
     return await services.execute_code(student_code)
 
 
@@ -39,12 +40,12 @@ def read_item(item_id: int, q: str | None = None):
 
 
 @router.post("/chat")
-def chat(chat: Chat):
+def chat(chat: Chat, current_user: dict = Depends(get_current_user)):
     return services.run_chat(chat)
 
 
 @router.post("/chat/stream")
-async def chat_stream(chat: Chat):
+async def chat_stream(chat: Chat, current_user: dict = Depends(get_current_user)):
     return StreamingResponse(
         services.stream_chat(chat),
         media_type="text/event-stream",
