@@ -53,6 +53,7 @@ app.add_middleware(
         "http://localhost:3000", 
         "http://localhost:5173"
     ], # In production, add your production frontend origin here
+    allow_origin_regex=".*", # Allows all origins (useful for Cloudflare tunnels/Railway)
     allow_credentials=True,
     allow_methods=["*"], # Allows all methods, including POST and OPTIONS
     allow_headers=["*"], # Allows all headers
