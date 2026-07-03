@@ -57,11 +57,16 @@ async def execute_code(student_code: StudentCode) -> dict:
 
     # make async request with httpx and timeout
     try:
+        log.info(f"Sending Judge0 request to URL: {exec_url}")
+        log.info(f"Judge0 request headers: {headers}")
+        log.info(f"Judge0 request payload: {payload}")
         async with httpx.AsyncClient() as client:
             response = await client.post(exec_url, json=payload, headers=headers, timeout=15.0)
+            log.info(f"Judge0 response status: {response.status_code}")
+            log.info(f"Judge0 response text: {response.text}")
             response.raise_for_status()
             output = response.json()
-            log.info(output)
+            log.info(f"Judge0 parsed output: {output}")
             return output
     except httpx.TimeoutException as e:
         log.error(f"Judge0 request timed out: {e}")
