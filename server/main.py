@@ -4,7 +4,7 @@ import httpx
 import ast
 import asyncio
 from model.student_code import StudentCode
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import sentry_sdk
 from slowapi import _rate_limit_exceeded_handler
@@ -19,6 +19,7 @@ from rich.logging import RichHandler
 
 from config import settings, log_config_summary
 from routers import router, limiter
+from dependencies import get_current_user
 
 
 sentry_sdk.init(
@@ -196,7 +197,7 @@ async def run_single_test_case(client, code, language_id, test_case, exec_url, h
 
 @app.post('/execute')
 @limiter.limit("10/minute")
-async def judge0_execution(student_code: StudentCode, request: Request):
+async def judge0_execution(student_code: StudentCode, request: Request, current_user: dict = Depends(get_current_user)):
     metrics.count("code.execution", 1)
     endpoint = settings.JUDGE0_ENDPOINT
     if not endpoint:
@@ -355,7 +356,7 @@ async def judge0_execution(student_code: StudentCode, request: Request):
         )
 
 @app.post("/chat")
-def chat(chat: Chat):
+def chat(chat: Chat, current_user: dict = Depends(get_current_user)):
     # Map the conversation messages to LangGraph role and content structure
     langgraph_messages = []
     for msg in chat.conversation:
