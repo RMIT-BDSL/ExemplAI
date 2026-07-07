@@ -13,6 +13,7 @@ import type * as courses from "../courses.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
+import type * as seed from "../seed.js";
 
 import type {
   ApiFromModules,
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   init: typeof init;
   invitationCodes: typeof invitationCodes;
+  seed: typeof seed;
 }>;
 
 /**

@@ -11,8 +11,15 @@ export default defineSchema({
     course: v.id("course"),
     problem_name: v.string(),
     problem_description: v.string(),
-    // todo implement solution (not for now)
-  }).index("by_week", ["week"]), // week are fixed to 12 weeks
+    knowledge_component: v.optional(v.string()), // The BKT tag (e.g. "io_basics")
+    topic: v.optional(v.string()), // The English language topic (e.g. "I/O basics")
+    tag: v.optional(v.string()), // To differentiate problem sets (e.g. "csedm", "csedm2")
+    starter_code: v.optional(v.string()), // Pre-filled code for the editor
+    unit_tests: v.optional(v.string()), // Hidden Python assert statements
+    solution: v.optional(v.string()), // A reference solution to the problem
+  })
+    .index("by_week", ["week"]) // week are fixed to 12 weeks
+    .index("by_kc", ["knowledge_component"]),
   users: defineTable({
     name: v.optional(v.string()),
     email: v.optional(v.string()),
