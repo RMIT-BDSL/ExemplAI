@@ -85,6 +85,7 @@ from langgraph.graph.message import add_messages
 class TutorGraphState(TypedDict):
     messages: Annotated[List[dict], add_messages]
     original_problem: str                 # The static target problem description from the dataset
+    reference_solution: str               # The canonical correct solution from the Convex DB
     unit_test_assertions: str             # The deterministic unit test code (assert statements)
     current_knowledge_component: str      # e.g., "KC_Loop_Syntax"
     bkt_prob_mastery: float               # Float 0.0 - 1.0 fetched from BKT DB

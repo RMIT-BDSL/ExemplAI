@@ -41,6 +41,7 @@ flowchart TB
 
     subgraph Layer2 ["Layer 2: Data"]
         Baseline[/"Historical Baseline (P-Init)"/]
+        Convex[(Convex DB<br/>Problems & Solutions)]
         BKT[(Bayesian Knowledge<br/>Tracing Engine)]
         KDD[(KDD Event Logs<br/>Supabase)]
         
@@ -88,7 +89,7 @@ flowchart TB
     classDef logic fill:#e17055,stroke:#fab1a0,stroke-width:2px,color:#fff
     
     class UI frontend
-    class BKT,KDD,Baseline db
+    class Convex,BKT,KDD,Baseline db
     class API backend
     class Eval,LLMEval,Router,EBL,ExpRouter,Control logic
     class Dean safety
@@ -117,7 +118,7 @@ The student-facing interface uses a **Split-Pane** layout:
 
 ### Layer 2: Data
 
-* **Key Components:** The **BKT Engine** (running Python libraries like `pyBKT`) calculates the probabilities of mastery. Simultaneously, the **KDD Event Logs** track granular behavioral data (e.g., time spent pausing before typing) which is needed for data analysis and control trial determination. We also need the baseline data set and info stored.
+* **Key Components:** The **Convex Database** hosts the curriculum, storing problem descriptions, starter code, unit tests, canonical solutions, and A/B test tags (`csedm` vs `csedm2`). The **BKT Engine** (running Python libraries like `pyBKT`) calculates the probabilities of mastery based on unit test results. Simultaneously, the **KDD Event Logs** track granular behavioral data (e.g., time spent pausing before typing) which is needed for data analysis and control trial determination. We also need the baseline data set and info stored.
 
 ### Layer 3: Generative Reasoning & Routing (LangGraph Engine)
 
