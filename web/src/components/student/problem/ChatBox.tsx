@@ -222,8 +222,12 @@ export interface PendingMessage {
 // 5. Chat Box default exported container
 export default function ChatBox({
   pendingMessage,
+  editorRef,
+  currentCode,
 }: {
   pendingMessage?: PendingMessage | null;
+  editorRef?: React.MutableRefObject<any>;
+  currentCode?: string;
 }) {
   const [messages, setMessages] = React.useState<Message[]>([
     {
@@ -255,7 +259,44 @@ export default function ChatBox({
         content: msg.content,
       }));
 
-      const response = await sendChatMessage(conversationPayload);
+      // Extract Monaco editor state
+      let editorContext = "";
+      let code = currentCode || "";
+      let cursorLine = null;
+      let cursorColumn = null;
+      let selectedText = "";
+
+      if (editorRef?.current) {
+        const editor = editorRef.current;
+        const editorValue = editor.getValue();
+        if (editorValue) {
+            code = editorValue;
+        }
+        
+        const selection = editor.getSelection();
+        const position = editor.getPosition();
+        
+        if (selection && !selection.isEmpty()) {
+          selectedText = editor.getModel()?.getValueInRange(selection) || "";
+        }
+        
+        if (position) {
+          cursorLine = position.lineNumber;
+          cursorColumn = position.column;
+        }
+      }
+
+      if (code) {
+        editorContext = `Code:\n${code}\n`;
+        if (cursorLine !== null && cursorColumn !== null) {
+          editorContext += `Cursor Line: ${cursorLine}, Column: ${cursorColumn}\n`;
+        }
+        if (selectedText) {
+          editorContext += `Selected Text:\n${selectedText}\n`;
+        }
+      }
+
+      const response = await sendChatMessage(conversationPayload, 1, editorContext);
 
       // Find the last AI assistant message content from the response messages
       const aiMessages = response.messages.filter(
