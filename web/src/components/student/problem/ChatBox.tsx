@@ -307,6 +307,9 @@ export default function ChatBox({
   }, [pendingMessage]);
 
   const handleClearChat = () => {
+    // Start a fresh checkpoint thread so the server doesn't resume the old
+    // conversation's memory after the student clears the chat.
+    chatIdRef.current = crypto.randomUUID();
     setMessages([
       {
         id: "welcome-reset",
