@@ -302,7 +302,7 @@ export default function ChatBox({
         }
       }
 
-      const response = await sendChatMessage(conversationPayload, 1, editorContext);
+      const response = await sendChatMessage(conversationPayload, chatIdRef.current, 1, editorContext);
 
       // Find the last AI assistant message content from the response messages
       const aiMessages = response.messages.filter(

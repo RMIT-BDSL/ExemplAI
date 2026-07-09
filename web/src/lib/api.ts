@@ -21,6 +21,7 @@ export interface LangGraphResponse {
 
 export async function sendChatMessage(
   conversation: ChatMessagePayload[],
+  chatId: string,
   userId = 1,
   studentCode = ""
 ): Promise<LangGraphResponse> {
