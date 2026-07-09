@@ -240,6 +240,12 @@ export default function ChatBox({
   ]);
   const [isTyping, setIsTyping] = React.useState(false);
 
+  // Stable per-conversation id — scopes the LangGraph checkpoint thread
+  // (thread_id = exemplai:{chat_id}) so multi-turn memory persists for this
+  // chat session. Generated once per mount.
+  const chatIdRef = React.useRef<string>("");
+  if (!chatIdRef.current) chatIdRef.current = crypto.randomUUID();
+
   const handleSendMessage = async (text: string) => {
     // 1. Add User Message
     const userMsg: Message = {
@@ -270,16 +276,16 @@ export default function ChatBox({
         const editor = editorRef.current;
         const editorValue = editor.getValue();
         if (editorValue) {
-            code = editorValue;
+          code = editorValue;
         }
-        
+
         const selection = editor.getSelection();
         const position = editor.getPosition();
-        
+
         if (selection && !selection.isEmpty()) {
           selectedText = editor.getModel()?.getValueInRange(selection) || "";
         }
-        
+
         if (position) {
           cursorLine = position.lineNumber;
           cursorColumn = position.column;
@@ -303,7 +309,9 @@ export default function ChatBox({
         (msg) => msg.type === "ai" || msg.type === "assistant"
       );
       const lastAiMessage = aiMessages[aiMessages.length - 1];
-      const replyContent = lastAiMessage ? lastAiMessage.content : "Sorry, I couldn't get a response.";
+      const replyContent = lastAiMessage
+        ? lastAiMessage.content
+        : "Sorry, I couldn't get a response.";
 
       const assistantMsg: Message = {
         id: lastAiMessage?.id || Math.random().toString(),
@@ -342,6 +350,9 @@ export default function ChatBox({
   }, [pendingMessage]);
 
   const handleClearChat = () => {
+    // Start a fresh checkpoint thread so the server doesn't resume the old
+    // conversation's memory after the student clears the chat.
+    chatIdRef.current = crypto.randomUUID();
     setMessages([
       {
         id: "welcome-reset",

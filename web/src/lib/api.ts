@@ -31,6 +31,7 @@ export async function sendChatMessage(
     `${BACKEND_URL}/chat`,
     {
       user_id: userId,
+      chat_id: chatId,
       conversation,
       student_code: studentCode,
     },

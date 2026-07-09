@@ -47,56 +47,62 @@ def experiment_entry(state: TutorGraphState):
     return {}
 
 
-graph = StateGraph(TutorGraphState)
+def build_tutor_graph() -> StateGraph:
+    """Build the ExemplAI tutor graph (uncompiled).
 
-graph.add_node("input_guardrail", input_guardrail)
-graph.add_node("guardrail_blocked", guardrail_blocked)
-graph.add_node("experiment_entry", experiment_entry)
-graph.add_node("orchestrator", orchestrator)
-graph.add_node("control_agent_node", control_agent_node)
-graph.add_node("complete_example_node", complete_example_node)
-graph.add_node("faded_example_node", faded_example_node)
-graph.add_node("erroneous_example_node", erroneous_example_node)
-graph.add_node("dean_validation_node", dean_validation_node)
+    Compilation is deferred to app startup so the graph can be bound to the
+    Postgres checkpointer (see ai/checkpointer.py + the app lifespan).
+    """
+    graph = StateGraph(TutorGraphState)
 
-# Input-safety gate runs first.
-graph.add_edge(START, "input_guardrail")
-graph.add_conditional_edges(
-    "input_guardrail",
-    route_after_guardrail,
-    {
-        "blocked": "guardrail_blocked",
-        "safe": "experiment_entry",
-    },
-)
-graph.add_edge("guardrail_blocked", END)
+    graph.add_node("input_guardrail", input_guardrail)
+    graph.add_node("guardrail_blocked", guardrail_blocked)
+    graph.add_node("experiment_entry", experiment_entry)
+    graph.add_node("orchestrator", orchestrator)
+    graph.add_node("control_agent_node", control_agent_node)
+    graph.add_node("complete_example_node", complete_example_node)
+    graph.add_node("faded_example_node", faded_example_node)
+    graph.add_node("erroneous_example_node", erroneous_example_node)
+    graph.add_node("dean_validation_node", dean_validation_node)
 
-# A/B split (sticky condition read from state).
-graph.add_conditional_edges(
-    "experiment_entry",
-    experiment_router,
-    {
-        "control": "control_agent_node",
-        "experimental": "orchestrator",
-    },
-)
+    # Input-safety gate runs first.
+    graph.add_edge(START, "input_guardrail")
+    graph.add_conditional_edges(
+        "input_guardrail",
+        route_after_guardrail,
+        {
+            "blocked": "guardrail_blocked",
+            "safe": "experiment_entry",
+        },
+    )
+    graph.add_edge("guardrail_blocked", END)
 
-# Experimental: BKT mastery → EBL modality.
-graph.add_conditional_edges(
-    "orchestrator",
-    orchestrator_router,
-    [
-        "complete_example_node",
-        "faded_example_node",
-        "erroneous_example_node",
-    ],
-)
+    # A/B split (sticky condition read from state).
+    graph.add_conditional_edges(
+        "experiment_entry",
+        experiment_router,
+        {
+            "control": "control_agent_node",
+            "experimental": "orchestrator",
+        },
+    )
 
-# Every drafted response is vetted by the Dean before reaching the student.
-graph.add_edge("control_agent_node", "dean_validation_node")
-graph.add_edge("complete_example_node", "dean_validation_node")
-graph.add_edge("faded_example_node", "dean_validation_node")
-graph.add_edge("erroneous_example_node", "dean_validation_node")
-graph.add_edge("dean_validation_node", END)
+    # Experimental: BKT mastery → EBL modality.
+    graph.add_conditional_edges(
+        "orchestrator",
+        orchestrator_router,
+        [
+            "complete_example_node",
+            "faded_example_node",
+            "erroneous_example_node",
+        ],
+    )
 
-graph = graph.compile()
+    # Every drafted response is vetted by the Dean before reaching the student.
+    graph.add_edge("control_agent_node", "dean_validation_node")
+    graph.add_edge("complete_example_node", "dean_validation_node")
+    graph.add_edge("faded_example_node", "dean_validation_node")
+    graph.add_edge("erroneous_example_node", "dean_validation_node")
+    graph.add_edge("dean_validation_node", END)
+
+    return graph
