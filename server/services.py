@@ -210,7 +210,7 @@ async def execute_code(student_code: StudentCode) -> dict:
                 sol_responses = await asyncio.gather(*sol_tasks, return_exceptions=True)
 
                 for idx, resp in enumerate(sol_responses):
-                    if isinstance(resp, Exception) or resp.status_code != 200:
+                    if isinstance(resp, Exception) or resp.status_code >= 400:
                         expected_outputs[idx] = student_code.test_cases[idx].expectedOutput
                     else:
                         res_data = resp.json()
@@ -321,9 +321,15 @@ async def execute_code(student_code: StudentCode) -> dict:
 
 # ── Tutor graph (LangGraph) ────────────────────────────────────────────
 
-def _thread_config(chat: Chat) -> dict:
-    """LangGraph config scoping the checkpoint to this conversation."""
-    return {"configurable": {"thread_id": f"exemplai:{chat.chat_id}"}}
+def _thread_config(chat: Chat, auth_user_id: str) -> dict:
+    """LangGraph config scoping the checkpoint to this user + conversation.
+
+    thread_id includes the authenticated user id (from the validated session,
+    NOT the client-supplied chat.user_id) so one user cannot read or overwrite
+    another user's checkpoint state by supplying/replaying someone else's
+    chat_id.
+    """
+    return {"configurable": {"thread_id": f"exemplai:{auth_user_id}:{chat.chat_id}"}}
 
 
 def build_initial_state(chat: Chat) -> dict:
@@ -350,10 +356,10 @@ def build_initial_state(chat: Chat) -> dict:
     }
 
 
-async def run_chat(graph, chat: Chat) -> dict:
+async def run_chat(graph, chat: Chat, auth_user_id: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
     try:
-        return await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat))
+        return await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
     except Exception as e:
         log.error(f"AI service error: {e}")
         raise HTTPException(
@@ -362,13 +368,13 @@ async def run_chat(graph, chat: Chat) -> dict:
         )
 
 
-async def stream_chat(graph, chat: Chat) -> AsyncGenerator[str, None]:
+async def stream_chat(graph, chat: Chat, auth_user_id: str) -> AsyncGenerator[str, None]:
     """SSE generator. The Dean validates the WHOLE draft before any token is
     released, so the graph runs to completion first; we then stream the vetted
     final message token-by-token. This preserves the research-integrity gate
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
-        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat))
+        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
     except Exception as e:
         log.error(f"AI service error: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': 'AI service temporarily unavailable'})}\n\n"

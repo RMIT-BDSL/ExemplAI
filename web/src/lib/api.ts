@@ -21,6 +21,7 @@ export interface LangGraphResponse {
 
 export async function sendChatMessage(
   conversation: ChatMessagePayload[],
+  chatId: string,
   userId = 1
 ): Promise<LangGraphResponse> {
   const tokenRes = await authClient.convex.token();
@@ -30,6 +31,7 @@ export async function sendChatMessage(
     `${BACKEND_URL}/chat`,
     {
       user_id: userId,
+      chat_id: chatId,
       conversation,
     },
     {

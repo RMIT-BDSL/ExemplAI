@@ -31,7 +31,13 @@ async def open_checkpointer() -> tuple[AsyncConnectionPool, AsyncPostgresSaver]:
     pool = AsyncConnectionPool(conninfo=dsn, min_size=1, max_size=5, open=False)
     await pool.open()
 
-    async with await AsyncConnection.connect(dsn, autocommit=True) as setup_conn:
-        await AsyncPostgresSaver(setup_conn).setup()
+    # If setup fails, the pool is already open — close it before propagating so
+    # startup errors don't leak the pool's background worker + connection.
+    try:
+        async with await AsyncConnection.connect(dsn, autocommit=True) as setup_conn:
+            await AsyncPostgresSaver(setup_conn).setup()
+    except BaseException:
+        await pool.close()
+        raise
 
     return pool, AsyncPostgresSaver(pool)
