@@ -40,14 +40,14 @@ def read_item(item_id: int, q: str | None = None):
 
 
 @router.post("/chat")
-def chat(chat: Chat, current_user: dict = Depends(get_current_user)):
-    return services.run_chat(chat)
+async def chat(chat: Chat, request: Request, current_user: dict = Depends(get_current_user)):
+    return await services.run_chat(request.app.state.tutor_graph, chat, current_user["id"])
 
 
 @router.post("/chat/stream")
-async def chat_stream(chat: Chat, current_user: dict = Depends(get_current_user)):
+async def chat_stream(chat: Chat, request: Request, current_user: dict = Depends(get_current_user)):
     return StreamingResponse(
-        services.stream_chat(chat),
+        services.stream_chat(request.app.state.tutor_graph, chat, current_user["id"]),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -8,4 +8,5 @@ data/csedm-2019/
 !**/.env.example
 # **/uv.lock
 **/.claude/
+**/.vscode/
 CLAUDE.md

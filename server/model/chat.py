@@ -6,6 +6,11 @@ class Chat(BaseModel):
     # understand who is it
     user_id: int
 
+    # Per-conversation id — scopes LangGraph checkpoint memory. thread_id is
+    # derived as f"exemplai:{chat_id}", so multi-turn state (messages, sticky
+    # experiment_condition) persists across requests for the same conversation.
+    chat_id: str
+
     # normal chat - send full chat
     conversation: list[dict]
 

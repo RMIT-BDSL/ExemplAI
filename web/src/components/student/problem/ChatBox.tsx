@@ -236,6 +236,12 @@ export default function ChatBox({
   ]);
   const [isTyping, setIsTyping] = React.useState(false);
 
+  // Stable per-conversation id — scopes the LangGraph checkpoint thread
+  // (thread_id = exemplai:{chat_id}) so multi-turn memory persists for this
+  // chat session. Generated once per mount.
+  const chatIdRef = React.useRef<string>("");
+  if (!chatIdRef.current) chatIdRef.current = crypto.randomUUID();
+
   const handleSendMessage = async (text: string) => {
     // 1. Add User Message
     const userMsg: Message = {
@@ -255,7 +261,7 @@ export default function ChatBox({
         content: msg.content,
       }));
 
-      const response = await sendChatMessage(conversationPayload);
+      const response = await sendChatMessage(conversationPayload, chatIdRef.current);
 
       // Find the last AI assistant message content from the response messages
       const aiMessages = response.messages.filter(
@@ -301,6 +307,9 @@ export default function ChatBox({
   }, [pendingMessage]);
 
   const handleClearChat = () => {
+    // Start a fresh checkpoint thread so the server doesn't resume the old
+    // conversation's memory after the student clears the chat.
+    chatIdRef.current = crypto.randomUUID();
     setMessages([
       {
         id: "welcome-reset",
