@@ -12,6 +12,9 @@ export interface Lesson {
   week: number;
   problem_name: string;
   problem_description: string;
+  knowledge_component: string;
+  topic?: string;
+  tag?: string;
   detail?: string;
   testCases?: TestCase[];
   starter_code?: string;
@@ -32,12 +35,27 @@ const LessonFormModal: Component<Props> = (props) => {
   const [week, setWeek] = createSignal(props.editingLesson?.week ?? props.initialWeek);
   const [problemName, setProblemName] = createSignal(props.editingLesson?.problem_name ?? '');
   const [problemDescription, setProblemDescription] = createSignal(props.editingLesson?.problem_description ?? '');
+  const [knowledgeComponent, setKnowledgeComponent] = createSignal(
+    props.editingLesson?.knowledge_component ?? 'io_basics'
+  );
+  const [topic, setTopic] = createSignal(props.editingLesson?.topic ?? '');
+  const [tag, setTag] = createSignal(props.editingLesson?.tag ?? '');
   const [detail, setDetail] = createSignal(props.editingLesson?.detail ?? '');
   const [testCases, setTestCases] = createSignal<TestCase[]>(
     props.editingLesson?.testCases ? JSON.parse(JSON.stringify(props.editingLesson.testCases)) : []
   );
   const [starterCode, setStarterCode] = createSignal(props.editingLesson?.starter_code ?? '');
   const [solutionCode, setSolutionCode] = createSignal(props.editingLesson?.solution_code ?? '');
+
+  const knowledgeComponents = [
+    'io_basics',
+    'arithmetic',
+    'modular_arith',
+    'conditionals',
+    'functions_params',
+    'string_manip',
+    'loops',
+  ];
 
   // Loading & Error States
   const [submitting, setSubmitting] = createSignal(false);
@@ -47,8 +65,8 @@ const LessonFormModal: Component<Props> = (props) => {
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    if (!problemName().trim() || !problemDescription().trim()) {
-      setError('Please fill in problem name and summary description.');
+    if (!problemName().trim() || !problemDescription().trim() || !knowledgeComponent().trim()) {
+      setError('Please fill in problem name, summary description, and knowledge component.');
       return;
     }
 
@@ -60,6 +78,9 @@ const LessonFormModal: Component<Props> = (props) => {
       week: week(),
       problem_name: problemName().trim(),
       problem_description: problemDescription().trim(),
+      knowledge_component: knowledgeComponent().trim(),
+      topic: topic().trim() || undefined,
+      tag: tag().trim() || undefined,
       detail: detail().trim() || undefined,
       starter_code: starterCode().trim() || undefined,
       solution_code: solutionCode().trim() || undefined,
@@ -152,6 +173,52 @@ const LessonFormModal: Component<Props> = (props) => {
               class="mt-2 w-full rounded-md border border-white/10 bg-[#151d2d] px-3.5 py-2 text-sm text-white outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/35 transition resize-none"
               required
             />
+          </div>
+
+          {/* Row 2b: BKT knowledge component + labels */}
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label for="lesson_kc" class="block font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                Knowledge Component
+              </label>
+              <select
+                id="lesson_kc"
+                value={knowledgeComponent()}
+                onChange={(e) => setKnowledgeComponent(e.currentTarget.value)}
+                class="mt-2 w-full rounded-md border border-white/10 bg-[#151d2d] px-3 py-2.5 text-sm text-white outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/35 transition"
+                required
+              >
+                <For each={knowledgeComponents}>
+                  {(kc) => <option value={kc} class="bg-[#1E293B]">{kc}</option>}
+                </For>
+              </select>
+            </div>
+            <div>
+              <label for="lesson_topic" class="block font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                Topic <span class="normal-case tracking-normal text-slate-500">— optional</span>
+              </label>
+              <input
+                id="lesson_topic"
+                type="text"
+                placeholder="e.g. Loops"
+                value={topic()}
+                onInput={(e) => setTopic(e.currentTarget.value)}
+                class="mt-2 w-full rounded-md border border-white/10 bg-[#151d2d] px-3.5 py-2.5 text-sm text-white outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/35 transition"
+              />
+            </div>
+            <div>
+              <label for="lesson_tag" class="block font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                Tag <span class="normal-case tracking-normal text-slate-500">— optional</span>
+              </label>
+              <input
+                id="lesson_tag"
+                type="text"
+                placeholder="e.g. csedm"
+                value={tag()}
+                onInput={(e) => setTag(e.currentTarget.value)}
+                class="mt-2 w-full rounded-md border border-white/10 bg-[#151d2d] px-3.5 py-2.5 text-sm text-white outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/35 transition"
+              />
+            </div>
           </div>
 
           {/* Row 3: Markdown / Detailed Instructions */}

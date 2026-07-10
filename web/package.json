@@ -14,6 +14,7 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
+    "seed": "convex run seed:seedQuestions",
     "deploy": "pnpm run build && wrangler deploy",
     "cf-typegen": "wrangler types"
   },
