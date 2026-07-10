@@ -14,14 +14,76 @@ import logging
 from typing import AsyncGenerator, Optional
 
 import httpx
+from convex import ConvexClient
 from fastapi import HTTPException, status
 from sentry_sdk import metrics
 
+from bkt import initial_mastery, update_mastery
 from config import settings
 from model.student_code import StudentCode
 from model.chat import Chat
 
 log = logging.getLogger("rich")
+
+
+def _convex_client(auth_token: str) -> ConvexClient:
+    client = ConvexClient(settings.CONVEX_URL)
+    client.set_auth(auth_token)
+    return client
+
+
+async def _record_code_execution(
+    auth_token: Optional[str],
+    lesson_id: Optional[str],
+    action_type: str,
+    passed: bool,
+) -> None:
+    """After Judge0: set has_run; on first Submit compute BKT in Python and store."""
+    if not auth_token or not lesson_id or not settings.CONVEX_URL:
+        return
+
+    action = action_type if action_type in ("run", "submit") else "run"
+    mutation_args: dict = {
+        "lessonId": lesson_id,
+        "passed": passed,
+        "actionType": action,
+    }
+
+    try:
+        client = _convex_client(auth_token)
+
+        if action == "submit":
+            ctx = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.query,
+                    "courses:getExecutionBktContext",
+                    {"lessonId": lesson_id},
+                ),
+                timeout=5.0,
+            )
+            if (
+                ctx
+                and not ctx.get("bkt_recorded")
+                and ctx.get("knowledge_component")
+            ):
+                kc = ctx["knowledge_component"]
+                current = ctx.get("prob_mastery")
+                if current is None:
+                    current = initial_mastery(kc)
+                new_mastery = update_mastery(current, passed, kc)
+                mutation_args["probMastery"] = new_mastery
+                mutation_args["knowledgeComponent"] = kc
+
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                client.mutation,
+                "courses:recordCodeExecution",
+                mutation_args,
+            ),
+            timeout=5.0,
+        )
+    except Exception as e:
+        log.warning("execute — failed to record progress/BKT in Convex: %s", e)
 
 
 # ── Code execution (Judge0) ───────────────────────────────────────────
@@ -154,12 +216,18 @@ async def run_single_test_case(client, code, language_id, test_case, exec_url, h
     }
 
 
-async def execute_code(student_code: StudentCode) -> dict:
+async def execute_code(
+    student_code: StudentCode,
+    auth_token: Optional[str] = None,
+) -> dict:
     """Proxy a code submission to Judge0 and return a Pass/Fail result.
 
     When test_cases are provided, runs each case (optionally computing expected
     outputs from solution_code) and returns aggregate results; otherwise falls
     back to a single execution.
+
+    After Judge0 completes, records has_run (and first-submit BKT) in Convex
+    when lesson_id is present.
     """
     metrics.count("code.execution", 1)
     endpoint = settings.JUDGE0_ENDPOINT
@@ -184,6 +252,8 @@ async def execute_code(student_code: StudentCode) -> dict:
         headers['X-RapidAPI-Host'] = host
 
     language_id = student_code.language_id or 71
+    action_type = student_code.action_type or "run"
+    lesson_id = student_code.lesson_id
 
     # Check if test cases are provided
     if student_code.test_cases:
@@ -258,7 +328,7 @@ async def execute_code(student_code: StudentCode) -> dict:
             if first_fail["stderr"]:
                 fail_msg += f"\nError: {first_fail['stderr']}\n"
 
-            return {
+            result = {
                 "error": True,
                 "status": {
                     "id": first_fail["status_id"],
@@ -269,7 +339,7 @@ async def execute_code(student_code: StudentCode) -> dict:
                 "test_results": results
             }
         else:
-            return {
+            result = {
                 "error": False,
                 "status": {
                     "id": 3,
@@ -279,6 +349,11 @@ async def execute_code(student_code: StudentCode) -> dict:
                 "stderr": None,
                 "test_results": results
             }
+
+        await _record_code_execution(
+            auth_token, lesson_id, action_type, passed=not result["error"]
+        )
+        return result
 
     # Fallback to single execution if no test cases are provided
     payload = {
@@ -293,6 +368,9 @@ async def execute_code(student_code: StudentCode) -> dict:
             response = await client.post(exec_url, json=payload, headers=headers, timeout=15.0)
             response.raise_for_status()
             output = response.json()
+            # Judge0 status id 3 = Accepted
+            passed = (output.get("status") or {}).get("id") == 3
+            await _record_code_execution(auth_token, lesson_id, action_type, passed=passed)
             return output
     except httpx.TimeoutException as e:
         log.error(f"Judge0 request timed out: {e}")

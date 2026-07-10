@@ -118,7 +118,8 @@ async function getUserByToken(
 
 /**
  * Returns a student's progress for every lesson they've started or completed.
- * Each entry is { lessonId, status }. Lessons not present are "pending".
+ * Each entry is { lessonId, status, has_run, bkt_recorded }.
+ * Lessons not present are "pending".
  */
 export const getLessonProgress = authenticatedQuery({
   args: {},
@@ -131,7 +132,55 @@ export const getLessonProgress = authenticatedQuery({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    return rows.map((row) => ({ lessonId: row.lessonId, status: row.status }));
+    return rows.map((row) => ({
+      lessonId: row.lessonId,
+      status: row.status,
+      has_run: row.has_run ?? false,
+      bkt_recorded: row.bkt_recorded ?? false,
+    }));
+  },
+});
+
+/**
+ * Context for the FastAPI BKT engine after Judge0: lesson KC, whether this
+ * lesson already contributed a BKT observation, and current mastery (if any).
+ * BKT math lives on the Python server — Convex only stores the result.
+ */
+export const getExecutionBktContext = authenticatedQuery({
+  args: { lessonId: v.id("questions") },
+  handler: async (ctx, args) => {
+    const user = await getUserByToken(ctx, ctx.user._id);
+    if (!user) return null;
+
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson) return null;
+
+    const progress = await ctx.db
+      .query("lessonProgress")
+      .withIndex("by_user_lesson", (q) =>
+        q.eq("userId", user._id).eq("lessonId", args.lessonId),
+      )
+      .unique();
+
+    const kc = lesson.knowledge_component ?? null;
+    let probMastery: number | null = null;
+    if (kc) {
+      const mastery = await ctx.db
+        .query("bktMastery")
+        .withIndex("by_user_kc", (q) =>
+          q.eq("userId", user._id).eq("knowledge_component", kc),
+        )
+        .unique();
+      probMastery = mastery?.prob_mastery ?? null;
+    }
+
+    return {
+      knowledge_component: kc,
+      bkt_recorded: progress?.bkt_recorded ?? false,
+      has_run: progress?.has_run ?? false,
+      status: progress?.status ?? null,
+      prob_mastery: probMastery,
+    };
   },
 });
 
@@ -188,6 +237,112 @@ export const setLessonStatus = authenticatedMutation({
     }
 
     return { success: true };
+  },
+});
+
+/**
+ * Called by the FastAPI /execute path (with the student's JWT) after Judge0
+ * finishes. Always sets has_run. On first Submit, persists server-computed
+ * BKT mastery (Python) when probMastery + knowledgeComponent are provided.
+ */
+export const recordCodeExecution = authenticatedMutation({
+  args: {
+    lessonId: v.id("questions"),
+    passed: v.boolean(),
+    actionType: v.union(v.literal("run"), v.literal("submit")),
+    // Server-computed mastery after first Submit; omit on run / re-submit.
+    probMastery: v.optional(v.number()),
+    knowledgeComponent: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserByToken(ctx, ctx.user._id);
+    if (!user) {
+      throw new Error("Student not found.");
+    }
+
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson) {
+      throw new Error("Lesson not found.");
+    }
+
+    const existing = await ctx.db
+      .query("lessonProgress")
+      .withIndex("by_user_lesson", (q) =>
+        q.eq("userId", user._id).eq("lessonId", args.lessonId),
+      )
+      .unique();
+
+    const alreadyCompleted = existing?.status === "completed";
+    const nextStatus =
+      args.actionType === "submit" && args.passed
+        ? ("completed" as const)
+        : alreadyCompleted
+          ? ("completed" as const)
+          : ("in-progress" as const);
+
+    const shouldRecordBkt =
+      args.actionType === "submit" &&
+      !existing?.bkt_recorded &&
+      args.probMastery !== undefined &&
+      !!args.knowledgeComponent;
+
+    let bktRecorded = existing?.bkt_recorded ?? false;
+    let probMastery: number | undefined;
+    let knowledgeComponent: string | undefined;
+
+    if (shouldRecordBkt) {
+      knowledgeComponent = args.knowledgeComponent!;
+      probMastery = Math.min(1, Math.max(0, args.probMastery!));
+      const now = Date.now();
+
+      const masteryRow = await ctx.db
+        .query("bktMastery")
+        .withIndex("by_user_kc", (q) =>
+          q
+            .eq("userId", user._id)
+            .eq("knowledge_component", knowledgeComponent!),
+        )
+        .unique();
+
+      if (masteryRow) {
+        await ctx.db.patch(masteryRow._id, {
+          prob_mastery: probMastery,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("bktMastery", {
+          userId: user._id,
+          knowledge_component: knowledgeComponent,
+          prob_mastery: probMastery,
+          updatedAt: now,
+        });
+      }
+      bktRecorded = true;
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: nextStatus,
+        has_run: true,
+        ...(bktRecorded ? { bkt_recorded: true } : {}),
+      });
+    } else {
+      await ctx.db.insert("lessonProgress", {
+        userId: user._id,
+        lessonId: args.lessonId,
+        status: nextStatus,
+        has_run: true,
+        ...(bktRecorded ? { bkt_recorded: true } : {}),
+      });
+    }
+
+    return {
+      has_run: true,
+      bkt_recorded: bktRecorded,
+      status: nextStatus,
+      prob_mastery: probMastery,
+      knowledge_component: knowledgeComponent,
+    };
   },
 });
 

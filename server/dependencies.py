@@ -9,15 +9,22 @@ log = logging.getLogger("rich")
 
 security = HTTPBearer(auto_error=False)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-    """FastAPI dependency to authenticate the request using the Convex JWT token."""
+
+async def get_current_user_with_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> dict:
+    """Authenticate via Convex JWT and return {user, token}.
+
+    The raw token is needed so /execute can call Convex mutations as the student
+    after Judge0 finishes (has_run + first-submit BKT).
+    """
     if not credentials:
         log.warning("auth — missing Authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization token missing",
         )
-    
+
     token = credentials.credentials
     if not token:
         log.warning("auth — Bearer token is empty")
@@ -34,17 +41,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
         )
 
     try:
-        # Initialize a Convex client pointing to our deployment
         client = ConvexClient(settings.CONVEX_URL)
-        
-        # Set the user's JWT token
         client.set_auth(token)
-        
-        # Call the getSessionUser query with a timeout
+
         try:
             session_data = await asyncio.wait_for(
                 asyncio.to_thread(client.query, "auth:getSessionUser"),
-                timeout=5.0
+                timeout=5.0,
             )
         except asyncio.TimeoutError as e:
             log.error("auth — Convex query timed out")
@@ -52,16 +55,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Authentication service is taking too long to respond",
             ) from e
-        
+
         if not session_data or not session_data.get("user"):
             log.warning("auth — invalid token or no session found")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token or session expired",
             )
-            
-        # Return the validated user details
-        return session_data["user"]
+
+        return {"user": session_data["user"], "token": token}
     except HTTPException:
         raise
     except Exception as e:
@@ -70,3 +72,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed due to an internal error",
         ) from e
+
+
+async def get_current_user(
+    auth: dict = Depends(get_current_user_with_token),
+) -> dict:
+    """FastAPI dependency: authenticated Convex user (no token)."""
+    return auth["user"]

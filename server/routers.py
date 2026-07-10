@@ -15,7 +15,7 @@ from slowapi.util import get_remote_address
 from model.student_code import StudentCode
 from model.chat import Chat
 import services
-from dependencies import get_current_user
+from dependencies import get_current_user, get_current_user_with_token
 
 # Shared with main.py for app.state + SlowAPIMiddleware wiring.
 limiter = Limiter(key_func=get_remote_address)
@@ -30,8 +30,12 @@ def read_root():
 
 @router.post('/execute')
 @limiter.limit("10/minute")
-async def judge0_execution(student_code: StudentCode, request: Request, current_user: dict = Depends(get_current_user)):
-    return await services.execute_code(student_code)
+async def judge0_execution(
+    student_code: StudentCode,
+    request: Request,
+    auth: dict = Depends(get_current_user_with_token),
+):
+    return await services.execute_code(student_code, auth_token=auth["token"])
 
 
 @router.get("/items/{item_id}")

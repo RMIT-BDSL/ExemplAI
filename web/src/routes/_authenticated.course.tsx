@@ -243,6 +243,9 @@ function Course() {
           starter_code: activeQuestion?.starter_code,
           solution_code: activeQuestion?.solution_code,
           test_cases: testCasesToRun,
+          // Server sets has_run + first-submit BKT after Judge0 finishes.
+          lesson_id: activeQuestionId ?? undefined,
+          action_type: actionType,
         },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -255,26 +258,8 @@ function Course() {
         language,
         success: succeeded,
       });
-
-      // Record progress on submit: a successful submission completes the
-      // lesson; a failed attempt keeps it "in-progress" (the server won't
-      // downgrade a lesson that's already completed).
-      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
-        setLessonStatus({
-          lessonId: activeQuestionId,
-          status: succeeded ? "completed" : "in-progress",
-        }).catch(() => {});
-      }
     } catch (error: any) {
       posthog.captureException(error);
-
-      // A submit that errors out is still a failed attempt → in-progress.
-      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
-        setLessonStatus({
-          lessonId: activeQuestionId,
-          status: "in-progress",
-        }).catch(() => {});
-      }
 
       setExecutionResult({
         error: true,
