@@ -129,6 +129,7 @@ describe("course CRUD", () => {
       week: 1,
       problem_name: "Sum two numbers",
       problem_description: "Add two integers",
+      knowledge_component: "arithmetic",
       testCases: sampleTestCases,
     });
 
@@ -172,6 +173,8 @@ describe("lesson CRUD", () => {
       week: 3,
       problem_name: "Sum",
       problem_description: "Add two integers",
+      knowledge_component: "arithmetic",
+      topic: "Arithmetic",
       detail: "Read two ints from stdin and print their sum.",
       testCases: sampleTestCases,
     });
@@ -180,6 +183,8 @@ describe("lesson CRUD", () => {
     expect(lesson).toMatchObject({
       week: 3,
       problem_name: "Sum",
+      knowledge_component: "arithmetic",
+      topic: "Arithmetic",
       detail: "Read two ints from stdin and print their sum.",
     });
     expect(lesson?.testCases).toHaveLength(3);
@@ -196,6 +201,7 @@ describe("lesson CRUD", () => {
       week: 1,
       problem_name: "No tests yet",
       problem_description: "todo",
+      knowledge_component: "io_basics",
     });
 
     const lesson = await client.query(api.lessons.getLesson, { id });
@@ -213,6 +219,7 @@ describe("lesson CRUD", () => {
         week,
         problem_name: `Week ${week}`,
         problem_description: "x",
+        knowledge_component: "loops",
       });
     }
 
@@ -234,12 +241,14 @@ describe("lesson CRUD", () => {
       week: 1,
       problem_name: "A1",
       problem_description: "x",
+      knowledge_component: "io_basics",
     });
     await client.mutation(api.lessons.createLesson, {
       course: courseB,
       week: 1,
       problem_name: "B1",
       problem_description: "x",
+      knowledge_component: "io_basics",
     });
 
     const lessons = await client.query(api.lessons.listLessonsByCourse, {
@@ -259,12 +268,14 @@ describe("lesson CRUD", () => {
       week: 1,
       problem_name: "Original",
       problem_description: "x",
+      knowledge_component: "conditionals",
     });
 
     await client.mutation(api.lessons.updateLesson, {
       id,
       week: 5,
       problem_name: "Renamed",
+      knowledge_component: "loops",
       testCases: [{ input: "1", expectedOutput: "1" }],
     });
 
@@ -284,6 +295,7 @@ describe("lesson CRUD", () => {
         week: 13,
         problem_name: "Too late",
         problem_description: "x",
+        knowledge_component: "loops",
       })
     ).rejects.toThrow();
   });
@@ -301,6 +313,7 @@ describe("lesson CRUD", () => {
         week: 1,
         problem_name: "Orphan",
         problem_description: "x",
+        knowledge_component: "io_basics",
       })
     ).rejects.toThrow("Course not found");
   });
@@ -314,6 +327,7 @@ describe("lesson CRUD", () => {
       week: 1,
       problem_name: "Bye",
       problem_description: "x",
+      knowledge_component: "io_basics",
     });
 
     const userId = await t.run(async (ctx) =>

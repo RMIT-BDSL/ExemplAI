@@ -155,16 +155,19 @@ export type PublicApiType = {
       {
         course: Id<"course">;
         detail?: string;
+        knowledge_component: string;
         problem_description: string;
         problem_name: string;
         solution_code?: string;
         starter_code?: string;
+        tag?: string;
         testCases?: Array<{
           description?: string;
           expectedOutput: string;
           hidden?: boolean;
           input: string;
         }>;
+        topic?: string;
         week: number;
       },
       any
@@ -194,16 +197,19 @@ export type PublicApiType = {
         course?: Id<"course">;
         detail?: string;
         id: Id<"questions">;
+        knowledge_component?: string;
         problem_description?: string;
         problem_name?: string;
         solution_code?: string;
         starter_code?: string;
+        tag?: string;
         testCases?: Array<{
           description?: string;
           expectedOutput: string;
           hidden?: boolean;
           input: string;
         }>;
+        topic?: string;
         week?: number;
       },
       any
