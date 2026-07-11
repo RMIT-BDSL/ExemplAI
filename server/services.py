@@ -15,7 +15,7 @@ from typing import AsyncGenerator, Optional
 
 import httpx
 from convex import ConvexClient
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, BackgroundTasks
 from sentry_sdk import metrics
 
 from bkt import initial_mastery, update_mastery
@@ -218,6 +218,7 @@ async def run_single_test_case(client, code, language_id, test_case, exec_url, h
 
 async def execute_code(
     student_code: StudentCode,
+    background_tasks: BackgroundTasks,
     auth_token: Optional[str] = None,
 ) -> dict:
     """Proxy a code submission to Judge0 and return a Pass/Fail result.
@@ -350,8 +351,12 @@ async def execute_code(
                 "test_results": results
             }
 
-        await _record_code_execution(
-            auth_token, lesson_id, action_type, passed=not result["error"]
+        background_tasks.add_task(
+            _record_code_execution,
+            auth_token,
+            lesson_id,
+            action_type,
+            not result["error"]
         )
         return result
 
@@ -370,7 +375,13 @@ async def execute_code(
             output = response.json()
             # Judge0 status id 3 = Accepted
             passed = (output.get("status") or {}).get("id") == 3
-            await _record_code_execution(auth_token, lesson_id, action_type, passed=passed)
+            background_tasks.add_task(
+                _record_code_execution,
+                auth_token,
+                lesson_id,
+                action_type,
+                passed
+            )
             return output
     except httpx.TimeoutException as e:
         log.error(f"Judge0 request timed out: {e}")
