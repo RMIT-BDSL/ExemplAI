@@ -63,6 +63,7 @@ class Settings(BaseSettings):
 
     # ── Observability ──────────────────────────────────────────────────
     SENTRY_DSN: SecretStr = SecretStr("")          # DSN embeds a project key
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
     LANGFUSE_PUBLIC_KEY: str = ""                   # public by design
     LANGFUSE_SECRET_KEY: SecretStr = SecretStr("")
 
