@@ -61,10 +61,13 @@ export default defineSchema({
   // A lesson with no row here is treated as "pending" by the UI, so we only
   // store lessons a student has started ("in-progress") or finished
   // ("completed"). One row per (student, lesson) pair.
+  // `has_run` / `bkt_recorded` are set only by the server after Judge0 runs.
   lessonProgress: defineTable({
     userId: v.id("users"),
     lessonId: v.id("questions"),
     status: v.union(v.literal("in-progress"), v.literal("completed")),
+    has_run: v.optional(v.boolean()),
+    bkt_recorded: v.optional(v.boolean()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])
@@ -72,6 +75,16 @@ export default defineSchema({
     .index("by_lesson", ["lessonId"])
     // exact (student, lesson) lookup for fast upserts
     .index("by_user_lesson", ["userId", "lessonId"]),
+  // Per-student BKT mastery for a knowledge component (shared across lessons
+  // tagged with the same KC). Updated once per lesson on first Submit only.
+  bktMastery: defineTable({
+    userId: v.id("users"),
+    knowledge_component: v.string(),
+    prob_mastery: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_kc", ["userId", "knowledge_component"]),
   invitationCodes: defineTable({
     code: v.string(),
     isValid: v.boolean(),

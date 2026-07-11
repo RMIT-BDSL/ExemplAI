@@ -350,3 +350,148 @@ describe("lesson CRUD", () => {
     expect(progress).toHaveLength(0);
   });
 });
+
+async function createMockStudent(t: ReturnType<typeof setup>) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "user",
+      document: {
+        name: "Student User",
+        email: "student-bkt@rmit.edu.vn",
+        emailVerified: true,
+        role: "student",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const sessionId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "session",
+      document: {
+        userId,
+        expiresAt: Date.now() + 1000 * 60 * 60,
+        token: `token-${userId}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const customUserId = await ctx.db.insert("users", {
+      name: "Student User",
+      email: "student-bkt@rmit.edu.vn",
+      tokenIdentifier: userId,
+      role: "student",
+    });
+
+    await ctx.db.insert("userProfiles", {
+      userId: customUserId,
+      tokenIdentifier: userId,
+      invitationCode: "TESTCODE",
+    });
+
+    return t.withIdentity({ subject: userId, sessionId });
+  });
+}
+
+describe("recordCodeExecution", () => {
+  it("sets has_run on run without recording BKT", async () => {
+    const t = setup();
+    const admin = await createMockAdmin(t);
+    const course = await makeCourse(admin);
+    const lessonId = await admin.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "Run only",
+      problem_description: "x",
+      knowledge_component: "loops",
+    });
+    const student = await createMockStudent(t);
+
+    const result = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: true,
+      actionType: "run",
+    });
+
+    expect(result).toMatchObject({
+      has_run: true,
+      bkt_recorded: false,
+      status: "in-progress",
+    });
+    expect(result.prob_mastery).toBeUndefined();
+
+    const progress = await student.query(api.courses.getLessonProgress, {});
+    expect(progress).toEqual([
+      expect.objectContaining({
+        lessonId,
+        status: "in-progress",
+        has_run: true,
+        bkt_recorded: false,
+      }),
+    ]);
+
+    const mastery = await t.run(async (ctx) => ctx.db.query("bktMastery").collect());
+    expect(mastery).toHaveLength(0);
+  });
+
+  it("persists server-computed BKT only on first submit", async () => {
+    const t = setup();
+    const admin = await createMockAdmin(t);
+    const course = await makeCourse(admin);
+    const lessonId = await admin.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "First submit",
+      problem_description: "x",
+      knowledge_component: "loops",
+    });
+    const student = await createMockStudent(t);
+
+    const ctxBefore = await student.query(api.courses.getExecutionBktContext, {
+      lessonId,
+    });
+    expect(ctxBefore).toMatchObject({
+      knowledge_component: "loops",
+      bkt_recorded: false,
+      prob_mastery: null,
+    });
+
+    // Python server would compute this; Convex only stores it.
+    const serverMastery = 0.42;
+    const first = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: true,
+      actionType: "submit",
+      probMastery: serverMastery,
+      knowledgeComponent: "loops",
+    });
+    expect(first.has_run).toBe(true);
+    expect(first.bkt_recorded).toBe(true);
+    expect(first.status).toBe("completed");
+    expect(first.knowledge_component).toBe("loops");
+    expect(first.prob_mastery).toBe(serverMastery);
+
+    const masteryAfterFirst = await t.run(async (ctx) =>
+      ctx.db.query("bktMastery").collect()
+    );
+    expect(masteryAfterFirst).toHaveLength(1);
+    expect(masteryAfterFirst[0].prob_mastery).toBe(serverMastery);
+
+    const second = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: false,
+      actionType: "submit",
+      probMastery: 0.01,
+      knowledgeComponent: "loops",
+    });
+    expect(second.bkt_recorded).toBe(true);
+    expect(second.status).toBe("completed");
+    expect(second.prob_mastery).toBeUndefined();
+
+    const masteryAfterSecond = await t.run(async (ctx) =>
+      ctx.db.query("bktMastery").collect()
+    );
+    expect(masteryAfterSecond).toHaveLength(1);
+    expect(masteryAfterSecond[0].prob_mastery).toBe(serverMastery);
+  });
+});

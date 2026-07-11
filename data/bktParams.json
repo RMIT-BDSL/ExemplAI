@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "source": "CSEDM 2019 Data Challenge (ProgSnap2)",
+    "n_students": 5,
+    "n_problems": 7,
+    "n_kcs": 5,
+    "n_observations": 50,
+    "fitting_library": "pyBKT"
+  },
+  "kc_parameters": {
+    "io_basics": {
+      "description": "Console I/O, type conversion, simple returns",
+      "prior": 0.0009,
+      "learn": 0.3583,
+      "guess": 0.5069,
+      "slip": 0.0907,
+      "forget": 0.0
+    },
+    "arithmetic": {
+      "description": "Numeric operators and math expressions",
+      "prior": 0.0025,
+      "learn": 1.0,
+      "guess": 0.0,
+      "slip": 0.0,
+      "forget": 0.0
+    },
+    "modular_arith": {
+      "description": "Modulo and integer division in context",
+      "prior": 0.0034,
+      "learn": 1.0,
+      "guess": 0.0,
+      "slip": 0.0,
+      "forget": 0.0
+    },
+    "conditionals": {
+      "description": "If/elif/else branching and boolean logic",
+      "prior": 0.0181,
+      "learn": 1.0,
+      "guess": 0.0,
+      "slip": 0.0,
+      "forget": 0.0
+    },
+    "loops": {
+      "description": "For/while iteration",
+      "prior": 0.0007,
+      "learn": 1.0,
+      "guess": 0.0,
+      "slip": 0.0,
+      "forget": 0.0
+    }
+  }
+}
