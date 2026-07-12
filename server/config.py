@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
     LANGFUSE_PUBLIC_KEY: str = ""                   # public by design
     LANGFUSE_SECRET_KEY: SecretStr = SecretStr("")
+    POSTHOG_PROJECT_TOKEN: str = ""
+    POSTHOG_HOST: str = "https://eu.posthog.com"
 
 
 # ── Singleton — import this everywhere ────────────────────────────────

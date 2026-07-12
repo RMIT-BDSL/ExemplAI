@@ -17,6 +17,7 @@ import httpx
 from convex import ConvexClient
 from fastapi import HTTPException, status, BackgroundTasks
 from sentry_sdk import metrics
+from posthog import Posthog
 
 from bkt import initial_mastery, update_mastery
 from config import settings
@@ -24,6 +25,13 @@ from model.student_code import StudentCode
 from model.chat import Chat
 
 log = logging.getLogger("rich")
+
+posthog_client = None
+if settings.POSTHOG_PROJECT_TOKEN:
+    try:
+        posthog_client = Posthog(settings.POSTHOG_PROJECT_TOKEN, host=settings.POSTHOG_HOST)
+    except Exception as e:
+        log.warning(f"Failed to initialize PostHog: {e}")
 
 
 def _convex_client(auth_token: str) -> ConvexClient:
@@ -448,6 +456,28 @@ def build_initial_state(chat: Chat) -> dict:
 async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
     try:
+        if posthog_client:
+            try:
+                flag = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        posthog_client.get_feature_flag,
+                        "new-model-test",
+                        auth_user_id
+                    ),
+                    timeout=2.0
+                )
+                if flag == "control":
+                    # In PostHog, 'control' means multiagent (experimental flow)
+                    chat.experiment_condition = "experimental"
+                elif flag == "prompted":
+                    # 'prompted' means normal OpenAI model (control flow)
+                    chat.experiment_condition = "control"
+                else:
+                    # Default
+                    chat.experiment_condition = "experimental"
+            except Exception as e:
+                log.warning("PostHog flag evaluation failed: %s", e)
+
         # Fetch BKT and problem context from Convex
         if chat.chat_id:
             try:
@@ -525,6 +555,28 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     final message token-by-token. This preserves the research-integrity gate
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
+        if posthog_client:
+            try:
+                flag = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        posthog_client.get_feature_flag,
+                        "new-model-test",
+                        auth_user_id
+                    ),
+                    timeout=2.0
+                )
+                if flag == "control":
+                    # In PostHog, 'control' means multiagent (experimental flow)
+                    chat.experiment_condition = "experimental"
+                elif flag == "prompted":
+                    # 'prompted' means normal OpenAI model (control flow)
+                    chat.experiment_condition = "control"
+                else:
+                    # Default
+                    chat.experiment_condition = "experimental"
+            except Exception as e:
+                log.warning("PostHog flag evaluation failed: %s", e)
+
         # Fetch BKT and problem context from Convex
         if chat.chat_id:
             try:
