@@ -102,3 +102,44 @@ export const clearChat = authenticatedMutation({
     return { success: true };
   },
 });
+
+// Fetch full problem context and BKT mastery for a given chat, meant to be called by the backend
+export const getChatContext = authenticatedQuery({
+  args: { chatId: v.id("chats") },
+  handler: async (ctx, args) => {
+    if (!ctx.customUser) throw new Error("User not found");
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId !== ctx.customUser._id) throw new Error("Unauthorized");
+
+    const lesson = await ctx.db.get(chat.lessonId);
+    if (!lesson) throw new Error("Lesson not found");
+
+    let probMastery = 0.0;
+    if (lesson.knowledge_component) {
+      const bkt = await ctx.db
+        .query("bktMastery")
+        .withIndex("by_user_kc", (q) =>
+          q.eq("userId", chat.userId).eq("knowledge_component", lesson.knowledge_component as string)
+        )
+        .unique();
+      if (bkt) {
+        probMastery = bkt.prob_mastery;
+      }
+    }
+
+    // let unitTestAssertions = "";
+    // if (lesson.testCases && lesson.testCases.length > 0) {
+    //   unitTestAssertions = lesson.testCases
+    //     .map((tc) => `Input: ${tc.input} | Expected Output: ${tc.expectedOutput}`)
+    //     .join("\n");
+    // }
+
+    return {
+      original_problem: lesson.problem_description || "",
+      // unit_test_assertions: unitTestAssertions,
+      current_knowledge_component: lesson.knowledge_component || "",
+      bkt_prob_mastery: probMastery,
+    };
+  },
+});

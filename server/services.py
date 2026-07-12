@@ -448,6 +448,26 @@ def build_initial_state(chat: Chat) -> dict:
 async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
     try:
+        # Fetch BKT and problem context from Convex
+        if chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                context = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.query,
+                        "chats:getChatContext",
+                        {"chatId": chat.chat_id},
+                    ),
+                    timeout=5.0,
+                )
+                if context:
+                    chat.original_problem = context.get("original_problem", "")
+                    # chat.unit_test_assertions = context.get("unit_test_assertions", "")
+                    chat.current_knowledge_component = context.get("current_knowledge_component", "")
+                    chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+            except Exception as cvx_err:
+                log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
+
         result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
         
         # Extract the final AI message
@@ -505,6 +525,26 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     final message token-by-token. This preserves the research-integrity gate
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
+        # Fetch BKT and problem context from Convex
+        if chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                context = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.query,
+                        "chats:getChatContext",
+                        {"chatId": chat.chat_id},
+                    ),
+                    timeout=5.0,
+                )
+                if context:
+                    chat.original_problem = context.get("original_problem", "")
+                    # chat.unit_test_assertions = context.get("unit_test_assertions", "")
+                    chat.current_knowledge_component = context.get("current_knowledge_component", "")
+                    chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+            except Exception as cvx_err:
+                log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
+
         result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
     except Exception as e:
         log.error(f"AI service error: {e}")
