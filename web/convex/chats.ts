@@ -53,6 +53,8 @@ export const addMessage = authenticatedMutation({
     chatId: v.id("chats"),
     sender: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    sentBySystem: v.optional(v.boolean()),
+    model: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
@@ -64,6 +66,8 @@ export const addMessage = authenticatedMutation({
       chatId: args.chatId,
       sender: args.sender,
       content: args.content,
+      sentBySystem: args.sentBySystem,
+      model: args.model,
     });
     return { success: true };
   },

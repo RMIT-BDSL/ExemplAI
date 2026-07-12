@@ -455,7 +455,19 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         text = getattr(final, "content", None)
         if text is None and isinstance(final, dict):
             text = final.get("content", "")
-        text = text or ""
+        # Determine the model from state
+        if not result.get("guardrail_passed", True):
+            chosen_model = "guardrail_blocked"
+        elif result.get("experiment_condition") == "control":
+            chosen_model = "control_agent_node"
+        else:
+            mastery = result.get("bkt_prob_mastery", 0.0)
+            if mastery < 0.3:
+                chosen_model = "complete_example_node"
+            elif mastery <= 0.7:
+                chosen_model = "faded_example_node"
+            else:
+                chosen_model = "erroneous_example_node"
         
         # Save to Convex
         if text and chat.chat_id:
@@ -468,7 +480,9 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
                         {
                             "chatId": chat.chat_id,
                             "sender": "assistant",
-                            "content": text
+                            "content": text,
+                            "sentBySystem": True,
+                            "model": chosen_model
                         },
                     ),
                     timeout=5.0,
@@ -504,6 +518,20 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
         text = final.get("content", "")
     text = text or ""
 
+    # Determine the model from state
+    if not result.get("guardrail_passed", True):
+        chosen_model = "guardrail_blocked"
+    elif result.get("experiment_condition") == "control":
+        chosen_model = "control_agent_node"
+    else:
+        mastery = result.get("bkt_prob_mastery", 0.0)
+        if mastery < 0.3:
+            chosen_model = "complete_example_node"
+        elif mastery <= 0.7:
+            chosen_model = "faded_example_node"
+        else:
+            chosen_model = "erroneous_example_node"
+
     # Re-chunk the vetted text into word tokens for progressive render.
     parts = text.split(" ")
     
@@ -518,7 +546,9 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
                     {
                         "chatId": chat.chat_id,
                         "sender": "assistant",
-                        "content": text
+                        "content": text,
+                        "sentBySystem": True,
+                        "model": chosen_model
                     },
                 ),
                 timeout=5.0,

@@ -102,5 +102,7 @@ export default defineSchema({
     chatId: v.id("chats"),
     sender: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    sentBySystem: v.optional(v.boolean()),
+    model: v.optional(v.string()),
   }).index("by_chat", ["chatId"]),
 });
