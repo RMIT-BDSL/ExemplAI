@@ -46,13 +46,13 @@ def read_item(item_id: int, q: str | None = None):
 
 @router.post("/chat")
 async def chat(chat: Chat, request: Request, auth: dict = Depends(get_current_user_with_token)):
-    return await services.run_chat(request.app.state.tutor_graph, chat, auth["id"], auth["token"])
+    return await services.run_chat(request.app.state.tutor_graph, chat, auth["user"]["id"], auth["token"])
 
 
 @router.post("/chat/stream")
 async def chat_stream(chat: Chat, request: Request, auth: dict = Depends(get_current_user_with_token)):
     return StreamingResponse(
-        services.stream_chat(request.app.state.tutor_graph, chat, auth["id"], auth["token"]),
+        services.stream_chat(request.app.state.tutor_graph, chat, auth["user"]["id"], auth["token"]),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
