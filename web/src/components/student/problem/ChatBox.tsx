@@ -354,12 +354,9 @@ export default function ChatBox({
         ? lastAiMessage.content
         : "Sorry, I couldn't get a response.";
 
-      // 2. Add Assistant Message to Convex
-      await addMessageMutation({
-        chatId: chatId as Id<"chats">,
-        sender: "assistant",
-        content: replyContent,
-      });
+      // The AI message will automatically appear in the UI once the backend 
+      // pushes it to Convex. We no longer save it from the frontend to avoid
+      // duplication and sync issues.
     } catch (error) {
       console.error("Error communicating with chat server:", error);
       await addMessageMutation({

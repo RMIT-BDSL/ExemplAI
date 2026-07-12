@@ -445,10 +445,38 @@ def build_initial_state(chat: Chat) -> dict:
     }
 
 
-async def run_chat(graph, chat: Chat, auth_user_id: str) -> dict:
+async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
     try:
-        return await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        
+        # Extract the final AI message
+        final = result["messages"][-1]
+        text = getattr(final, "content", None)
+        if text is None and isinstance(final, dict):
+            text = final.get("content", "")
+        text = text or ""
+        
+        # Save to Convex
+        if text and chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.mutation,
+                        "chats:addMessage",
+                        {
+                            "chatId": chat.chat_id,
+                            "sender": "assistant",
+                            "content": text
+                        },
+                    ),
+                    timeout=5.0,
+                )
+            except Exception as cvx_err:
+                log.error(f"Failed to sync AI message to Convex: {cvx_err}")
+                
+        return result
     except Exception as e:
         log.error(f"AI service error: {e}")
         raise HTTPException(
@@ -457,7 +485,7 @@ async def run_chat(graph, chat: Chat, auth_user_id: str) -> dict:
         )
 
 
-async def stream_chat(graph, chat: Chat, auth_user_id: str) -> AsyncGenerator[str, None]:
+async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> AsyncGenerator[str, None]:
     """SSE generator. The Dean validates the WHOLE draft before any token is
     released, so the graph runs to completion first; we then stream the vetted
     final message token-by-token. This preserves the research-integrity gate
@@ -478,6 +506,26 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str) -> AsyncGenerator[st
 
     # Re-chunk the vetted text into word tokens for progressive render.
     parts = text.split(" ")
+    
+    # Save to Convex before starting the stream
+    if text and chat.chat_id:
+        try:
+            client = _convex_client(auth_token)
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.mutation,
+                    "chats:addMessage",
+                    {
+                        "chatId": chat.chat_id,
+                        "sender": "assistant",
+                        "content": text
+                    },
+                ),
+                timeout=5.0,
+            )
+        except Exception as cvx_err:
+            log.error(f"Failed to sync AI message to Convex: {cvx_err}")
+
     for i, part in enumerate(parts):
         token = part if i == 0 else " " + part
         yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
