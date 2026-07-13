@@ -258,7 +258,7 @@ export default function ChatBox({
         {
           id: "welcome",
           sender: "assistant",
-          content: "Hi there! I am your AI learning assistant. I can help you understand the 'Two Sum' problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
+          content: "Hi there I am your AI learning assistant. I can help you understand this problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
           timestamp: new Date(),
         },
       ];
