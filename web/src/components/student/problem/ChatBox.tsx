@@ -426,7 +426,7 @@ export default function ChatBox({
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId} />
     </div>
   );
 }
