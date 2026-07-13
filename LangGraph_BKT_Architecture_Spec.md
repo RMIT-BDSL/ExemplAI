@@ -27,7 +27,7 @@ graph TD
     F[Erroneous Example Agent]
     
     Dean[Dean Agent<br/>Safety Validation]
-    G([Stream Model Response to Chat UI])
+    G([Send Approved Response to Chat UI])
     H[(Log Intervention to BKT)]
 
     %% Flow
@@ -155,6 +155,8 @@ concept the student is failing on (e.g., loop iteration, conditional logic, accu
 If the student replies with a follow-up question, answer it supportively while staying \
 within the analog problem domain. If they ask you to solve their actual problem, gently \
 redirect: "Let's keep working through this example first — the pattern will click."
+If the student asks for a DIFFERENT example, acknowledge the request and generate a NEW \
+complete example using a completely DIFFERENT scenario to prevent pattern-matching.
 </multi_turn>
 
 <output_format>
@@ -228,6 +230,8 @@ When the student replies with their attempt to fill in the blanks:
 the remaining blank. Do NOT fill it in.
 - If WRONG: Do NOT reveal the answer. Rephrase the question using a concrete \
 analogy, or trace through the code with a sample input to help them see the gap.
+- If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
+faded example using a completely DIFFERENT scenario to prevent pattern-matching.
 </multi_turn>
 
 <output_format>
@@ -303,6 +307,8 @@ right track — trace through [edge_case_input] step by step. What does the vari
 equal after iteration 3?"
 - If WRONG: Do NOT reveal the answer. Ask them to manually trace the code execution \
 with the failing test case, line by line.
+- If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
+erroneous example using a completely DIFFERENT scenario to prevent pattern-matching.
 </multi_turn>
 
 <output_format>
@@ -455,4 +461,5 @@ To make this graph function align with the Split-Pane UX and RCT methodology, de
    * **Right Pane (Chat Reply):** Bypasses unit testing and BKT updates. Routes directly to the active LLM agent for **Conversational Evaluation** (checking if they understood the pedagogical hint).
 2. **A/B Experiment Routing:** After handling the input, the router checks the student's RCT cohort. Control Group students bypass the BKT engine entirely and are routed to a generic `Control Agent` (Standard LLM). Experimental Group students proceed to the Orchestrator.
 3. **State Injection (Experimental Group):** Fetch the newly updated `probMastery` float and inject it into the `TutorGraphState` before invoking the Orchestrator conditional edge.
-4. **Post-Graph Logging (Phase 2):** After the selected agent (Control or EBL) drafts a response, it passes through the Dean Agent for safety validation. Once streamed to the UI, trigger an async job to log the intervention type (Control, Complete, Faded, Erroneous) to Supabase.
+4. **Post-Graph Logging (Phase 2):** After the selected agent (Control or EBL) drafts a response, it passes through the Dean Agent for safety validation. Once passed to the UI, trigger an async job to log the intervention type (Control, Complete, Faded, Erroneous) to Supabase.
+5. **UI Streaming Constraints (Dean Validation):** Because the Dean Agent must approve the full draft *before* the student sees it, the backend CANNOT stream raw tokens from the EBL agents directly to the UI. The frontend must display a loading state (e.g., "Tutor is thinking...") while the graph executes. Once the Dean approves, the backend returns the full string. The frontend may then use a Javascript typewriter effect to simulate streaming for a better UX.
