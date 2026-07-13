@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     SUPABASE_PUBLIC_KEY: str = ""            # anon key — public by design
     SUPABASE_SECRET_KEY: SecretStr = SecretStr("")  # service-role key
     CONVEX_URL: str = ""
+    CONVEX_BACKEND_SECRET: SecretStr = SecretStr("")
 
     # ── Observability ──────────────────────────────────────────────────
     SENTRY_DSN: SecretStr = SecretStr("")          # DSN embeds a project key

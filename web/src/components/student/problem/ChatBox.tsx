@@ -234,6 +234,7 @@ export default function ChatBox({
   lessonId?: string;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
+  const [localError, setLocalError] = React.useState<string | null>(null);
 
   // Convex integration
   const convexLessonId = lessonId as Id<"questions"> | undefined;
@@ -252,9 +253,9 @@ export default function ChatBox({
 
   // Map Convex messages to the local Message format
   const messages: Message[] = React.useMemo(() => {
-    if (!dbMessages) return [];
-    if (dbMessages.length === 0) {
-      return [
+    let result: Message[] = [];
+    if (!dbMessages || dbMessages.length === 0) {
+      result = [
         {
           id: "welcome",
           sender: "assistant",
@@ -262,27 +263,48 @@ export default function ChatBox({
           timestamp: new Date(),
         },
       ];
+    } else {
+      result = dbMessages.map((msg) => ({
+        id: msg._id,
+        sender: msg.sender as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg._creationTime),
+      }));
     }
-    return dbMessages.map((msg) => ({
-      id: msg._id,
-      sender: msg.sender,
-      content: msg.content,
-      timestamp: new Date(msg._creationTime),
-    }));
-  }, [dbMessages]);
 
+    if (localError) {
+      result.push({
+        id: "local-error",
+        sender: "assistant",
+        content: localError,
+        timestamp: new Date(),
+      });
+    }
+    return result;
+  }, [dbMessages, localError]);
   React.useEffect(() => {
+    setChatId(null);
+    let isActive = true;
+
     async function initChat() {
       if (convexLessonId) {
         try {
           const id = await getOrCreateChat({ lessonId: convexLessonId });
-          setChatId(id);
+          if (isActive) {
+            setChatId(id);
+          }
         } catch (e) {
-          console.error("Failed to initialize chat:", e);
+          if (isActive) {
+            console.error("Failed to initialize chat:", e);
+          }
         }
       }
     }
     initChat();
+
+    return () => {
+      isActive = false;
+    };
   }, [convexLessonId, getOrCreateChat]);
 
   const handleSendMessage = async (text: string) => {
@@ -290,6 +312,7 @@ export default function ChatBox({
     
     // Optmistically show typing state
     setIsTyping(true);
+    setLocalError(null);
 
     try {
       // 1. Add User Message to Convex
@@ -359,11 +382,7 @@ export default function ChatBox({
       // duplication and sync issues.
     } catch (error) {
       console.error("Error communicating with chat server:", error);
-      await addMessageMutation({
-        chatId: chatId as Id<"chats">,
-        sender: "assistant",
-        content: "Sorry, I encountered an error connecting to the server.",
-      });
+      setLocalError("Sorry, I encountered an error connecting to the server.");
     } finally {
       setIsTyping(false);
     }

@@ -47,16 +47,42 @@ export const getOrCreateChat = authenticatedMutation({
   },
 });
 
-// Add a message to the chat
+// Add a message to the chat (user path)
 export const addMessage = authenticatedMutation({
+  args: {
+    chatId: v.id("chats"),
+    sender: v.literal("user"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!ctx.customUser) throw new Error("User not found");
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    if (chat.userId !== ctx.customUser._id) throw new Error("Unauthorized");
+
+    await ctx.db.insert("chatMessages", {
+      chatId: args.chatId,
+      sender: args.sender,
+      content: args.content,
+    });
+    return { success: true };
+  },
+});
+
+// Add a trusted system/assistant message (backend path)
+export const addSystemMessage = authenticatedMutation({
   args: {
     chatId: v.id("chats"),
     sender: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
     sentBySystem: v.optional(v.boolean()),
     model: v.optional(v.string()),
+    backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    if (args.backendSecret !== process.env.CONVEX_BACKEND_SECRET) {
+      throw new Error("Unauthorized: Invalid backend secret");
+    }
     if (!ctx.customUser) throw new Error("User not found");
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");

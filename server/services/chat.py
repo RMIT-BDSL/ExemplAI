@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import json
 import logging
 from typing import AsyncGenerator, Optional
@@ -56,22 +57,27 @@ def build_initial_state(chat: Chat) -> dict:
     }
 
 
+_posthog_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
 async def _evaluate_posthog_condition(auth_user_id: str, chat: Chat) -> None:
+    if getattr(chat, "experiment_condition", None):
+        return
+
+    chat.experiment_condition = "control"
+
     if posthog_client:
         try:
+            loop = asyncio.get_running_loop()
             flag = await asyncio.wait_for(
-                asyncio.to_thread(
+                loop.run_in_executor(
+                    _posthog_executor,
                     posthog_client.get_feature_flag,
                     "new-model-test",
                     auth_user_id
                 ),
                 timeout=POSTHOG_FLAG_TIMEOUT
             )
-            if flag == "control":
-                chat.experiment_condition = "experimental"
-            elif flag == "prompted":
-                chat.experiment_condition = "control"
-            else:
+            if flag == "prompted":
                 chat.experiment_condition = "experimental"
         except Exception as e:
             log.warning("PostHog flag evaluation failed: %s", e)
@@ -92,6 +98,8 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> None:
                 chat.original_problem = context.get("original_problem", "")
                 chat.current_knowledge_component = context.get("current_knowledge_component", "")
                 chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+                if context.get("experiment_condition"):
+                    chat.experiment_condition = context.get("experiment_condition")
         except Exception as cvx_err:
             log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
 
@@ -130,13 +138,14 @@ async def _save_assistant_message(
             await asyncio.wait_for(
                 asyncio.to_thread(
                     client.mutation,
-                    "chats:addMessage",
+                    "chats:addSystemMessage",
                     {
                         "chatId": chat_id,
                         "sender": "assistant",
                         "content": text,
                         "sentBySystem": True,
-                        "model": chosen_model
+                        "model": chosen_model,
+                        "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
                 timeout=CONVEX_OP_TIMEOUT,
@@ -149,8 +158,8 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     """Run the tutor graph to completion and return the final state."""
     try:
         client = _convex_client(auth_token)
-        await _evaluate_posthog_condition(auth_user_id, chat)
         await _load_convex_context(client, chat)
+        await _evaluate_posthog_condition(auth_user_id, chat)
 
         result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
 
@@ -174,8 +183,8 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
         client = _convex_client(auth_token)
-        await _evaluate_posthog_condition(auth_user_id, chat)
         await _load_convex_context(client, chat)
+        await _evaluate_posthog_condition(auth_user_id, chat)
 
         result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
     except Exception as e:
