@@ -94,4 +94,15 @@ export default defineSchema({
     whoUsed: v.array(v.string()),
     expiryDate: v.optional(v.string()),
   }).index("by_code", ["code"]),
+  chats: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+  }).index("by_user_lesson", ["userId", "lessonId"]),
+  chatMessages: defineTable({
+    chatId: v.id("chats"),
+    sender: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    sentBySystem: v.optional(v.boolean()),
+    model: v.optional(v.string()),
+  }).index("by_chat", ["chatId"]),
 });

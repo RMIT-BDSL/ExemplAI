@@ -17,6 +17,7 @@ import httpx
 from convex import ConvexClient
 from fastapi import HTTPException, status, BackgroundTasks
 from sentry_sdk import metrics
+from posthog import Posthog
 
 from bkt import initial_mastery, update_mastery
 from config import settings
@@ -24,6 +25,13 @@ from model.student_code import StudentCode
 from model.chat import Chat
 
 log = logging.getLogger("rich")
+
+posthog_client = None
+if settings.POSTHOG_PROJECT_TOKEN:
+    try:
+        posthog_client = Posthog(settings.POSTHOG_PROJECT_TOKEN, host=settings.POSTHOG_HOST)
+    except Exception as e:
+        log.warning(f"Failed to initialize PostHog: {e}")
 
 
 def _convex_client(auth_token: str) -> ConvexClient:
@@ -445,10 +453,94 @@ def build_initial_state(chat: Chat) -> dict:
     }
 
 
-async def run_chat(graph, chat: Chat, auth_user_id: str) -> dict:
+async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
     try:
-        return await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        if posthog_client:
+            try:
+                flag = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        posthog_client.get_feature_flag,
+                        "new-model-test",
+                        auth_user_id
+                    ),
+                    timeout=2.0
+                )
+                if flag == "control":
+                    # In PostHog, 'control' means multiagent (experimental flow)
+                    chat.experiment_condition = "experimental"
+                elif flag == "prompted":
+                    # 'prompted' means normal OpenAI model (control flow)
+                    chat.experiment_condition = "control"
+                else:
+                    # Default
+                    chat.experiment_condition = "experimental"
+            except Exception as e:
+                log.warning("PostHog flag evaluation failed: %s", e)
+
+        # Fetch BKT and problem context from Convex
+        if chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                context = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.query,
+                        "chats:getChatContext",
+                        {"chatId": chat.chat_id},
+                    ),
+                    timeout=5.0,
+                )
+                if context:
+                    chat.original_problem = context.get("original_problem", "")
+                    # chat.unit_test_assertions = context.get("unit_test_assertions", "")
+                    chat.current_knowledge_component = context.get("current_knowledge_component", "")
+                    chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+            except Exception as cvx_err:
+                log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
+
+        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        
+        # Extract the final AI message
+        final = result["messages"][-1]
+        text = getattr(final, "content", None)
+        if text is None and isinstance(final, dict):
+            text = final.get("content", "")
+        # Determine the model from state
+        if not result.get("guardrail_passed", True):
+            chosen_model = "guardrail_blocked"
+        elif result.get("experiment_condition") == "control":
+            chosen_model = "control_agent_node"
+        else:
+            mastery = result.get("bkt_prob_mastery", 0.0)
+            if mastery < 0.3:
+                chosen_model = "complete_example_node"
+            elif mastery <= 0.7:
+                chosen_model = "faded_example_node"
+            else:
+                chosen_model = "erroneous_example_node"
+        
+        # Save to Convex
+        if text and chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.mutation,
+                        "chats:addMessage",
+                        {
+                            "chatId": chat.chat_id,
+                            "sender": "assistant",
+                            "content": text,
+                            "sentBySystem": True,
+                            "model": chosen_model
+                        },
+                    ),
+                    timeout=5.0,
+                )
+            except Exception as cvx_err:
+                log.error(f"Failed to sync AI message to Convex: {cvx_err}")
+                
+        return result
     except Exception as e:
         log.error(f"AI service error: {e}")
         raise HTTPException(
@@ -457,12 +549,54 @@ async def run_chat(graph, chat: Chat, auth_user_id: str) -> dict:
         )
 
 
-async def stream_chat(graph, chat: Chat, auth_user_id: str) -> AsyncGenerator[str, None]:
+async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> AsyncGenerator[str, None]:
     """SSE generator. The Dean validates the WHOLE draft before any token is
     released, so the graph runs to completion first; we then stream the vetted
     final message token-by-token. This preserves the research-integrity gate
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
+        if posthog_client:
+            try:
+                flag = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        posthog_client.get_feature_flag,
+                        "new-model-test",
+                        auth_user_id
+                    ),
+                    timeout=2.0
+                )
+                if flag == "control":
+                    # In PostHog, 'control' means multiagent (experimental flow)
+                    chat.experiment_condition = "experimental"
+                elif flag == "prompted":
+                    # 'prompted' means normal OpenAI model (control flow)
+                    chat.experiment_condition = "control"
+                else:
+                    # Default
+                    chat.experiment_condition = "experimental"
+            except Exception as e:
+                log.warning("PostHog flag evaluation failed: %s", e)
+
+        # Fetch BKT and problem context from Convex
+        if chat.chat_id:
+            try:
+                client = _convex_client(auth_token)
+                context = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.query,
+                        "chats:getChatContext",
+                        {"chatId": chat.chat_id},
+                    ),
+                    timeout=5.0,
+                )
+                if context:
+                    chat.original_problem = context.get("original_problem", "")
+                    # chat.unit_test_assertions = context.get("unit_test_assertions", "")
+                    chat.current_knowledge_component = context.get("current_knowledge_component", "")
+                    chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+            except Exception as cvx_err:
+                log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
+
         result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
     except Exception as e:
         log.error(f"AI service error: {e}")
@@ -476,8 +610,44 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str) -> AsyncGenerator[st
         text = final.get("content", "")
     text = text or ""
 
+    # Determine the model from state
+    if not result.get("guardrail_passed", True):
+        chosen_model = "guardrail_blocked"
+    elif result.get("experiment_condition") == "control":
+        chosen_model = "control_agent_node"
+    else:
+        mastery = result.get("bkt_prob_mastery", 0.0)
+        if mastery < 0.3:
+            chosen_model = "complete_example_node"
+        elif mastery <= 0.7:
+            chosen_model = "faded_example_node"
+        else:
+            chosen_model = "erroneous_example_node"
+
     # Re-chunk the vetted text into word tokens for progressive render.
     parts = text.split(" ")
+    
+    # Save to Convex before starting the stream
+    if text and chat.chat_id:
+        try:
+            client = _convex_client(auth_token)
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.mutation,
+                    "chats:addMessage",
+                    {
+                        "chatId": chat.chat_id,
+                        "sender": "assistant",
+                        "content": text,
+                        "sentBySystem": True,
+                        "model": chosen_model
+                    },
+                ),
+                timeout=5.0,
+            )
+        except Exception as cvx_err:
+            log.error(f"Failed to sync AI message to Convex: {cvx_err}")
+
     for i, part in enumerate(parts):
         token = part if i == 0 else " " + part
         yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"

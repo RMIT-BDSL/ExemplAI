@@ -3,7 +3,9 @@ import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
 import { sendChatMessage } from "#/lib/api.ts";
-
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 // Types for Chat
 export interface Message {
   id: string;
@@ -224,46 +226,108 @@ export default function ChatBox({
   pendingMessage,
   editorRef,
   currentCode,
+  lessonId,
 }: {
   pendingMessage?: PendingMessage | null;
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
+  lessonId?: string;
 }) {
-  const [messages, setMessages] = React.useState<Message[]>([
-    {
-      id: "welcome",
-      sender: "assistant",
-      content:
-        "Hi there! I am your AI learning assistant. I can help you understand the 'Two Sum' problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
-      timestamp: new Date(),
-    },
-  ]);
   const [isTyping, setIsTyping] = React.useState(false);
+  const [localError, setLocalError] = React.useState<string | null>(null);
 
-  // Stable per-conversation id — scopes the LangGraph checkpoint thread
-  // (thread_id = exemplai:{chat_id}) so multi-turn memory persists for this
-  // chat session. Generated once per mount.
-  const chatIdRef = React.useRef<string>("");
-  if (!chatIdRef.current) chatIdRef.current = crypto.randomUUID();
+  // Convex integration
+  const convexLessonId = lessonId as Id<"questions"> | undefined;
+  
+  // Get or create chat session
+  const [chatId, setChatId] = React.useState<string | null>(null);
+  const getOrCreateChat = useMutation(api.chats.getOrCreateChat);
+  const addMessageMutation = useMutation(api.chats.addMessage);
+  const clearChatMutation = useMutation(api.chats.clearChat);
+
+  // Fetch messages from Convex
+  const dbMessages = useQuery(
+    api.chats.getMessages,
+    convexLessonId ? { lessonId: convexLessonId } : "skip"
+  );
+
+  // Map Convex messages to the local Message format
+  const messages: Message[] = React.useMemo(() => {
+    let result: Message[] = [];
+    if (!dbMessages || dbMessages.length === 0) {
+      result = [
+        {
+          id: "welcome",
+          sender: "assistant",
+          content: "Hi there I am your AI learning assistant. I can help you understand this problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
+          timestamp: new Date(),
+        },
+      ];
+    } else {
+      result = dbMessages.map((msg) => ({
+        id: msg._id,
+        sender: msg.sender as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg._creationTime),
+      }));
+    }
+
+    if (localError) {
+      result.push({
+        id: "local-error",
+        sender: "assistant",
+        content: localError,
+        timestamp: new Date(),
+      });
+    }
+    return result;
+  }, [dbMessages, localError]);
+  React.useEffect(() => {
+    setChatId(null);
+    let isActive = true;
+
+    async function initChat() {
+      if (convexLessonId) {
+        try {
+          const id = await getOrCreateChat({ lessonId: convexLessonId });
+          if (isActive) {
+            setChatId(id);
+          }
+        } catch (e) {
+          if (isActive) {
+            console.error("Failed to initialize chat:", e);
+          }
+        }
+      }
+    }
+    initChat();
+
+    return () => {
+      isActive = false;
+    };
+  }, [convexLessonId, getOrCreateChat]);
 
   const handleSendMessage = async (text: string) => {
-    // 1. Add User Message
-    const userMsg: Message = {
-      id: Math.random().toString(),
-      sender: "user",
-      content: text,
-      timestamp: new Date(),
-    };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    if (!chatId || !convexLessonId) return;
+    
+    // Optmistically show typing state
     setIsTyping(true);
+    setLocalError(null);
 
     try {
-      // Map messages to structure expected by server Pydantic model
-      const conversationPayload = updatedMessages.map((msg) => ({
-        sender: msg.sender,
-        content: msg.content,
-      }));
+      // 1. Add User Message to Convex
+      await addMessageMutation({
+        chatId: chatId as Id<"chats">,
+        sender: "user",
+        content: text,
+      });
+
+      // Prepare conversation payload for backend
+      // Note: We use the existing messages array from the UI + the new message
+      const conversationPayload = [
+        ...messages.filter(m => m.id !== "welcome"),
+        { sender: "user" as const, content: text }
+      ];
 
       // Extract Monaco editor state
       let editorContext = "";
@@ -302,7 +366,7 @@ export default function ChatBox({
         }
       }
 
-      const response = await sendChatMessage(conversationPayload, chatIdRef.current, 1, editorContext);
+      const response = await sendChatMessage(conversationPayload, chatId, 1, editorContext);
 
       // Find the last AI assistant message content from the response messages
       const aiMessages = response.messages.filter(
@@ -313,22 +377,12 @@ export default function ChatBox({
         ? lastAiMessage.content
         : "Sorry, I couldn't get a response.";
 
-      const assistantMsg: Message = {
-        id: lastAiMessage?.id || Math.random().toString(),
-        sender: "assistant",
-        content: replyContent,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      // The AI message will automatically appear in the UI once the backend 
+      // pushes it to Convex. We no longer save it from the frontend to avoid
+      // duplication and sync issues.
     } catch (error) {
       console.error("Error communicating with chat server:", error);
-      const assistantMsg: Message = {
-        id: Math.random().toString(),
-        sender: "assistant",
-        content: "Sorry, I encountered an error connecting to the server.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setLocalError("Sorry, I encountered an error connecting to the server.");
     } finally {
       setIsTyping(false);
     }
@@ -349,18 +403,14 @@ export default function ChatBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingMessage]);
 
-  const handleClearChat = () => {
-    // Start a fresh checkpoint thread so the server doesn't resume the old
-    // conversation's memory after the student clears the chat.
-    chatIdRef.current = crypto.randomUUID();
-    setMessages([
-      {
-        id: "welcome-reset",
-        sender: "assistant",
-        content: "Chat reset. How can I help you with this problem?",
-        timestamp: new Date(),
-      },
-    ]);
+  const handleClearChat = async () => {
+    if (convexLessonId) {
+      await clearChatMutation({ lessonId: convexLessonId });
+      // Start a fresh checkpoint thread so the server doesn't resume the old
+      // conversation's memory after the student clears the chat.
+      const newChatId = await getOrCreateChat({ lessonId: convexLessonId });
+      setChatId(newChatId);
+    }
   };
 
   // Quick prompt triggers
@@ -395,7 +445,7 @@ export default function ChatBox({
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId} />
     </div>
   );
 }

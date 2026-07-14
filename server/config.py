@@ -60,12 +60,15 @@ class Settings(BaseSettings):
     SUPABASE_PUBLIC_KEY: str = ""            # anon key — public by design
     SUPABASE_SECRET_KEY: SecretStr = SecretStr("")  # service-role key
     CONVEX_URL: str = ""
+    CONVEX_BACKEND_SECRET: SecretStr = SecretStr("")
 
     # ── Observability ──────────────────────────────────────────────────
     SENTRY_DSN: SecretStr = SecretStr("")          # DSN embeds a project key
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
     LANGFUSE_PUBLIC_KEY: str = ""                   # public by design
     LANGFUSE_SECRET_KEY: SecretStr = SecretStr("")
+    POSTHOG_PROJECT_TOKEN: str = ""
+    POSTHOG_HOST: str = "https://eu.posthog.com"
 
 
 # ── Singleton — import this everywhere ────────────────────────────────

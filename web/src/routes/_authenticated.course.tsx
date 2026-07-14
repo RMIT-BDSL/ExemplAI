@@ -378,7 +378,7 @@ function Course() {
           {/* Chat Panel */}
           {!isChatCollapsed && (
             <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
-              <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} />
+              <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
             </div>
           )}
         </div>
