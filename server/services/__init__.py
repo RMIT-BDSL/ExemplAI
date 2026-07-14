@@ -318,29 +318,84 @@ async def execute_code(
             ]
             results = await asyncio.gather(*student_tasks)
 
+        # Sanitize results for the student
+        sanitized_results = []
+        for r in results:
+            if r.get("hidden"):
+                sanitized_r = {
+                    "passed": r["passed"],
+                    "error": r["error"],
+                    "status_id": r["status_id"],
+                    "description": "Hidden Test Failed" if not r["passed"] else "Accepted",
+                    "hidden": True,
+                    "test_description": r.get("test_description"),
+                    "input": None,
+                    "expected": None,
+                    "stdout": None,
+                    "stderr": None,
+                }
+                sanitized_results.append(sanitized_r)
+            else:
+                sanitized_results.append(r)
+
         # Analyze results
         failed_tests = [r for r in results if not r["passed"]]
         if failed_tests:
-            first_fail = failed_tests[0]
-            fail_msg = (
-                f"Test Case Failed!\n"
-                f"Input: {first_fail['input']}\n"
-                f"Expected: {first_fail['expected']}\n"
-                f"Got: {first_fail['stdout'].strip()}\n"
-            )
-            if first_fail["stderr"]:
-                fail_msg += f"\nError: {first_fail['stderr']}\n"
+            # Prioritize compilation errors, then visible failures, then hidden failures
+            first_fail = next((r for r in failed_tests if r.get("status_id") == 6), None)
+            if not first_fail:
+                first_fail = next((r for r in failed_tests if not r.get("hidden")), None)
+            if not first_fail:
+                first_fail = failed_tests[0]
 
-            result = {
-                "error": True,
-                "status": {
-                    "id": first_fail["status_id"],
-                    "description": first_fail["description"]
-                },
-                "stdout": first_fail["stdout"],
-                "stderr": fail_msg,
-                "test_results": results
-            }
+            if first_fail.get("status_id") == 6:
+                fail_msg = "Compilation Error!\n"
+                if first_fail.get("stderr"):
+                    fail_msg += f"\nError: {first_fail['stderr']}\n"
+                
+                result = {
+                    "error": True,
+                    "status": {
+                        "id": first_fail["status_id"],
+                        "description": "Compilation Error"
+                    },
+                    "stdout": None,
+                    "stderr": fail_msg,
+                    "test_results": sanitized_results
+                }
+            elif first_fail.get("hidden"):
+                fail_msg = "A hidden test case failed."
+                result = {
+                    "error": True,
+                    "status": {
+                        "id": first_fail["status_id"],
+                        "description": "Hidden Test Failed"
+                    },
+                    "stdout": None,
+                    "stderr": fail_msg,
+                    "test_results": sanitized_results
+                }
+            else:
+                stdout_str = first_fail.get("stdout") or ""
+                fail_msg = (
+                    f"Test Case Failed!\n"
+                    f"Input: {first_fail.get('input')}\n"
+                    f"Expected: {first_fail.get('expected')}\n"
+                    f"Got: {stdout_str.strip()}\n"
+                )
+                if first_fail.get("stderr"):
+                    fail_msg += f"\nError: {first_fail['stderr']}\n"
+
+                result = {
+                    "error": True,
+                    "status": {
+                        "id": first_fail["status_id"],
+                        "description": first_fail.get("description")
+                    },
+                    "stdout": first_fail.get("stdout"),
+                    "stderr": fail_msg,
+                    "test_results": sanitized_results
+                }
         else:
             result = {
                 "error": False,
@@ -350,7 +405,7 @@ async def execute_code(
                 },
                 "stdout": "All test cases passed successfully!\n",
                 "stderr": None,
-                "test_results": results
+                "test_results": sanitized_results
             }
 
         background_tasks.add_task(

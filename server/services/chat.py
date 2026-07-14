@@ -102,6 +102,7 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> None:
                     chat.experiment_condition = context.get("experiment_condition")
         except Exception as cvx_err:
             log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
+            raise RuntimeError("Unable to load authenticated chat context") from cvx_err
 
 
 def _determine_chosen_model(result: dict) -> str:
@@ -152,6 +153,7 @@ async def _save_assistant_message(
             )
         except Exception as cvx_err:
             log.error(f"Failed to sync AI message to Convex: {cvx_err}")
+            raise RuntimeError("Failed to persist assistant message") from cvx_err
 
 
 async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
@@ -194,7 +196,12 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
 
     text = _extract_final_message_text(result)
     chosen_model = _determine_chosen_model(result)
-    await _save_assistant_message(client, chat.chat_id, text, chosen_model)
+    try:
+        await _save_assistant_message(client, chat.chat_id, text, chosen_model)
+    except Exception as e:
+        log.error(f"Message persistence error: {e}")
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to save assistant message'})}\n\n"
+        return
 
     # Re-chunk the vetted text into word tokens for progressive render.
     parts = text.split(" ")
