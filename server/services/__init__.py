@@ -328,7 +328,11 @@ async def execute_code(
                     "status_id": r["status_id"],
                     "description": "Hidden Test Failed" if not r["passed"] else "Accepted",
                     "hidden": True,
-                    "test_description": r.get("test_description")
+                    "test_description": r.get("test_description"),
+                    "input": None,
+                    "expected": None,
+                    "stdout": None,
+                    "stderr": None,
                 }
                 sanitized_results.append(sanitized_r)
             else:
