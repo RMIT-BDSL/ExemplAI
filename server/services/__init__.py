@@ -318,29 +318,58 @@ async def execute_code(
             ]
             results = await asyncio.gather(*student_tasks)
 
+        # Sanitize results for the student
+        sanitized_results = []
+        for r in results:
+            if r.get("hidden"):
+                sanitized_r = {
+                    "passed": r["passed"],
+                    "error": r["error"],
+                    "status_id": r["status_id"],
+                    "description": "Hidden Test Failed" if not r["passed"] else "Accepted",
+                    "hidden": True,
+                    "test_description": r.get("test_description")
+                }
+                sanitized_results.append(sanitized_r)
+            else:
+                sanitized_results.append(r)
+
         # Analyze results
         failed_tests = [r for r in results if not r["passed"]]
         if failed_tests:
             first_fail = failed_tests[0]
-            fail_msg = (
-                f"Test Case Failed!\n"
-                f"Input: {first_fail['input']}\n"
-                f"Expected: {first_fail['expected']}\n"
-                f"Got: {first_fail['stdout'].strip()}\n"
-            )
-            if first_fail["stderr"]:
-                fail_msg += f"\nError: {first_fail['stderr']}\n"
+            if first_fail.get("hidden"):
+                fail_msg = "A hidden test case failed."
+                result = {
+                    "error": True,
+                    "status": {
+                        "id": first_fail["status_id"],
+                        "description": "Hidden Test Failed"
+                    },
+                    "stdout": None,
+                    "stderr": fail_msg,
+                    "test_results": sanitized_results
+                }
+            else:
+                fail_msg = (
+                    f"Test Case Failed!\n"
+                    f"Input: {first_fail['input']}\n"
+                    f"Expected: {first_fail['expected']}\n"
+                    f"Got: {first_fail['stdout'].strip()}\n"
+                )
+                if first_fail["stderr"]:
+                    fail_msg += f"\nError: {first_fail['stderr']}\n"
 
-            result = {
-                "error": True,
-                "status": {
-                    "id": first_fail["status_id"],
-                    "description": first_fail["description"]
-                },
-                "stdout": first_fail["stdout"],
-                "stderr": fail_msg,
-                "test_results": results
-            }
+                result = {
+                    "error": True,
+                    "status": {
+                        "id": first_fail["status_id"],
+                        "description": first_fail["description"]
+                    },
+                    "stdout": first_fail["stdout"],
+                    "stderr": fail_msg,
+                    "test_results": sanitized_results
+                }
         else:
             result = {
                 "error": False,
@@ -350,7 +379,7 @@ async def execute_code(
                 },
                 "stdout": "All test cases passed successfully!\n",
                 "stderr": None,
-                "test_results": results
+                "test_results": sanitized_results
             }
 
         background_tasks.add_task(
