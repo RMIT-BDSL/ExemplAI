@@ -395,13 +395,15 @@ export default function ChatBox({
     if (
       pendingMessage &&
       pendingMessage.content.trim() &&
-      pendingMessage.key !== lastPendingKey.current
+      pendingMessage.key !== lastPendingKey.current &&
+      chatId &&
+      convexLessonId
     ) {
       lastPendingKey.current = pendingMessage.key;
       handleSendMessage(pendingMessage.content);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMessage]);
+  }, [pendingMessage, chatId, convexLessonId]);
 
   const handleClearChat = async () => {
     if (convexLessonId) {
@@ -436,7 +438,8 @@ export default function ChatBox({
             <button
               key={idx}
               onClick={() => handleSendMessage(p.query)}
-              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none"
+              disabled={!chatId || !convexLessonId}
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
             >
               <Sparkles className="size-3 text-indigo-400" />
               {p.label}
@@ -445,7 +448,7 @@ export default function ChatBox({
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId || !convexLessonId} />
     </div>
   );
 }
