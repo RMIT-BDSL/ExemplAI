@@ -1,6 +1,6 @@
 import { Editor } from "@monaco-editor/react";
 import { ClientOnly } from "@tanstack/react-router";
-import { Check, ChevronDown, ChevronUp, Loader2, Play } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Loader2, Play, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import Terminal from "../ide/Terminal";
 
@@ -21,6 +21,8 @@ interface CodeEditorProps {
 	isSaved: boolean;
 	onSave: () => void;
 	testCases: any[];
+	isCompleted?: boolean;
+	onNextLesson?: () => void;
 }
 
 export default function CodeEditor({
@@ -40,6 +42,8 @@ export default function CodeEditor({
 	isSaved,
 	onSave,
 	testCases,
+	isCompleted,
+	onNextLesson,
 }: CodeEditorProps) {
 	const [activeTab, setActiveTab] = useState<"result" | "stdout" | "testcases">("testcases");
 
@@ -47,6 +51,9 @@ export default function CodeEditor({
 	const hasStdout = executionResult && executionResult.stdout;
 
 	const isLoading = isRunning || isSubmitting;
+
+	const isPassed = executionResult && !executionResult.error && executionResult.status?.id === 3;
+	const showNextButton = !!onNextLesson && (isPassed || !!isCompleted);
 
 	// Format Status Badge
 	const renderStatusBadge = () => {
@@ -201,6 +208,17 @@ export default function CodeEditor({
 							)}
 							<span>Submit Solution</span>
 						</button>
+
+						{showNextButton && (
+							<button
+								type="button"
+								onClick={onNextLesson}
+								className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-650 px-4 py-1.5 text-xs font-bold text-white hover:from-emerald-500 hover:to-teal-550 transition-all shadow-md active:scale-95 border border-emerald-500/20 animate-pulse cursor-pointer"
+							>
+								<span>Next Lesson</span>
+								<ArrowRight className="size-3.5" />
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

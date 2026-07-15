@@ -1,5 +1,5 @@
 import { usePostHog } from "@posthog/react";
-import { ClientOnly, createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 import axios from "axios";
 import { useMutation, useQuery } from "convex/react";
 import { BookOpen, ChevronLeft } from "lucide-react";
@@ -45,6 +45,10 @@ function Course() {
   const { data: session } = authClient.useSession();
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
+  const lessonProgress = useQuery(
+    api.courses.getLessonProgress,
+    tokenIdentifier ? {} : "skip"
+  );
 
   const [language, setLanguage] = useState<string>("python");
   const [fontSize, setFontSize] = useState<number>(14);
@@ -82,6 +86,25 @@ function Course() {
   // Opening a problem marks it "in-progress" (the server keeps it "completed"
   // if it already was, so reviewing a finished problem won't downgrade it).
   const activeQuestionId = activeQuestion?._id;
+  const isCompleted = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId)?.status === "completed";
+
+  const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
+  const nextQuestion =
+    currentIndex !== -1 && questions && currentIndex < questions.length - 1
+      ? questions[currentIndex + 1]
+      : null;
+
+  const navigate = useNavigate();
+  const handleNextLesson = nextQuestion
+    ? () => {
+        navigate({
+          to: "/course",
+          search: { problemId: nextQuestion._id },
+        });
+        setExecutionResult(null);
+        setIsConsoleOpen(false);
+      }
+    : undefined;
   useEffect(() => {
     if (tokenIdentifier && activeQuestionId) {
       setLessonStatus({
@@ -379,6 +402,8 @@ function Course() {
                 isSaved={isSaved}
                 onSave={handleSave}
                 testCases={activeQuestion?.testCases || []}
+                isCompleted={isCompleted}
+                onNextLesson={handleNextLesson}
               />
             </div>
           </div>
