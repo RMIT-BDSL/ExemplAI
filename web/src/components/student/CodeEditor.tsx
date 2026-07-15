@@ -1,6 +1,6 @@
 import { Editor } from "@monaco-editor/react";
 import { ClientOnly } from "@tanstack/react-router";
-import { Check, ChevronDown, ChevronUp, Loader2, Play } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Loader2, Play, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import Terminal from "../ide/Terminal";
 
@@ -21,6 +21,8 @@ interface CodeEditorProps {
 	isSaved: boolean;
 	onSave: () => void;
 	testCases: any[];
+	isCompleted?: boolean;
+	onNextLesson?: () => void;
 }
 
 export default function CodeEditor({
@@ -40,6 +42,8 @@ export default function CodeEditor({
 	isSaved,
 	onSave,
 	testCases,
+	isCompleted,
+	onNextLesson,
 }: CodeEditorProps) {
 	const [activeTab, setActiveTab] = useState<"result" | "stdout" | "testcases">("testcases");
 
@@ -47,6 +51,9 @@ export default function CodeEditor({
 	const hasStdout = executionResult && executionResult.stdout;
 
 	const isLoading = isRunning || isSubmitting;
+
+	const isPassed = executionResult && !executionResult.error && executionResult.status?.id === 3;
+	const showNextButton = !!onNextLesson && (isPassed || !!isCompleted);
 
 	// Format Status Badge
 	const renderStatusBadge = () => {
@@ -83,10 +90,7 @@ export default function CodeEditor({
 		<ClientOnly>
 			<div className="flex flex-1 flex-col overflow-hidden relative bg-zinc-950">
 				{/* Editor Area */}
-				<div
-					className="flex-1 overflow-hidden"
-					style={{ height: isConsoleOpen ? "calc(100% - 280px)" : "100%" }}
-				>
+				<div className="flex-1 overflow-hidden min-h-0">
 					<Editor
 						onMount={onMount}
 						height="100%"
@@ -125,12 +129,12 @@ export default function CodeEditor({
 					/>
 				</div>
 
-				{/* Sliding Console Drawer */}
+				{/* Console Drawer */}
 				<div
-					className={`absolute bottom-11 left-0 right-0 z-40 bg-zinc-900 border-t border-zinc-800 transition-all duration-300 ease-in-out ${
+					className={`bg-zinc-900 border-t border-zinc-800 transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
 						isConsoleOpen
 							? "h-[280px] opacity-100"
-							: "h-0 opacity-0 pointer-events-none"
+							: "h-0 border-t-0 opacity-0 pointer-events-none"
 					}`}
 				>
 					{isConsoleOpen && (
@@ -149,7 +153,7 @@ export default function CodeEditor({
 				</div>
 
 				{/* Footer / Execution Action Bar */}
-				<div className="flex h-11 items-center justify-between border-t border-zinc-800 bg-zinc-900 px-4 select-none">
+				<div className="flex h-11 items-center justify-between border-t border-zinc-800 bg-zinc-900 px-4 select-none flex-shrink-0">
 					<button
 						type="button"
 						onClick={() => setIsConsoleOpen(!isConsoleOpen)}
@@ -204,6 +208,17 @@ export default function CodeEditor({
 							)}
 							<span>Submit Solution</span>
 						</button>
+
+						{showNextButton && (
+							<button
+								type="button"
+								onClick={onNextLesson}
+								className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-650 px-4 py-1.5 text-xs font-bold text-white hover:from-emerald-500 hover:to-teal-550 transition-all shadow-md active:scale-95 border border-emerald-500/20 animate-pulse cursor-pointer"
+							>
+								<span>Next Lesson</span>
+								<ArrowRight className="size-3.5" />
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

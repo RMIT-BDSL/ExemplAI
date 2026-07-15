@@ -1,4 +1,4 @@
-import { Bot, RefreshCw, Send, Sparkles, User } from "lucide-react";
+import { Bot, RefreshCw, Send, Sparkles, User, ChevronRight, MessageSquare } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
@@ -18,32 +18,43 @@ export interface Message {
 export interface ChatHeaderProps {
   onClearChat?: () => void;
   isTyping?: boolean;
+  onCollapse?: () => void;
 }
 
-export function ChatHeader({ onClearChat, isTyping }: ChatHeaderProps) {
+export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProps) {
   return (
-    <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900/40">
-      <div className="flex items-center gap-2.5">
-        <div className="relative flex size-8 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-          <Bot className="size-4" />
-          <span className="absolute bottom-0 right-0 size-2 rounded-full bg-emerald-500 border border-zinc-900 animate-pulse" />
+    <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+        <div className="relative flex items-center justify-center">
+          <MessageSquare className="size-4 text-emerald-400" />
+          <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-emerald-500 border border-zinc-955 animate-pulse" />
         </div>
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-200">AI Assistant</h2>
-          <p className="text-xs text-zinc-500">
-            {isTyping ? "Typing..." : "Online • Ready to help"}
-          </p>
-        </div>
+        <span>AI Assistant</span>
+        {isTyping && (
+          <span className="ml-1 text-[10px] font-normal text-zinc-500 animate-pulse">typing...</span>
+        )}
       </div>
-      {onClearChat && (
-        <button
-          onClick={onClearChat}
-          className="inline-flex size-8 items-center justify-center rounded-md border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
-          title="Reset chat"
-        >
-          <RefreshCw className="size-3.5" />
-        </button>
-      )}
+      <div className="flex items-center gap-1.5">
+        {onClearChat && (
+          <button
+            onClick={onClearChat}
+            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            title="Reset chat"
+          >
+            <RefreshCw className="size-3.5 text-zinc-400" />
+          </button>
+        )}
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            title="Collapse panel"
+          >
+            <ChevronRight className="size-4 text-zinc-400" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -227,11 +238,13 @@ export default function ChatBox({
   editorRef,
   currentCode,
   lessonId,
+  onCollapse,
 }: {
   pendingMessage?: PendingMessage | null;
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
+  onCollapse?: () => void;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -427,7 +440,7 @@ export default function ChatBox({
 
   return (
     <div className="flex h-full flex-col bg-zinc-900/50">
-      <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} />
+      <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} onCollapse={onCollapse} />
 
       <MessageFeed messages={messages} isTyping={isTyping} />
 
