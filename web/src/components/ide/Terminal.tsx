@@ -171,12 +171,12 @@ export default function Terminal({
     return (
         <div className="flex h-full flex-col overflow-hidden text-sm text-zinc-300">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/50 px-4 py-2">
-                <div className="flex items-center gap-2">
+            <div className="flex h-11 items-stretch justify-between border-b border-zinc-800 bg-zinc-900/50 px-4">
+                <div className="flex items-stretch gap-1">
                     <button
                         type="button"
                         onClick={() => setActiveTab("testcases")}
-                        className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "testcases"
+                        className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "testcases"
                             ? "border-emerald-500 text-emerald-500"
                             : "border-transparent text-zinc-400 hover:text-zinc-200"
                             }`}
@@ -187,7 +187,7 @@ export default function Terminal({
                         <button
                             type="button"
                             onClick={() => setActiveTab("result")}
-                            className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "result"
+                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "result"
                                 ? "border-emerald-500 text-emerald-500"
                                 : "border-transparent text-zinc-400 hover:text-zinc-200"
                                 }`}
@@ -199,7 +199,7 @@ export default function Terminal({
                         <button
                             type="button"
                             onClick={() => setActiveTab("stdout")}
-                            className={`border-b-2 px-2 py-1 text-xs font-semibold transition-colors ${activeTab === "stdout"
+                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "stdout"
                                 ? "border-emerald-500 text-emerald-500"
                                 : "border-transparent text-zinc-400 hover:text-zinc-200"
                                 }`}
@@ -211,7 +211,7 @@ export default function Terminal({
                 <button
                     type="button"
                     onClick={() => setIsConsoleOpen(false)}
-                    className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+                    className="self-center rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
                 >
                     <X className="size-4" />
                 </button>

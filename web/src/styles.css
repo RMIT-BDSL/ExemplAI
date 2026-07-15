@@ -220,15 +220,24 @@ code {
   background: color-mix(in oklab, var(--surface-strong) 82%, white 18%);
   border-radius: 7px;
   padding: 2px 7px;
+  color: var(--sea-ink);
+}
+
+.dark code,
+.prose-invert code,
+[class*="bg-zinc-"] code {
+  background: rgba(9, 9, 11, 0.65) !important;
+  border: 1px solid rgba(63, 63, 70, 0.5) !important;
+  color: #34d399 !important;
 }
 
 pre code {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
-  font-size: inherit;
-  color: inherit;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit !important;
+  color: inherit !important;
 }
 
 .prose pre {

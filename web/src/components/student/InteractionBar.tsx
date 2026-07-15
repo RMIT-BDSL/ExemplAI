@@ -84,7 +84,7 @@ export default function CodingBar({
         </button>
 
         {/* Mock Quest File Tab */}
-        <div className="flex items-center gap-2 rounded-t-lg bg-zinc-950/80 px-3 py-1.5 text-xs font-semibold text-emerald-500 border border-zinc-800 border-b-transparent">
+        <div className="flex items-center gap-2 rounded-md bg-zinc-950/80 px-3 py-1.5 text-xs font-semibold text-emerald-500 border border-zinc-800">
           <Code className="size-3.5" />
           <span>
             solution.
@@ -142,14 +142,7 @@ export default function CodingBar({
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-4">
-        {/* Autosave Status
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Autosaved to Cloud</span>
-        </div> */}
-
-        <div className="h-4 w-px bg-zinc-800" />
+      <div className="flex items-center gap-3">
 
         {/* Settings / Font Size dropdown */}
         <div className="relative" ref={fontRef}>

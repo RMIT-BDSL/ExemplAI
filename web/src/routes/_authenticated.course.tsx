@@ -71,6 +71,14 @@ function Course() {
 
   const [isSaved, setIsSaved] = useState<boolean>(true);
 
+  // Set dark theme class on document.body for the duration of this page
+  useEffect(() => {
+    document.body.classList.add("dark");
+    return () => {
+      document.body.classList.remove("dark");
+    };
+  }, []);
+
   // Opening a problem marks it "in-progress" (the server keeps it "completed"
   // if it already was, so reviewing a finished problem won't downgrade it).
   const activeQuestionId = activeQuestion?._id;
@@ -306,12 +314,12 @@ function Course() {
 
   return (
     <ClientOnly>
-      <div className="flex h-[calc(100vh-57px)] w-full flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
+      <div className="dark flex h-[calc(100vh-57px)] w-full flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
         {/* Workspace Container */}
-        <div className="flex flex-1 flex-row overflow-hidden p-3 w-full h-full gap-3">
+        <div className="relative flex flex-1 flex-row overflow-hidden p-3 w-full gap-3">
           {/* Problem Description Container */}
           {!isProblemCollapsed && (
-            <div className="flex h-full w-[450px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
+            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[350px] xl:w-[450px] lg:left-0 lg:top-0 lg:bottom-0 absolute left-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
               {/* Header */}
               <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 flex-shrink-0">
                 <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
@@ -377,7 +385,7 @@ function Course() {
 
           {/* Chat Panel */}
           {!isChatCollapsed && (
-            <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
+            <div className="flex flex-col text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[320px] xl:w-[420px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
               <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
             </div>
           )}

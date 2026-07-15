@@ -10,11 +10,11 @@ import UserStatusButton from "./UserStatusButton";
  */
 export default function Navbar() {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/80 backdrop-blur">
-      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-line dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/95 backdrop-blur text-sea-ink dark:text-zinc-100">
+      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 dark:max-w-none dark:px-6">
         <Link
           to="/"
-          className="text-base font-extrabold tracking-tight text-sea-ink"
+          className="text-base font-extrabold tracking-tight text-sea-ink dark:text-zinc-100 hover:text-sea-ink-soft dark:hover:text-emerald-400 transition-colors"
         >
           ExemplAI
         </Link>
