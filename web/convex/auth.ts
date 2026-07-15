@@ -6,7 +6,6 @@ import { createAuthMiddleware, APIError } from "better-auth/api";
 import { components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { type GenericCtx } from "convex/server";
 import type { DataModel } from "./_generated/dataModel.d.ts";
 import authConfig from "./auth.config";
 
@@ -33,7 +32,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
 
 export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 
-export const createAuthOptions = (ctx: GenericCtx<DataModel>): BetterAuthOptions => {
+export const createAuthOptions = (ctx: any): BetterAuthOptions => {
   return {
     database: authComponent.adapter(ctx),
     baseURL: process.env.BETTER_AUTH_URL || 
@@ -115,7 +114,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>): BetterAuthOptions
   };
 };
 
-export const createAuth = (ctx: GenericCtx<DataModel>) => {
+export const createAuth = (ctx: any) => {
   return betterAuth(createAuthOptions(ctx));
 };
 

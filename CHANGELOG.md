@@ -1,3 +1,8 @@
+## [0.7.0] - 2026-07-07
+
+### 🚀 Features
+
+- *(convex)* Add CSEDM seeder, update schema with new fields, and fix TS compilation errors
 ## [0.6.4] - 2026-06-29
 
 ### ⚙️ Miscellaneous Tasks
