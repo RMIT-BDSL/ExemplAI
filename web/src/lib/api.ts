@@ -1,4 +1,5 @@
 import axios from "axios";
+import { authClient } from "#/lib/auth-client";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -20,13 +21,25 @@ export interface LangGraphResponse {
 
 export async function sendChatMessage(
   conversation: ChatMessagePayload[],
-  userId = 1
+  chatId: string,
+  userId = 1,
+  studentCode = ""
 ): Promise<LangGraphResponse> {
-  const response = await axios.post<LangGraphResponse>(`${BACKEND_URL}/chat`, {
-    user_id: userId,
-    conversation,
-  }, {
-    timeout: 60000
-  });
+  const tokenRes = await authClient.convex.token();
+  const token = tokenRes.data?.token;
+
+  const response = await axios.post<LangGraphResponse>(
+    `${BACKEND_URL}/chat`,
+    {
+      user_id: userId,
+      chat_id: chatId,
+      conversation,
+      student_code: studentCode,
+    },
+    {
+      timeout: 60000,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
   return response.data;
 }

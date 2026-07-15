@@ -1,11 +1,12 @@
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { adminQuery, adminMutation } from "./functions";
 
 /**
  * Creates a new invitation code.
  * The usage limit (quantity) is hardcoded to 1.
  */
-export const add = mutation({
+export const add = adminMutation({
   args: {
     code: v.string(),
     createdBy: v.optional(v.string()),
@@ -171,7 +172,7 @@ export const useCode = mutation({
 /**
  * Manually invalidates an invitation code.
  */
-export const invalidateCode = mutation({
+export const invalidateCode = adminMutation({
   args: {
     code: v.string(),
   },
@@ -193,7 +194,7 @@ export const invalidateCode = mutation({
 /**
  * Lists all invitation codes. Intended for admin use.
  */
-export const listAll = query({
+export const listAll = adminQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("invitationCodes").collect();
@@ -203,7 +204,7 @@ export const listAll = query({
 /**
  * Deletes an invitation code by its string code value.
  */
-export const remove = mutation({
+export const remove = adminMutation({
   args: {
     code: v.string(),
   },
@@ -291,7 +292,7 @@ export const createUserAndUseCode = mutation({
 /**
  * Lists all invitation codes, sorted by creation time descending.
  */
-export const list = query({
+export const list = adminQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("invitationCodes").order("desc").collect();
@@ -301,7 +302,7 @@ export const list = query({
 /**
  * Deletes an invitation code.
  */
-export const deleteCode = mutation({
+export const deleteCode = adminMutation({
   args: {
     id: v.id("invitationCodes"),
   },
@@ -314,7 +315,7 @@ export const deleteCode = mutation({
 /**
  * Updates an invitation code's details.
  */
-export const update = mutation({
+export const update = adminMutation({
   args: {
     id: v.id("invitationCodes"),
     code: v.optional(v.string()),

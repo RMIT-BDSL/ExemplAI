@@ -27,44 +27,44 @@ export default function UserStatusButton() {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         className={cn(
-          "flex items-center gap-2 rounded-full border border-line bg-white/70 py-1 pl-1 pr-2.5",
-          "text-sea-ink outline-none hover:bg-sand/45 focus-visible:ring-1 focus-visible:ring-lagoon-deep/40 cursor-pointer",
+          "flex items-center gap-2 rounded-full border border-line dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/50 py-1 pl-1 pr-2.5",
+          "text-sea-ink dark:text-zinc-200 outline-none hover:bg-sand/45 dark:hover:bg-zinc-800/60 focus-visible:ring-1 focus-visible:ring-lagoon-deep/40 cursor-pointer",
         )}
       >
         <Avatar image={user.image} initial={initial} />
         <span className="hidden sm:block max-w-[140px] truncate text-sm font-semibold">
           {user.name || "Account"}
         </span>
-        <ChevronDown className="size-4 text-sea-ink-soft" />
+        <ChevronDown className="size-4 text-sea-ink-soft dark:text-zinc-500" />
       </DropdownMenu.Trigger>
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[220px] rounded-xl border border-line bg-white p-1.5 shadow-lg"
+          className="z-50 min-w-[220px] rounded-xl border border-line dark:border-zinc-800 bg-white dark:bg-zinc-900 p-1.5 shadow-lg"
         >
           {/* Identity block — the useful info, shown plainly */}
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar image={user.image} initial={initial} size="lg" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-sea-ink">
+              <p className="truncate text-sm font-bold text-sea-ink dark:text-zinc-200">
                 {user.name || "Account"}
               </p>
-              <p className="truncate text-xs text-sea-ink-soft">{user.email}</p>
+              <p className="truncate text-xs text-sea-ink-soft dark:text-zinc-400">{user.email}</p>
             </div>
           </div>
 
-          <DropdownMenu.Separator className="my-1 h-px bg-line" />
+          <DropdownMenu.Separator className="my-1 h-px bg-line dark:bg-zinc-800" />
 
           <DropdownMenu.Item
             onSelect={() => void authClient.signOut()}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-sea-ink",
-              "outline-none data-[highlighted]:bg-sand/55 cursor-pointer",
+              "flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-sea-ink dark:text-zinc-200",
+              "outline-none data-[highlighted]:bg-sand/55 dark:data-[highlighted]:bg-zinc-800/60 cursor-pointer",
             )}
           >
-            <LogOut className="size-4 text-sea-ink-soft" />
+            <LogOut className="size-4 text-sea-ink-soft dark:text-zinc-400" />
             Sign out
           </DropdownMenu.Item>
         </DropdownMenu.Content>
@@ -91,7 +91,7 @@ function Avatar({
         alt=""
         className={cn(
           dimension,
-          "rounded-full object-cover border border-line",
+          "rounded-full object-cover border border-line dark:border-zinc-800",
         )}
       />
     );

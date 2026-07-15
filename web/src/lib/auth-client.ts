@@ -1,10 +1,10 @@
 import { createAuthClient } from 'better-auth/react'
-import { magicLinkClient } from 'better-auth/client/plugins'
+// import { magicLinkClient } from 'better-auth/client/plugins'
 import { convexClient } from '@convex-dev/better-auth/client/plugins'
 
 export const authClient = createAuthClient({
   plugins: [
-    magicLinkClient(),
+    // magicLinkClient(),
     convexClient()
   ],
   // Don't refetch the session when the tab regains focus. The default (true)

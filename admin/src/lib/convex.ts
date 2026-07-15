@@ -1,4 +1,5 @@
 import { ConvexClient } from 'convex/browser';
+import { authClient } from './auth-client';
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL || '';
 
@@ -7,3 +8,23 @@ if (!convexUrl) {
 }
 
 export const convex = new ConvexClient(convexUrl);
+
+convex.setAuth(async () => {
+  try {
+    // Wait for the Better Auth session (including cross-domain plugins) to initialize
+    await authClient.getSession();
+
+    // The official non-hacky way from the Better Auth Convex plugin:
+    const { data, error } = await authClient.convex.token();
+    
+    if (error) {
+      console.error('Error fetching Convex token:', error);
+      return null;
+    }
+    
+    return data?.token || null;
+  } catch (err) {
+    console.error('Failed to get Convex token:', err);
+    return null;
+  }
+});

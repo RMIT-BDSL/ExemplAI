@@ -90,7 +90,7 @@ export default function CourseList() {
   const tokenIdentifier = session?.user?.id;
   const lessonProgress = useQuery(
     api.courses.getLessonProgress,
-    tokenIdentifier ? { tokenIdentifier } : "skip"
+    tokenIdentifier ? {} : "skip"
   );
 
   // lessonId -> status. Lessons absent from the map are "pending".

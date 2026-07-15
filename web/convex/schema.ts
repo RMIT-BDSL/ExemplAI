@@ -6,19 +6,35 @@ export default defineSchema({
     course_name: v.string(),
     course_language: v.string(),
   }),
+  // A "lesson". `detail`/`testCases` are optional so rows created before those
+  // fields existed remain valid. `knowledge_component` keys BKT mastery.
   questions: defineTable({
     week: v.number(),
     course: v.id("course"),
     problem_name: v.string(),
     problem_description: v.string(),
-    knowledge_component: v.optional(v.string()), // The BKT tag (e.g. "io_basics")
-    topic: v.optional(v.string()), // The English language topic (e.g. "I/O basics")
-    tag: v.optional(v.string()), // To differentiate problem sets (e.g. "csedm", "csedm2")
-    starter_code: v.optional(v.string()), // Pre-filled code for the editor
-    unit_tests: v.optional(v.string()), // Hidden Python assert statements
-    solution: v.optional(v.string()), // A reference solution to the problem
+    // Optional at the document level so pre-BKT rows remain valid; createLesson
+    // still requires it via Zod.
+    knowledge_component: v.optional(v.string()),
+    topic: v.optional(v.string()),
+    tag: v.optional(v.string()),
+    detail: v.optional(v.string()),
+    testCases: v.optional(
+      v.array(
+        v.object({
+          input: v.string(),
+          expectedOutput: v.string(),
+          description: v.optional(v.string()),
+          hidden: v.optional(v.boolean()),
+        }),
+      ),
+    ),
+    starter_code: v.optional(v.string()),
+    solution_code: v.optional(v.string()),
   })
     .index("by_week", ["week"]) // week are fixed to 12 weeks
+    .index("by_course", ["course"])
+    .index("by_course_week", ["course", "week"])
     .index("by_kc", ["knowledge_component"]),
   users: defineTable({
     name: v.optional(v.string()),
@@ -45,10 +61,13 @@ export default defineSchema({
   // A lesson with no row here is treated as "pending" by the UI, so we only
   // store lessons a student has started ("in-progress") or finished
   // ("completed"). One row per (student, lesson) pair.
+  // `has_run` / `bkt_recorded` are set only by the server after Judge0 runs.
   lessonProgress: defineTable({
     userId: v.id("users"),
     lessonId: v.id("questions"),
     status: v.union(v.literal("in-progress"), v.literal("completed")),
+    has_run: v.optional(v.boolean()),
+    bkt_recorded: v.optional(v.boolean()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])
@@ -56,6 +75,16 @@ export default defineSchema({
     .index("by_lesson", ["lessonId"])
     // exact (student, lesson) lookup for fast upserts
     .index("by_user_lesson", ["userId", "lessonId"]),
+  // Per-student BKT mastery for a knowledge component (shared across lessons
+  // tagged with the same KC). Updated once per lesson on first Submit only.
+  bktMastery: defineTable({
+    userId: v.id("users"),
+    knowledge_component: v.string(),
+    prob_mastery: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_kc", ["userId", "knowledge_component"]),
   invitationCodes: defineTable({
     code: v.string(),
     isValid: v.boolean(),
@@ -65,4 +94,15 @@ export default defineSchema({
     whoUsed: v.array(v.string()),
     expiryDate: v.optional(v.string()),
   }).index("by_code", ["code"]),
+  chats: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+  }).index("by_user_lesson", ["userId", "lessonId"]),
+  chatMessages: defineTable({
+    chatId: v.id("chats"),
+    sender: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    sentBySystem: v.optional(v.boolean()),
+    model: v.optional(v.string()),
+  }).index("by_chat", ["chatId"]),
 });

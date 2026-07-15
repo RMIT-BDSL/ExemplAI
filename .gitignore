@@ -6,4 +6,7 @@ data/csedm-2019/
 **/__pycache__/
 **/.env.*
 !**/.env.example
-**/uv.lock
+# **/uv.lock
+**/.claude/
+**/.vscode/
+CLAUDE.md

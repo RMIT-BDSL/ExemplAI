@@ -9,11 +9,15 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as chats from "../chats.js";
 import type * as courses from "../courses.js";
+import type * as functions from "../functions.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
+import type * as lessons from "../lessons.js";
 import type * as seed from "../seed.js";
+import type * as validators from "../validators.js";
 
 import type {
   ApiFromModules,
@@ -23,11 +27,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  chats: typeof chats;
   courses: typeof courses;
+  functions: typeof functions;
   http: typeof http;
   init: typeof init;
   invitationCodes: typeof invitationCodes;
+  lessons: typeof lessons;
   seed: typeof seed;
+  validators: typeof validators;
 }>;
 
 /**

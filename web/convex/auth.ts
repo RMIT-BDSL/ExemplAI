@@ -2,6 +2,7 @@ import { createClient, type AuthFunctions } from "@convex-dev/better-auth";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
 import { magicLink, admin } from "better-auth/plugins";
+import { createAuthMiddleware, APIError } from "better-auth/api";
 import { components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
@@ -46,6 +47,9 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
       ...(process.env.VITE_TRUSTED_ORIGINS?.split(",") || []),
     ],
     user: {
+      deleteUser: {
+        enabled: true
+      },
       additionalFields: {
         isAnonymous: { type: "boolean", required: false },
         phone: { type: "string", required: false },
@@ -59,19 +63,52 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
     emailAndPassword: {
       enabled: true,
     },
+    hooks: {
+      before: createAuthMiddleware(async (apiCtx) => {
+        if (apiCtx.path === "/sign-up/email") {
+          const body = apiCtx.body as any;
+          const code = body?.code;
+          if (!code) {
+            throw new APIError("BAD_REQUEST", {
+              message: "Invitation code is required.",
+            });
+          }
+
+          const invitation = await ctx.db
+            .query("invitationCodes")
+            .withIndex("by_code", (q) => q.eq("code", code))
+            .unique();
+
+          if (!invitation || !invitation.isValid || invitation.usesCount >= invitation.quantity) {
+            throw new APIError("BAD_REQUEST", {
+              message: "Invalid or expired invitation code.",
+            });
+          }
+
+          if (invitation.expiryDate) {
+            const expiry = new Date(invitation.expiryDate);
+            if (!isNaN(expiry.getTime()) && expiry.getTime() < Date.now()) {
+              throw new APIError("BAD_REQUEST", {
+                message: "Invitation code has expired.",
+              });
+            }
+          }
+        }
+      }),
+    },
     plugins: [
       convex({ authConfig, jwtExpirationSeconds: 60 * 60 * 24 }),
       crossDomain({
         siteUrl: process.env.SITE_URL || "http://localhost:5173",
       }),
-      magicLink({
+      /* magicLink({
         sendMagicLink: async ({ email, url }) => {
           console.log(`\n==================================================`);
           console.log(`[Dev Mailer] Magic Link for: ${email}`);
           console.log(`URL: ${url}`);
           console.log(`==================================================\n`);
         },
-      }),
+      }), */
       admin(),
     ],
   };

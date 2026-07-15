@@ -1,9 +1,11 @@
-import { Bot, RefreshCw, Send, Sparkles, User } from "lucide-react";
+import { Bot, RefreshCw, Send, Sparkles, User, ChevronRight, MessageSquare } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
 import { sendChatMessage } from "#/lib/api.ts";
-
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 // Types for Chat
 export interface Message {
   id: string;
@@ -16,32 +18,43 @@ export interface Message {
 export interface ChatHeaderProps {
   onClearChat?: () => void;
   isTyping?: boolean;
+  onCollapse?: () => void;
 }
 
-export function ChatHeader({ onClearChat, isTyping }: ChatHeaderProps) {
+export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProps) {
   return (
-    <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900/40">
-      <div className="flex items-center gap-2.5">
-        <div className="relative flex size-8 items-center justify-center rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-          <Bot className="size-4" />
-          <span className="absolute bottom-0 right-0 size-2 rounded-full bg-emerald-500 border border-zinc-900 animate-pulse" />
+    <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+        <div className="relative flex items-center justify-center">
+          <MessageSquare className="size-4 text-emerald-400" />
+          <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-emerald-500 border border-zinc-955 animate-pulse" />
         </div>
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-200">AI Assistant</h2>
-          <p className="text-xs text-zinc-500">
-            {isTyping ? "Typing..." : "Online • Ready to help"}
-          </p>
-        </div>
+        <span>AI Assistant</span>
+        {isTyping && (
+          <span className="ml-1 text-[10px] font-normal text-zinc-500 animate-pulse">typing...</span>
+        )}
       </div>
-      {onClearChat && (
-        <button
-          onClick={onClearChat}
-          className="inline-flex size-8 items-center justify-center rounded-md border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
-          title="Reset chat"
-        >
-          <RefreshCw className="size-3.5" />
-        </button>
-      )}
+      <div className="flex items-center gap-1.5">
+        {onClearChat && (
+          <button
+            onClick={onClearChat}
+            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            title="Reset chat"
+          >
+            <RefreshCw className="size-3.5 text-zinc-400" />
+          </button>
+        )}
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            title="Collapse panel"
+          >
+            <ChevronRight className="size-4 text-zinc-400" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -222,64 +235,167 @@ export interface PendingMessage {
 // 5. Chat Box default exported container
 export default function ChatBox({
   pendingMessage,
+  editorRef,
+  currentCode,
+  lessonId,
+  onCollapse,
 }: {
   pendingMessage?: PendingMessage | null;
+  editorRef?: React.MutableRefObject<any>;
+  currentCode?: string;
+  lessonId?: string;
+  onCollapse?: () => void;
 }) {
-  const [messages, setMessages] = React.useState<Message[]>([
-    {
-      id: "welcome",
-      sender: "assistant",
-      content:
-        "Hi there! I am your AI learning assistant. I can help you understand the 'Two Sum' problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
-      timestamp: new Date(),
-    },
-  ]);
   const [isTyping, setIsTyping] = React.useState(false);
+  const [localError, setLocalError] = React.useState<string | null>(null);
+
+  // Convex integration
+  const convexLessonId = lessonId as Id<"questions"> | undefined;
+  
+  // Get or create chat session
+  const [chatId, setChatId] = React.useState<string | null>(null);
+  const getOrCreateChat = useMutation(api.chats.getOrCreateChat);
+  const addMessageMutation = useMutation(api.chats.addMessage);
+  const clearChatMutation = useMutation(api.chats.clearChat);
+
+  // Fetch messages from Convex
+  const dbMessages = useQuery(
+    api.chats.getMessages,
+    convexLessonId ? { lessonId: convexLessonId } : "skip"
+  );
+
+  // Map Convex messages to the local Message format
+  const messages: Message[] = React.useMemo(() => {
+    let result: Message[] = [];
+    if (!dbMessages || dbMessages.length === 0) {
+      result = [
+        {
+          id: "welcome",
+          sender: "assistant",
+          content: "Hi there I am your AI learning assistant. I can help you understand this problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
+          timestamp: new Date(),
+        },
+      ];
+    } else {
+      result = dbMessages.map((msg) => ({
+        id: msg._id,
+        sender: msg.sender as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg._creationTime),
+      }));
+    }
+
+    if (localError) {
+      result.push({
+        id: "local-error",
+        sender: "assistant",
+        content: localError,
+        timestamp: new Date(),
+      });
+    }
+    return result;
+  }, [dbMessages, localError]);
+  React.useEffect(() => {
+    setChatId(null);
+    let isActive = true;
+
+    async function initChat() {
+      if (convexLessonId) {
+        try {
+          const id = await getOrCreateChat({ lessonId: convexLessonId });
+          if (isActive) {
+            setChatId(id);
+          }
+        } catch (e) {
+          if (isActive) {
+            console.error("Failed to initialize chat:", e);
+          }
+        }
+      }
+    }
+    initChat();
+
+    return () => {
+      isActive = false;
+    };
+  }, [convexLessonId, getOrCreateChat]);
 
   const handleSendMessage = async (text: string) => {
-    // 1. Add User Message
-    const userMsg: Message = {
-      id: Math.random().toString(),
-      sender: "user",
-      content: text,
-      timestamp: new Date(),
-    };
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    if (!chatId || !convexLessonId) return;
+    
+    // Optmistically show typing state
     setIsTyping(true);
+    setLocalError(null);
 
     try {
-      // Map messages to structure expected by server Pydantic model
-      const conversationPayload = updatedMessages.map((msg) => ({
-        sender: msg.sender,
-        content: msg.content,
-      }));
+      // 1. Add User Message to Convex
+      await addMessageMutation({
+        chatId: chatId as Id<"chats">,
+        sender: "user",
+        content: text,
+      });
 
-      const response = await sendChatMessage(conversationPayload);
+      // Prepare conversation payload for backend
+      // Note: We use the existing messages array from the UI + the new message
+      const conversationPayload = [
+        ...messages.filter(m => m.id !== "welcome"),
+        { sender: "user" as const, content: text }
+      ];
+
+      // Extract Monaco editor state
+      let editorContext = "";
+      let code = currentCode || "";
+      let cursorLine = null;
+      let cursorColumn = null;
+      let selectedText = "";
+
+      if (editorRef?.current) {
+        const editor = editorRef.current;
+        const editorValue = editor.getValue();
+        if (editorValue) {
+          code = editorValue;
+        }
+
+        const selection = editor.getSelection();
+        const position = editor.getPosition();
+
+        if (selection && !selection.isEmpty()) {
+          selectedText = editor.getModel()?.getValueInRange(selection) || "";
+        }
+
+        if (position) {
+          cursorLine = position.lineNumber;
+          cursorColumn = position.column;
+        }
+      }
+
+      if (code) {
+        editorContext = `Code:\n${code}\n`;
+        if (cursorLine !== null && cursorColumn !== null) {
+          editorContext += `Cursor Line: ${cursorLine}, Column: ${cursorColumn}\n`;
+        }
+        if (selectedText) {
+          editorContext += `Selected Text:\n${selectedText}\n`;
+        }
+      }
+
+      const response = await sendChatMessage(conversationPayload, chatId, 1, editorContext);
 
       // Find the last AI assistant message content from the response messages
       const aiMessages = response.messages.filter(
         (msg) => msg.type === "ai" || msg.type === "assistant"
       );
       const lastAiMessage = aiMessages[aiMessages.length - 1];
-      const replyContent = lastAiMessage ? lastAiMessage.content : "Sorry, I couldn't get a response.";
+      const replyContent = lastAiMessage
+        ? lastAiMessage.content
+        : "Sorry, I couldn't get a response.";
 
-      const assistantMsg: Message = {
-        id: lastAiMessage?.id || Math.random().toString(),
-        sender: "assistant",
-        content: replyContent,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      // The AI message will automatically appear in the UI once the backend 
+      // pushes it to Convex. We no longer save it from the frontend to avoid
+      // duplication and sync issues.
     } catch (error) {
       console.error("Error communicating with chat server:", error);
-      const assistantMsg: Message = {
-        id: Math.random().toString(),
-        sender: "assistant",
-        content: "Sorry, I encountered an error connecting to the server.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setLocalError("Sorry, I encountered an error connecting to the server.");
     } finally {
       setIsTyping(false);
     }
@@ -292,23 +408,24 @@ export default function ChatBox({
     if (
       pendingMessage &&
       pendingMessage.content.trim() &&
-      pendingMessage.key !== lastPendingKey.current
+      pendingMessage.key !== lastPendingKey.current &&
+      chatId &&
+      convexLessonId
     ) {
       lastPendingKey.current = pendingMessage.key;
       handleSendMessage(pendingMessage.content);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMessage]);
+  }, [pendingMessage, chatId, convexLessonId]);
 
-  const handleClearChat = () => {
-    setMessages([
-      {
-        id: "welcome-reset",
-        sender: "assistant",
-        content: "Chat reset. How can I help you with this problem?",
-        timestamp: new Date(),
-      },
-    ]);
+  const handleClearChat = async () => {
+    if (convexLessonId) {
+      await clearChatMutation({ lessonId: convexLessonId });
+      // Start a fresh checkpoint thread so the server doesn't resume the old
+      // conversation's memory after the student clears the chat.
+      const newChatId = await getOrCreateChat({ lessonId: convexLessonId });
+      setChatId(newChatId);
+    }
   };
 
   // Quick prompt triggers
@@ -323,7 +440,7 @@ export default function ChatBox({
 
   return (
     <div className="flex h-full flex-col bg-zinc-900/50">
-      <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} />
+      <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} onCollapse={onCollapse} />
 
       <MessageFeed messages={messages} isTyping={isTyping} />
 
@@ -334,7 +451,8 @@ export default function ChatBox({
             <button
               key={idx}
               onClick={() => handleSendMessage(p.query)}
-              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none"
+              disabled={!chatId || !convexLessonId}
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
             >
               <Sparkles className="size-3 text-indigo-400" />
               {p.label}
@@ -343,7 +461,7 @@ export default function ChatBox({
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId || !convexLessonId} />
     </div>
   );
 }

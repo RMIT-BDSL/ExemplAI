@@ -1,3 +1,4 @@
+/*
 import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
 import { ArrowRight, Mail } from "lucide-react";
@@ -112,3 +113,4 @@ export function MagicLinkForm({
     </form>
   );
 }
+*/

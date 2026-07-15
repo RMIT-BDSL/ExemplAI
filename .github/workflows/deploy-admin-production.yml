@@ -1,0 +1,146 @@
+name: Deploy Admin Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'admin/**'
+      - '.github/workflows/deploy-admin-production.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint & Test Admin
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-admin-v2-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-admin-v2-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Add linting or test commands here if available for admin in the future
+      # - name: Lint
+      #   run: pnpm run check
+
+  deploy:
+    name: Deploy Admin Production
+    runs-on: ubuntu-latest
+    needs: [test]
+    environment:
+      name: production
+      url: ${{ steps.extract_url.outputs.deployment_url }}
+
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-admin-v2-${{ hashFiles('admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-admin-v2-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Application
+        run: pnpm run build
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name admin-exemplai --branch main
+          workingDirectory: admin
+
+      - name: Extract Deployment URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | head -n 1)
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Whitelist Admin Origin in Convex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          NEW_URL="${{ steps.extract_url.outputs.deployment_url }}"
+          if [ -n "$NEW_URL" ]; then
+            # NEW_URL is like https://1234abcd.my-project-name.pages.dev
+            DOMAIN="${NEW_URL#https://}"
+            # Extract the base project domain (e.g. my-project-name.pages.dev)
+            PROJECT_DOMAIN="${DOMAIN#*.}"
+            # Escape dots for the regex
+            REGEX_DOMAIN="\."$(echo "$PROJECT_DOMAIN" | sed 's/\./\\./g')
+            
+            CURRENT_ORIGINS=$(npx convex env get VITE_TRUSTED_ORIGINS || echo "")
+            # Remove existing Pages URLs with a hash/branch prefix, preserving the root domain
+            CLEANED_ORIGINS=$(echo "$CURRENT_ORIGINS" | tr ',' '\n' | grep -vE "$REGEX_DOMAIN" | paste -sd, - || echo "")
+            
+            if [[ ! "$CLEANED_ORIGINS" == *"$NEW_URL"* ]]; then
+              NEW_ORIGINS="${CLEANED_ORIGINS:+$CLEANED_ORIGINS,}$NEW_URL"
+              npx convex env set VITE_TRUSTED_ORIGINS "$NEW_ORIGINS"
+              echo "Added $NEW_URL to VITE_TRUSTED_ORIGINS (replacing older prefixed URLs)"
+            else
+              echo "URL $NEW_URL is already whitelisted in Convex"
+            fi
+          fi

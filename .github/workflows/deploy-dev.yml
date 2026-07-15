@@ -1,0 +1,95 @@
+name: Deploy Development
+
+on:
+  push:
+    branches:
+      - dev
+      - develop
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-dev.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Development
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ steps.extract_url.outputs.deployment_url }}
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('web/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy Convex Backend & Build Application (Dev)
+        run: npx convex deploy --cmd "node build-wrapper.js" --cmd-url-env-var-name VITE_CONVEX_URL
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}
+          CLOUDFLARE_ENV: dev
+          VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL_PREVIEW }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN_PREVIEW }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST_PREVIEW }}
+
+      - name: Deploy to Cloudflare Workers (Dev)
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config dist/server/wrangler.json
+          workingDirectory: web
+
+      - name: Extract Deployment URL
+        id: extract_url
+        shell: bash
+        run: |
+          OUTPUT="${{ steps.deploy.outputs.command-output }}"
+          # Find the deployment URL in the command output (e.g. ending in workers.dev)
+          URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' | head -n 1)
+          if [ -z "$URL" ]; then
+            # Fallback regex to find any HTTP/HTTPS URL that isn't the API URL
+            URL=$(echo "$OUTPUT" | grep -oE 'https?://[a-zA-Z0-9./-]+' | grep -v 'api.cloudflare.com' | head -n 1)
+          fi
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Update Convex Environment Variables
+        run: |
+          npx convex env set SITE_URL "${{ steps.extract_url.outputs.deployment_url }}"
+          npx convex env set BETTER_AUTH_URL "${{ steps.extract_url.outputs.deployment_url }}/api/auth"
+          npx convex env set BETTER_AUTH_SECRET "${{ secrets.BETTER_AUTH_SECRET_PREVIEW }}"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}

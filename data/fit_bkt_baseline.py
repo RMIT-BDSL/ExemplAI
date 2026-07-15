@@ -22,8 +22,120 @@ import sys
 from pathlib import Path
 import pandas as pd
 
+# Monkeypatch scikit-learn metrics submodules to handle list inputs, bypassing a pyBKT import bug in newer sklearn versions
+try:
+    import numpy as np
+    import re
+    import sklearn.metrics._regression
+    import sklearn.metrics._classification
+    def _make_list_to_array_wrapper(func):
+        def _wrapper(*args, **kwargs):
+            try:
+                # Convert list inputs to float64 arrays so that metrics like log_loss don't fail on finfo(int64)
+                new_args = [np.asarray(arg, dtype=np.float64) if isinstance(arg, list) else arg for arg in args]
+                new_kwargs = {k: (np.asarray(v, dtype=np.float64) if isinstance(v, list) else v) for k, v in kwargs.items()}
+                return func(*new_args, **new_kwargs)
+            except Exception as e:
+                # Raise TypeError so that pyBKT's import-time check (which only catches TypeError) skips this metric safely
+                raise TypeError(f"Wrapped metric check failed: {e}") from e
+        return _wrapper
+
+    for _mod in (sklearn.metrics._regression, sklearn.metrics._classification):
+        for _name in dir(_mod):
+            # Only wrap actual metrics, avoiding core NumPy/helper functions which could cause infinite recursion
+            if re.search('_loss$|_score$|_error$', _name):
+                _obj = getattr(_mod, _name)
+                if callable(_obj) and not isinstance(_obj, type):
+                    try:
+                        setattr(_mod, _name, _make_list_to_array_wrapper(_obj))
+                    except AttributeError:
+                        pass
+except Exception:
+    pass
+
 try:
     from pyBKT.models import Model
+    import pyBKT.fit.EM_fit
+    
+    def patched_EM_fit_run(data, model, trans_softcounts, emission_softcounts, init_softcounts, num_outputs, parallel = True, fixed = {}):
+        alldata = data["data"]
+        bigT, num_subparts = len(alldata[0]), len(alldata)
+        allresources, starts, learns, forgets, guesses, slips, lengths = \
+                data["resources"], data["starts"], model["learns"], model["forgets"], model["guesses"], model["slips"], data["lengths"]
+
+        prior, num_sequences, num_resources = model["prior"], len(starts), len(learns)
+        normalizeLengths = False
+        
+        if 'prior' in fixed:
+            prior = fixed['prior']
+        initial_distn = np.empty((2, ), dtype = 'float')
+        initial_distn[0] = 1 - prior
+        initial_distn[1] = prior
+        
+        if 'learns' in fixed:
+            learns = learns * (fixed['learns'] < 0) + fixed['learns'] * (fixed['learns'] >= 0)
+        if 'forgets' in fixed:
+            forgets = forgets * (fixed['forgets'] < 0) + fixed['forgets'] * (fixed['forgets'] >= 0)
+        As = np.empty((2, 2 * num_resources))
+        pyBKT.fit.EM_fit.interleave(As[0], 1 - learns, forgets.copy())
+        pyBKT.fit.EM_fit.interleave(As[1], learns.copy(), 1 - forgets)
+
+        if 'guesses' in fixed:
+            guesses = fixed['guesses'] * (fixed['guesses'] < 0) + fixed['guesses'] * (fixed['guesses'] >= 0)
+        if 'slips' in fixed:
+            slips = fixed['slips'] * (fixed['slips'] < 0) + fixed['slips'] * (fixed['slips'] >= 0)
+        Bn = np.empty((2, 2 * num_subparts))
+        pyBKT.fit.EM_fit.interleave(Bn[0], 1 - guesses, guesses.copy())
+        pyBKT.fit.EM_fit.interleave(Bn[1], slips.copy(), 1 - slips)
+
+        all_trans_softcounts = np.zeros((2, 2 * num_resources))
+        all_emission_softcounts = np.zeros((2, 2 * num_subparts))
+        all_initial_softcounts = np.zeros((2, 1))
+
+        alpha_out = np.zeros((2, bigT))
+
+        total_loglike = np.empty((1,1))
+        total_loglike.fill(0)
+
+        input = {"As": As, "Bn": Bn, "initial_distn": initial_distn, 'allresources': allresources, \
+                 'starts': starts,
+                 'lengths': lengths, \
+                 'num_resources': num_resources, 'num_subparts': num_subparts, \
+                 'alldata': alldata, 'normalizeLengths': normalizeLengths, 'alpha_out': alpha_out}
+
+        # Force sequential if parallel=False, otherwise use cpu_count
+        num_threads = pyBKT.fit.EM_fit.cpu_count() if parallel else 1
+        thread_counts = [None for _ in range(num_threads)]
+        for thread_num in range(num_threads):
+            blocklen = 1 + ((num_sequences - 1) // num_threads)
+            sequence_idx_start = int(blocklen * thread_num)
+            sequence_idx_end = min(sequence_idx_start+blocklen, num_sequences)
+            thread_counts[thread_num] = {'sequence_idx_start': sequence_idx_start, 'sequence_idx_end': sequence_idx_end}
+            thread_counts[thread_num].update(input)
+
+        # Run sequentially to prevent __main__ multiprocessing issues on Windows
+        x = [pyBKT.fit.EM_fit.inner(tc) for tc in thread_counts]
+
+        for i in x:
+            total_loglike += i[3]
+            all_trans_softcounts += i[0]
+            all_emission_softcounts += i[1]
+            all_initial_softcounts += i[2]
+            for sequence_start, T, alpha in i[4]:
+                alpha_out[:, sequence_start: sequence_start + T] += alpha
+        all_trans_softcounts = all_trans_softcounts.flatten(order = 'F')
+        all_emission_softcounts = all_emission_softcounts.flatten(order = 'F')
+        result = {}
+        # Coerce total_loglike to standard python float to avoid numpy 2.x assignment issues
+        result["total_loglike"] = float(total_loglike.squeeze())
+        result["all_trans_softcounts"] = np.reshape(all_trans_softcounts, (num_resources, 2, 2), order = 'C')
+        result["all_emission_softcounts"] = np.reshape(all_emission_softcounts, (num_subparts, 2, 2), order = 'C')
+        result["all_initial_softcounts"] = all_initial_softcounts
+        result["alpha_out"] = alpha_out.flatten(order = 'F').reshape(alpha_out.shape, order = 'C')
+
+        return result
+
+    pyBKT.fit.EM_fit.run = patched_EM_fit_run
 except ImportError:
     print("ERROR: pyBKT is not installed. Install it with:")
     print("  pip install pyBKT")
@@ -141,36 +253,64 @@ def prepare_pyBKT_input(df: pd.DataFrame) -> pd.DataFrame:
 
 def fit_bkt(bkt_df: pd.DataFrame) -> dict:
     """Fit a pyBKT model and return the learned parameters per KC."""
-    model = Model(seed=42, num_fits=5)
+    
+    # Suppress cosmetic NumPy warnings generated inside pyBKT's EM_fit.py
+    # EM_fit divides by 0 creating NaNs, but safely handles them via np.nan_to_num on line 213
+    import warnings
+    warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in divide")
+    
+    model = Model(seed=42, num_fits=5, parallel=False)
     model.fit(data=bkt_df)
 
     params = model.params()
     return params
 
 
-def extract_params(params: dict) -> dict:
+def extract_params(df: pd.DataFrame) -> dict:
     """
-    Extract the four BKT parameters for each KC from pyBKT's output.
-
-    pyBKT returns a nested dict like:
-        params[skill_name] = {
-            "prior": float,
-            "learns": [float],
-            "guesses": [float],
-            "slips": [float],
-            "forgets": [float],   # usually ~0
-        }
+    Extract the four BKT parameters for each KC from pyBKT's output DataFrame.
     """
     result = {}
-    for kc_name, kc_params in params.items():
-        result[kc_name] = {
-            "description": KC_DESCRIPTIONS.get(kc_name, ""),
-            "prior":  round(float(kc_params["prior"]), 4),
-            "learn":  round(float(kc_params["learns"][0]), 4),
-            "guess":  round(float(kc_params["guesses"][0]), 4),
-            "slip":   round(float(kc_params["slips"][0]), 4),
-            "forget": round(float(kc_params.get("forgets", [0.0])[0]), 4),
+    
+    if not isinstance(df, pd.DataFrame):
+        print(f"Warning: Expected DataFrame from model.params(), got {type(df)}")
+        return result
+
+    # The index level 'skill' contains the KC names
+    if 'skill' in df.index.names:
+        skills = df.index.get_level_values('skill').unique()
+    else:
+        # Fallback if the index names are different
+        skills = df.index.get_level_values(0).unique()
+
+    for skill in skills:
+        # Get all rows for this skill and reset index to make it flat
+        skill_params = df.loc[skill].reset_index()
+        
+        def get_val(param_name):
+            # The parameter name column is typically 'param'
+            if 'param' in skill_params.columns:
+                val = skill_params[skill_params['param'] == param_name]
+            else:
+                # Fallback: assume the first column contains the parameter names
+                first_col = skill_params.columns[0]
+                val = skill_params[skill_params[first_col] == param_name]
+                
+            if not val.empty:
+                # The value is usually in 'value', or just the last column
+                val_col = 'value' if 'value' in val.columns else val.columns[-1]
+                return round(float(val[val_col].iloc[0]), 4)
+            return 0.0
+
+        result[skill] = {
+            "description": KC_DESCRIPTIONS.get(skill, ""),
+            "prior":  get_val("prior"),
+            "learn":  get_val("learns"),
+            "guess":  get_val("guesses"),
+            "slip":   get_val("slips"),
+            "forget": get_val("forgets"),
         }
+        
     return result
 
 

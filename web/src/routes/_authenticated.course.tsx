@@ -1,5 +1,5 @@
 import { usePostHog } from "@posthog/react";
-import { ClientOnly, createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 import axios from "axios";
 import { useMutation, useQuery } from "convex/react";
 import { BookOpen, ChevronLeft } from "lucide-react";
@@ -11,6 +11,8 @@ import ResetCodeForm from "#/components/student/ResetCodeForm";
 import SidePanel from "#/components/student/SidePane";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
@@ -35,7 +37,7 @@ function Course() {
   const questions = useQuery(api.courses.getAllCourses);
   const fetchedQuestion = useQuery(
     api.courses.getQuestionById,
-    problemId ? { id: problemId } : "skip",
+    problemId ? { id: problemId } : "skip"
   );
 
   // The Convex client isn't authenticated, so read the session from the
@@ -43,6 +45,10 @@ function Course() {
   const { data: session } = authClient.useSession();
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
+  const lessonProgress = useQuery(
+    api.courses.getLessonProgress,
+    tokenIdentifier ? {} : "skip"
+  );
 
   const [language, setLanguage] = useState<string>("python");
   const [fontSize, setFontSize] = useState<number>(14);
@@ -67,43 +73,123 @@ function Course() {
       ? questions[0]
       : null;
 
+  const [isSaved, setIsSaved] = useState<boolean>(true);
+
+  // Set dark theme class on document.body for the duration of this page
+  useEffect(() => {
+    document.body.classList.add("dark");
+    return () => {
+      document.body.classList.remove("dark");
+    };
+  }, []);
+
   // Opening a problem marks it "in-progress" (the server keeps it "completed"
   // if it already was, so reviewing a finished problem won't downgrade it).
   const activeQuestionId = activeQuestion?._id;
+  const isCompleted = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId)?.status === "completed";
+
+  const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
+  const nextQuestion =
+    currentIndex !== -1 && questions && currentIndex < questions.length - 1
+      ? questions[currentIndex + 1]
+      : null;
+
+  const navigate = useNavigate();
+  const handleNextLesson = nextQuestion
+    ? () => {
+        navigate({
+          to: "/course",
+          search: { problemId: nextQuestion._id },
+        });
+        setExecutionResult(null);
+        setIsConsoleOpen(false);
+      }
+    : undefined;
   useEffect(() => {
     if (tokenIdentifier && activeQuestionId) {
       setLessonStatus({
-        tokenIdentifier,
         lessonId: activeQuestionId,
         status: "in-progress",
       }).catch(() => {});
     }
   }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
 
+  // Load code template from localStorage, falling back to starter_code or defaults
+  useEffect(() => {
+    if (activeQuestion && problemId) {
+      const storageKey = `exemplai_code_${problemId}_${language}`;
+      const savedCode = localStorage.getItem(storageKey);
+
+      if (savedCode) {
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: savedCode,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(savedCode);
+        }
+        setIsSaved(true);
+      } else if (activeQuestion.starter_code) {
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: activeQuestion.starter_code,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(activeQuestion.starter_code);
+        }
+        setIsSaved(true);
+      } else {
+        const defaultCode = CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+        setCodeTemplates((prev) => ({
+          ...prev,
+          [language]: defaultCode,
+        }));
+        if (editorRef.current) {
+          editorRef.current.setValue(defaultCode);
+        }
+        setIsSaved(true);
+      }
+    }
+  }, [activeQuestionId, language, problemId]);
+
+  // Autosave code to localStorage every 5 seconds if there are changes
+  useEffect(() => {
+    if (!problemId) return;
+
+    const interval = setInterval(() => {
+      if (!isSaved && editorRef.current) {
+        const currentVal = editorRef.current.getValue();
+        const storageKey = `exemplai_code_${problemId}_${language}`;
+        localStorage.setItem(storageKey, currentVal);
+        setIsSaved(true);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [problemId, language, isSaved]);
+
   if (activeQuestion === undefined) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <div className="text-center space-y-4">
-          <p className="text-zinc-500 text-sm animate-pulse">
-            Loading workspace...
-          </p>
-        </div>
+        <Loader2 className="size-8 animate-spin text-emerald-500" />
       </div>
     );
   }
 
   if (activeQuestion === null) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <p className="text-zinc-400">No problems available in the database.</p>
+      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-400">
+        No questions found.
       </div>
     );
   }
 
+  const sidebarProblems = questions || [];
   const mappedProblem = {
     id: activeQuestion._id,
     title: activeQuestion.problem_name,
     description: activeQuestion.problem_description,
+    detail: activeQuestion.detail,
     tags: ["Python"],
   };
 
@@ -117,20 +203,31 @@ function Course() {
         ...prev,
         [language]: value,
       }));
+      setIsSaved(false);
     }
   }
 
+  const handleSave = () => {
+    if (!problemId || !editorRef.current) return;
+    const currentVal = editorRef.current.getValue();
+    const storageKey = `exemplai_code_${problemId}_${language}`;
+    localStorage.setItem(storageKey, currentVal);
+    setIsSaved(true);
+    toast.success("Progress saved locally.");
+  };
+
   function handleReset() {
     posthog.capture("code_reset", { problem_id: problemId, language });
+    const defaultCode =
+      activeQuestion?.starter_code || CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
     setCodeTemplates((prev) => ({
       ...prev,
-      [language]: CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES],
+      [language]: defaultCode,
     }));
     if (editorRef.current) {
-      editorRef.current.setValue(
-        CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES],
-      );
+      editorRef.current.setValue(defaultCode);
     }
+    setIsSaved(false);
   }
 
   async function handleExecute(actionType: "run" | "submit") {
@@ -147,10 +244,44 @@ function Course() {
 
     const submissionCode = editorRef.current.getValue();
 
+    const LANGUAGE_IDS = {
+      python: 71,
+      javascript: 63,
+      typescript: 74,
+      cpp: 54,
+      java: 62,
+      go: 60,
+      rust: 73,
+      sql: 82,
+    };
+    const activeLang = language.toLowerCase();
+    const languageId = LANGUAGE_IDS[activeLang as keyof typeof LANGUAGE_IDS] || 71;
+
+    // Filter test cases based on actionType
+    const allTestCases = activeQuestion?.testCases || [];
+    const testCasesToRun =
+      actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
+
     try {
-      const response = await axios.post(`${url}/execute`, {
-        code: submissionCode,
-      });
+      const tokenRes = await authClient.convex.token();
+      const token = tokenRes.data?.token;
+
+      const response = await axios.post(
+        `${url}/execute`,
+        {
+          code: submissionCode,
+          language_id: languageId,
+          starter_code: activeQuestion?.starter_code,
+          solution_code: activeQuestion?.solution_code,
+          test_cases: testCasesToRun,
+          // Server sets has_run + first-submit BKT after Judge0 finishes.
+          lesson_id: activeQuestionId ?? undefined,
+          action_type: actionType,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
       setExecutionResult(response.data);
       const succeeded = !response.data?.error;
       posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {
@@ -158,36 +289,13 @@ function Course() {
         language,
         success: succeeded,
       });
-
-      // Record progress on submit: a successful submission completes the
-      // lesson; a failed attempt keeps it "in-progress" (the server won't
-      // downgrade a lesson that's already completed).
-      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
-        setLessonStatus({
-          tokenIdentifier,
-          lessonId: activeQuestionId,
-          status: succeeded ? "completed" : "in-progress",
-        }).catch(() => {});
-      }
     } catch (error: any) {
       posthog.captureException(error);
-
-      // A submit that errors out is still a failed attempt → in-progress.
-      if (actionType === "submit" && tokenIdentifier && activeQuestionId) {
-        setLessonStatus({
-          tokenIdentifier,
-          lessonId: activeQuestionId,
-          status: "in-progress",
-        }).catch(() => {});
-      }
 
       setExecutionResult({
         error: true,
         message: error.message || "Execution failed",
-        stderr:
-          error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message,
+        stderr: error.response?.data?.detail || error.response?.data?.message || error.message,
       });
     } finally {
       setIsRunning(false);
@@ -225,17 +333,16 @@ function Course() {
     setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
   }
 
-  const currentCode =
-    codeTemplates[language as keyof typeof codeTemplates] || "";
+  const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
 
   return (
     <ClientOnly>
-      <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
+      <div className="dark flex h-[calc(100vh-57px)] w-full flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
         {/* Workspace Container */}
-        <div className="flex flex-1 flex-row overflow-hidden p-3 w-full h-full gap-3">
+        <div className="relative flex flex-1 flex-row overflow-hidden p-3 w-full gap-3">
           {/* Problem Description Container */}
           {!isProblemCollapsed && (
-            <div className="flex h-full w-[450px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
+            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[350px] xl:w-[450px] lg:left-0 lg:top-0 lg:bottom-0 absolute left-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
               {/* Header */}
               <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 flex-shrink-0">
                 <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
@@ -271,8 +378,7 @@ function Course() {
               setIsProblemCollapsed={setIsProblemCollapsed}
               isChatCollapsed={isChatCollapsed}
               setIsChatCollapsed={(collapsed) => {
-                if (!collapsed)
-                  posthog.capture("ai_chat_opened", { problem_id: problemId });
+                if (!collapsed) posthog.capture("ai_chat_opened", { problem_id: problemId });
                 setIsChatCollapsed(collapsed);
               }}
             />
@@ -293,27 +399,26 @@ function Course() {
                 onRun={() => handleExecute("run")}
                 onSubmit={() => handleExecute("submit")}
                 onSendErrorToChat={handleSendErrorToChat}
+                isSaved={isSaved}
+                onSave={handleSave}
+                testCases={activeQuestion?.testCases || []}
+                isCompleted={isCompleted}
+                onNextLesson={handleNextLesson}
               />
             </div>
           </div>
 
           {/* Chat Panel */}
           {!isChatCollapsed && (
-            <div className="flex h-full w-[420px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0">
-              <SidePanel
-                onCollapse={() => setIsChatCollapsed(true)}
-                pendingMessage={chatPrompt}
-              />
+            <div className="flex flex-col text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[320px] xl:w-[420px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
+              <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
             </div>
           )}
         </div>
 
         {/* Solid Reset Confirmation Modal */}
         {showResetModal && (
-          <ResetCodeForm
-            setShowResetModal={setShowResetModal}
-            handleReset={handleReset}
-          />
+          <ResetCodeForm setShowResetModal={setShowResetModal} handleReset={handleReset} />
         )}
       </div>
     </ClientOnly>

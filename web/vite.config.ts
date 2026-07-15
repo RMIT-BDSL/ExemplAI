@@ -10,37 +10,23 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  plugins: [devtools({
-    consolePiping: {
-      enabled: false,
-    },
-  }), tailwindcss(), tanstackStart(), viteReact(), cloudflare({
-    viteEnvironment: {
-      name: "ssr"
-    }
-  })],
-  server: {
-    proxy: {
-      "^/api/v1/static": {
-        target: "https://eu-assets.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
+  plugins: [
+    devtools({
+      consolePiping: {
+        enabled: false,
       },
-      "^/api/v1/array": {
-        target: "https://eu-assets.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
-      },
-      "^/api/v1": {
-        target: "https://eu.i.posthog.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
-        secure: false,
-      },
-    },
-  },
+    }),
+    tailwindcss(),
+    tanstackStart(),
+    viteReact(),
+    !process.env.VITEST &&
+      cloudflare({
+        viteEnvironment: {
+          name: "ssr",
+        },
+      }),
+  ].filter(Boolean),
+
 });
 
 export default config;

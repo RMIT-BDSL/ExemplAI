@@ -1,0 +1,497 @@
+import { convexTest } from "convex-test";
+import { describe, it, expect } from "vitest";
+import { api, components } from "../convex/_generated/api";
+import schema from "../convex/schema";
+
+// convex-test needs every Convex module so it can resolve function references.
+// Tests live outside the `convex/` folder, so we hand it the glob explicitly.
+const modules = import.meta.glob("../convex/**/*.ts");
+
+const setup = () => convexTest(schema, modules);
+
+async function createMockAdmin(t: ReturnType<typeof setup>) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "user",
+      document: {
+        name: "Admin User",
+        email: "admin@rmit.edu.vn",
+        emailVerified: true,
+        role: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const sessionId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "session",
+      document: {
+        userId,
+        expiresAt: Date.now() + 1000 * 60 * 60,
+        token: `token-${userId}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    await ctx.db.insert("users", {
+      name: "Admin User",
+      email: "admin@rmit.edu.vn",
+      tokenIdentifier: userId,
+      role: "admin",
+    });
+
+    return t.withIdentity({ subject: userId, sessionId });
+  });
+}
+
+const sampleTestCases = [
+  { input: "2 3", expectedOutput: "5" },
+  { input: "10 5", expectedOutput: "15", description: "larger numbers" },
+  { input: "0 0", expectedOutput: "0", hidden: true },
+];
+
+describe("course CRUD", () => {
+  it("creates a course and reads it back", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+
+    const id = await client.mutation(api.courses.createCourse, {
+      course_name: "Intro to Python",
+      course_language: "python",
+    });
+
+    const course = await client.query(api.courses.getCourse, { id });
+    expect(course).toMatchObject({
+      course_name: "Intro to Python",
+      course_language: "python",
+    });
+  });
+
+  it("lists courses newest first", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+
+    await client.mutation(api.courses.createCourse, {
+      course_name: "First",
+      course_language: "python",
+    });
+    await client.mutation(api.courses.createCourse, {
+      course_name: "Second",
+      course_language: "javascript",
+    });
+
+    const courses = await client.query(api.courses.listCourses, {});
+    expect(courses).toHaveLength(2);
+    expect(courses[0].course_name).toBe("Second");
+  });
+
+  it("updates only the provided fields", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+
+    const id = await client.mutation(api.courses.createCourse, {
+      course_name: "Old name",
+      course_language: "python",
+    });
+
+    await client.mutation(api.courses.updateCourse, { id, course_name: "New name" });
+
+    const course = await client.query(api.courses.getCourse, { id });
+    expect(course).toMatchObject({
+      course_name: "New name",
+      course_language: "python", // untouched
+    });
+  });
+
+  it("rejects an empty course name (Zod validation)", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+
+    await expect(
+      client.mutation(api.courses.createCourse, {
+        course_name: "",
+        course_language: "python",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("deleting a course cascades to its lessons and their progress", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+
+    const courseId = await client.mutation(api.courses.createCourse, {
+      course_name: "Course to delete",
+      course_language: "python",
+    });
+    const lessonId = await client.mutation(api.lessons.createLesson, {
+      course: courseId,
+      week: 1,
+      problem_name: "Sum two numbers",
+      problem_description: "Add two integers",
+      knowledge_component: "arithmetic",
+      testCases: sampleTestCases,
+    });
+
+    // Give a student some progress on the lesson, then delete the course.
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { tokenIdentifier: "tok-1" })
+    );
+    await t.run(async (ctx) =>
+      ctx.db.insert("lessonProgress", {
+        userId,
+        lessonId,
+        status: "in-progress",
+      })
+    );
+
+    await client.mutation(api.courses.deleteCourse, { id: courseId });
+
+    expect(await client.query(api.courses.getCourse, { id: courseId })).toBeNull();
+    expect(await client.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
+    const remainingProgress = await t.run(async (ctx) =>
+      ctx.db.query("lessonProgress").collect()
+    );
+    expect(remainingProgress).toHaveLength(0);
+  });
+});
+
+describe("lesson CRUD", () => {
+  const makeCourse = async (client: ReturnType<typeof setup>["withIdentity"]) =>
+    client.mutation(api.courses.createCourse, {
+      course_name: "Host course",
+      course_language: "python",
+    });
+
+  it("creates a lesson with test cases", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+
+    const id = await client.mutation(api.lessons.createLesson, {
+      course,
+      week: 3,
+      problem_name: "Sum",
+      problem_description: "Add two integers",
+      knowledge_component: "arithmetic",
+      topic: "Arithmetic",
+      detail: "Read two ints from stdin and print their sum.",
+      testCases: sampleTestCases,
+    });
+
+    const lesson = await client.query(api.lessons.getLesson, { id });
+    expect(lesson).toMatchObject({
+      week: 3,
+      problem_name: "Sum",
+      knowledge_component: "arithmetic",
+      topic: "Arithmetic",
+      detail: "Read two ints from stdin and print their sum.",
+    });
+    expect(lesson?.testCases).toHaveLength(3);
+    expect(lesson?.testCases?.[2]).toMatchObject({ hidden: true });
+  });
+
+  it("defaults testCases to an empty array when omitted", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+
+    const id = await client.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "No tests yet",
+      problem_description: "todo",
+      knowledge_component: "io_basics",
+    });
+
+    const lesson = await client.query(api.lessons.getLesson, { id });
+    expect(lesson?.testCases).toEqual([]);
+  });
+
+  it("lists lessons of a course ordered by week", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+
+    for (const week of [3, 1, 2]) {
+      await client.mutation(api.lessons.createLesson, {
+        course,
+        week,
+        problem_name: `Week ${week}`,
+        problem_description: "x",
+        knowledge_component: "loops",
+      });
+    }
+
+    const lessons = await client.query(api.lessons.listLessonsByCourse, { course });
+    expect(lessons.map((l) => l.week)).toEqual([1, 2, 3]);
+  });
+
+  it("does not return lessons from other courses", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const courseA = await makeCourse(client);
+    const courseB = await client.mutation(api.courses.createCourse, {
+      course_name: "Other",
+      course_language: "javascript",
+    });
+
+    await client.mutation(api.lessons.createLesson, {
+      course: courseA,
+      week: 1,
+      problem_name: "A1",
+      problem_description: "x",
+      knowledge_component: "io_basics",
+    });
+    await client.mutation(api.lessons.createLesson, {
+      course: courseB,
+      week: 1,
+      problem_name: "B1",
+      problem_description: "x",
+      knowledge_component: "io_basics",
+    });
+
+    const lessons = await client.query(api.lessons.listLessonsByCourse, {
+      course: courseA,
+    });
+    expect(lessons).toHaveLength(1);
+    expect(lessons[0].problem_name).toBe("A1");
+  });
+
+  it("updates a lesson's fields", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+
+    const id = await client.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "Original",
+      problem_description: "x",
+      knowledge_component: "conditionals",
+    });
+
+    await client.mutation(api.lessons.updateLesson, {
+      id,
+      week: 5,
+      problem_name: "Renamed",
+      knowledge_component: "loops",
+      testCases: [{ input: "1", expectedOutput: "1" }],
+    });
+
+    const lesson = await client.query(api.lessons.getLesson, { id });
+    expect(lesson).toMatchObject({ week: 5, problem_name: "Renamed" });
+    expect(lesson?.testCases).toHaveLength(1);
+  });
+
+  it("rejects a week outside the 1-12 range (Zod validation)", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+
+    await expect(
+      client.mutation(api.lessons.createLesson, {
+        course,
+        week: 13,
+        problem_name: "Too late",
+        problem_description: "x",
+        knowledge_component: "loops",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects creating a lesson for a missing course", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+    // Create then delete so we hold a real-but-dangling id.
+    await client.mutation(api.courses.deleteCourse, { id: course });
+
+    await expect(
+      client.mutation(api.lessons.createLesson, {
+        course,
+        week: 1,
+        problem_name: "Orphan",
+        problem_description: "x",
+        knowledge_component: "io_basics",
+      })
+    ).rejects.toThrow("Course not found");
+  });
+
+  it("deletes a lesson and its progress rows", async () => {
+    const t = setup();
+    const client = await createMockAdmin(t);
+    const course = await makeCourse(client);
+    const lessonId = await client.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "Bye",
+      problem_description: "x",
+      knowledge_component: "io_basics",
+    });
+
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { tokenIdentifier: "tok-2" })
+    );
+    await t.run(async (ctx) =>
+      ctx.db.insert("lessonProgress", {
+        userId,
+        lessonId,
+        status: "completed",
+      })
+    );
+
+    await client.mutation(api.lessons.deleteLesson, { id: lessonId });
+
+    expect(await client.query(api.lessons.getLesson, { id: lessonId })).toBeNull();
+    const progress = await t.run(async (ctx) =>
+      ctx.db.query("lessonProgress").collect()
+    );
+    expect(progress).toHaveLength(0);
+  });
+});
+
+async function createMockStudent(t: ReturnType<typeof setup>) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "user",
+      document: {
+        name: "Student User",
+        email: "student-bkt@rmit.edu.vn",
+        emailVerified: true,
+        role: "student",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const sessionId = await ctx.runMutation(components.betterAuth.adapter.insertOne, {
+      model: "session",
+      document: {
+        userId,
+        expiresAt: Date.now() + 1000 * 60 * 60,
+        token: `token-${userId}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+
+    const customUserId = await ctx.db.insert("users", {
+      name: "Student User",
+      email: "student-bkt@rmit.edu.vn",
+      tokenIdentifier: userId,
+      role: "student",
+    });
+
+    await ctx.db.insert("userProfiles", {
+      userId: customUserId,
+      tokenIdentifier: userId,
+      invitationCode: "TESTCODE",
+    });
+
+    return t.withIdentity({ subject: userId, sessionId });
+  });
+}
+
+describe("recordCodeExecution", () => {
+  it("sets has_run on run without recording BKT", async () => {
+    const t = setup();
+    const admin = await createMockAdmin(t);
+    const course = await makeCourse(admin);
+    const lessonId = await admin.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "Run only",
+      problem_description: "x",
+      knowledge_component: "loops",
+    });
+    const student = await createMockStudent(t);
+
+    const result = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: true,
+      actionType: "run",
+    });
+
+    expect(result).toMatchObject({
+      has_run: true,
+      bkt_recorded: false,
+      status: "in-progress",
+    });
+    expect(result.prob_mastery).toBeUndefined();
+
+    const progress = await student.query(api.courses.getLessonProgress, {});
+    expect(progress).toEqual([
+      expect.objectContaining({
+        lessonId,
+        status: "in-progress",
+        has_run: true,
+        bkt_recorded: false,
+      }),
+    ]);
+
+    const mastery = await t.run(async (ctx) => ctx.db.query("bktMastery").collect());
+    expect(mastery).toHaveLength(0);
+  });
+
+  it("persists server-computed BKT only on first submit", async () => {
+    const t = setup();
+    const admin = await createMockAdmin(t);
+    const course = await makeCourse(admin);
+    const lessonId = await admin.mutation(api.lessons.createLesson, {
+      course,
+      week: 1,
+      problem_name: "First submit",
+      problem_description: "x",
+      knowledge_component: "loops",
+    });
+    const student = await createMockStudent(t);
+
+    const ctxBefore = await student.query(api.courses.getExecutionBktContext, {
+      lessonId,
+    });
+    expect(ctxBefore).toMatchObject({
+      knowledge_component: "loops",
+      bkt_recorded: false,
+      prob_mastery: null,
+    });
+
+    // Python server would compute this; Convex only stores it.
+    const serverMastery = 0.42;
+    const first = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: true,
+      actionType: "submit",
+      probMastery: serverMastery,
+      knowledgeComponent: "loops",
+    });
+    expect(first.has_run).toBe(true);
+    expect(first.bkt_recorded).toBe(true);
+    expect(first.status).toBe("completed");
+    expect(first.knowledge_component).toBe("loops");
+    expect(first.prob_mastery).toBe(serverMastery);
+
+    const masteryAfterFirst = await t.run(async (ctx) =>
+      ctx.db.query("bktMastery").collect()
+    );
+    expect(masteryAfterFirst).toHaveLength(1);
+    expect(masteryAfterFirst[0].prob_mastery).toBe(serverMastery);
+
+    const second = await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: false,
+      actionType: "submit",
+      probMastery: 0.01,
+      knowledgeComponent: "loops",
+    });
+    expect(second.bkt_recorded).toBe(true);
+    expect(second.status).toBe("completed");
+    expect(second.prob_mastery).toBeUndefined();
+
+    const masteryAfterSecond = await t.run(async (ctx) =>
+      ctx.db.query("bktMastery").collect()
+    );
+    expect(masteryAfterSecond).toHaveLength(1);
+    expect(masteryAfterSecond[0].prob_mastery).toBe(serverMastery);
+  });
+});

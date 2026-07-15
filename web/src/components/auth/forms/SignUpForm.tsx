@@ -1,8 +1,9 @@
 import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
-import { useConvex, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { ArrowRight, Lock, Mail, ShieldCheck, User } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
+import { validateInvitationCode } from "#/lib/auth.functions";
 import { api } from "../../../../convex/_generated/api";
 import { AuthButton } from "../AuthButton";
 import { AuthTextField } from "../AuthTextField";
@@ -14,7 +15,6 @@ interface SignUpFormProps {
 
 export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
   const posthog = usePostHog();
-  const convex = useConvex();
   const createUserAndUseCode = useMutation(
     api.invitationCodes.createUserAndUseCode,
   );
@@ -29,10 +29,9 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
     onSubmit: async ({ value }) => {
       try {
         // 1. Validate invitation code in Convex
-        const validation = await convex.query(
-          api.invitationCodes.validateCode,
-          { code: value.code },
-        );
+        const validation = await validateInvitationCode({
+          data: value.code,
+        });
         if (!validation.isValid) {
           onError(validation.reason || "Invalid invitation code.");
           return;
@@ -43,7 +42,8 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           email: value.email,
           password: value.password,
           name: value.name,
-        });
+          code: value.code, // Pass code to Better Auth signup body
+        } as any);
 
         if (signUpRes.error) {
           onError(signUpRes.error.message || "Failed to create account");
