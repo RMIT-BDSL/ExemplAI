@@ -11,7 +11,7 @@ interface SidePanelProps {
 
 export default function SidePanel({ onCollapse, pendingMessage, editorRef, currentCode, lessonId }: SidePanelProps) {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 animate-in fade-in duration-200">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/90 backdrop-blur-md shadow-xl text-zinc-100 animate-in fade-in duration-200">
       {/* Pane Content */}
       <div className="flex-1 min-h-0">
         <ChatBox

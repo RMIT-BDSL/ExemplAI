@@ -77,27 +77,11 @@ export function ProblemHeader({
   */
 
   return (
-    <div className="space-y-4 border-b border-zinc-800 pb-5">
+    <div className="space-y-3.5 border-b border-zinc-850 pb-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+        <h1 className="text-xl font-bold tracking-tight text-zinc-100">
           {title}
         </h1>
-        {/*
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold select-none",
-              difficultyStyles[difficulty]
-            )}
-          >
-            {difficulty}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/50 px-2.5 py-0.5 text-xs text-zinc-400 select-none">
-            <CheckCircle className="size-3 text-zinc-500" />
-            Acceptance: {acceptanceRate}
-          </span>
-        </div>
-        */}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -105,7 +89,7 @@ export function ProblemHeader({
         {tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center rounded-md border border-zinc-800/80 bg-zinc-950 px-2 py-0.5 text-xs font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-300"
+            className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-medium text-zinc-400"
           >
             {tag}
           </span>
@@ -124,7 +108,7 @@ export function ProblemDescriptionText({
   description,
 }: ProblemDescriptionTextProps) {
   return (
-    <div className="prose prose-invert prose-sm max-w-none text-zinc-300">
+    <div className="prose prose-invert prose-xs max-w-none text-zinc-300 leading-relaxed">
       <ReactMarkdown>{description}</ReactMarkdown>
     </div>
   );
@@ -217,9 +201,9 @@ export interface ProblemProps {
 
 export default function Problem({ problem = MOCK_PROBLEM }: ProblemProps) {
   return (
-    <div className="flex h-full flex-col bg-zinc-900/50">
+    <div className="flex h-full flex-col bg-transparent">
       {/* Scrollable Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 scrollbar-thin scrollbar-thumb-zinc-800">
         <ProblemHeader
           title={problem.title}
           // difficulty={problem.difficulty}
@@ -227,7 +211,7 @@ export default function Problem({ problem = MOCK_PROBLEM }: ProblemProps) {
           tags={problem.tags}
         />
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <ProblemDescriptionText description={problem.description} />
 
           {/* <ProblemExamples examples={problem.examples} /> */}

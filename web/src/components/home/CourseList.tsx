@@ -173,45 +173,45 @@ export default function CourseList() {
     <div className="space-y-6">
       {/* Title & Introduction */}
       <div>
-        <h2 className="text-xl font-extrabold text-sea-ink tracking-tight flex items-center gap-2">
-          <Compass className="size-5 text-lagoon-deep" />
+        <h2 className="text-lg font-bold text-sea-ink tracking-tight flex items-center gap-2">
+          <Compass className="size-4.5 text-lagoon" />
           <span>Python Programming Syllabus</span>
         </h2>
-        <p className="text-sm text-sea-ink-soft mt-1">
+        <p className="text-xs text-sea-ink-soft mt-1 leading-relaxed">
           Complete the challenges below sequentially. Use the workspace editor to run and submit
           your solutions.
         </p>
       </div>
 
       {/* Interactive Controls (Search & Filters) */}
-      <div className="island-shell rounded-xl p-4 border border-line space-y-4">
+      <div className="island-shell rounded-xl p-3.5 border border-line space-y-3.5">
         <div className="flex flex-col md:flex-row gap-3">
           {/* Search bar */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 size-4 text-sea-ink-soft/60" />
+            <Search className="absolute left-3 top-2.5 size-3.5 text-sea-ink-soft" />
             <input
               type="text"
-              placeholder="Search problems, descriptions, or tags..."
+              placeholder="Search exercises, descriptions, or tags..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-sand/35 border border-line rounded-lg py-2 pl-9 pr-4 text-sm text-sea-ink placeholder:text-sea-ink-soft/40 outline-none focus:border-lagoon-deep focus:ring-1 focus:ring-lagoon-deep/30 transition-all"
+              className="w-full bg-sand/50 dark:bg-white/5 border border-line rounded-lg py-1.5 pl-9 pr-4 text-xs text-sea-ink placeholder:text-sea-ink-soft/60 outline-none focus:border-lagoon/50 focus:ring-1 focus:ring-lagoon/20 transition-all"
             />
           </div>
 
-          {/* Status filter tabs */}
-          <div className="flex bg-sand/40 border border-line rounded-lg p-1 shrink-0">
+          {/* Status filter tabs (Segmented Control style) */}
+          <div className="flex bg-sand/60 dark:bg-white/5 border border-line rounded-lg p-0.5 shrink-0">
             {(["all", "completed", "in-progress", "pending"] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setSelectedStatus(status)}
                 className={cn(
-                  "px-3 py-1 text-xs font-semibold capitalize rounded-md transition-colors cursor-pointer",
+                  "px-3 py-1 text-[11px] font-medium capitalize rounded-md transition-all cursor-pointer",
                   selectedStatus === status
-                    ? "bg-white text-sea-ink shadow-sm border border-line/20"
+                    ? "bg-white dark:bg-zinc-800 text-sea-ink shadow-sm border border-line/10"
                     : "text-sea-ink-soft hover:text-sea-ink"
                 )}
               >
-                {status === "all" ? "All Status" : status.replace("-", " ")}
+                {status === "all" ? "All" : status.replace("-", " ")}
               </button>
             ))}
           </div>
@@ -222,10 +222,10 @@ export default function CourseList() {
           <button
             onClick={() => setSelectedWeek("all")}
             className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
+              "px-3 py-1 text-[11px] font-medium rounded-full cursor-pointer transition-all border",
               selectedWeek === "all"
-                ? "bg-sea-ink text-white border-sea-ink"
-                : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
+                ? "bg-lagoon/10 border-lagoon/30 text-lagoon font-semibold"
+                : "bg-white/40 dark:bg-transparent border-line text-sea-ink-soft hover:text-sea-ink hover:bg-sand"
             )}
           >
             All Weeks
@@ -235,10 +235,10 @@ export default function CourseList() {
               key={wk}
               onClick={() => setSelectedWeek(wk)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg border cursor-pointer transition-colors",
+                "px-3 py-1 text-[11px] font-medium rounded-full cursor-pointer transition-all border",
                 selectedWeek === wk
-                  ? "bg-sea-ink text-white border-sea-ink"
-                  : "bg-sand/30 border-line text-sea-ink hover:bg-sand/65"
+                  ? "bg-lagoon/10 border-lagoon/30 text-lagoon font-semibold"
+                  : "bg-white/40 dark:bg-transparent border-line text-sea-ink-soft hover:text-sea-ink hover:bg-sand"
               )}
             >
               Week {wk}
@@ -249,7 +249,7 @@ export default function CourseList() {
 
       {/* Problems List Stack grouped by Week */}
       {sortedWeeks.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {sortedWeeks.map((weekNum) => {
             const isCollapsed = collapsedWeeks[weekNum];
             const weekProblems = problemsByWeek[weekNum];
@@ -257,38 +257,37 @@ export default function CourseList() {
             const completedPct = Math.round((completedCount / weekProblems.length) * 100);
 
             return (
-              <div key={weekNum} className="space-y-3">
+              <div key={weekNum} className="space-y-2.5">
                 <button
                   onClick={() => toggleWeek(weekNum)}
-                  className="w-full flex items-center gap-3 border-b border-line pb-1.5 hover:border-lagoon-deep text-left cursor-pointer group transition-colors"
+                  className="w-full flex items-center gap-3 pb-1 text-left cursor-pointer group transition-colors"
                 >
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-sea-ink-soft group-hover:text-sea-ink shrink-0">
-                    Week {weekNum} ({weekProblems.length}{" "}
-                    {weekProblems.length === 1 ? "exercise" : "exercises"})
+                  <h3 className="font-semibold text-xs tracking-tight text-sea-ink group-hover:text-lagoon shrink-0">
+                    Week {weekNum} &middot; <span className="text-sea-ink-soft font-normal text-[11px]">{weekProblems.length} {weekProblems.length === 1 ? "exercise" : "exercises"}</span>
                   </h3>
 
                   {/* Week progress bar + count */}
                   <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <div className="h-1.5 flex-1 rounded-full bg-sand/60 overflow-hidden max-w-[160px]">
+                    <div className="h-1 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden max-w-[120px]">
                       <div
                         className="h-full rounded-full bg-palm transition-all"
                         style={{ width: `${completedPct}%` }}
                       />
                     </div>
-                    <span className="text-[10px] font-bold text-sea-ink-soft tabular-nums shrink-0">
+                    <span className="text-[10px] font-medium text-sea-ink-soft tabular-nums shrink-0">
                       {completedCount}/{weekProblems.length}
                     </span>
                   </div>
 
                   {isCollapsed ? (
-                    <ChevronRight className="size-4 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
+                    <ChevronRight className="size-3.5 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
                   ) : (
-                    <ChevronDown className="size-4 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
+                    <ChevronDown className="size-3.5 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
                   )}
                 </button>
 
                 {!isCollapsed && (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
                     {weekProblems.map((problem) => (
                       <ShortProblemCard key={problem.id} {...problem} />
                     ))}
@@ -299,10 +298,10 @@ export default function CourseList() {
           })}
         </div>
       ) : (
-        <div className="island-shell rounded-xl p-10 text-center border border-line">
-          <HelpCircle className="size-8 text-sea-ink-soft/40 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-sea-ink">No exercises found</p>
-          <p className="text-xs text-sea-ink-soft mt-1">
+        <div className="island-shell rounded-xl p-8 text-center border border-line">
+          <HelpCircle className="size-6 text-sea-ink-soft/60 mx-auto mb-2" />
+          <p className="text-xs font-semibold text-sea-ink">No exercises found</p>
+          <p className="text-[11px] text-sea-ink-soft mt-1">
             Try adjusting your search criteria or selected filters.
           </p>
         </div>
@@ -323,42 +322,38 @@ function ShortProblemCard({
 }: ShortProblem) {
   const posthog = usePostHog();
   const difficultyStyles = {
-    Easy: "text-emerald-600 bg-emerald-50 border-emerald-200/50",
-    Medium: "text-amber-600 bg-amber-50 border-amber-200/50",
-    Hard: "text-rose-600 bg-rose-50 border-rose-200/50",
+    Easy: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/15",
+    Medium: "text-amber-600 dark:text-amber-400 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/15",
+    Hard: "text-rose-600 dark:text-rose-400 bg-rose-500/5 dark:bg-rose-500/10 border-rose-500/15",
   };
 
-  // Per-status visual language: each state gets a distinct rail color, icon,
-  // pill, card treatment and call-to-action so progress is readable at a glance.
+  // Per-status visual language
   const statusStyles = {
     completed: {
       Icon: CheckCircle2,
       label: "Completed",
-      rail: "bg-palm",
       iconClass: "text-palm",
-      pill: "bg-palm/10 text-palm border-palm/30",
-      card: "border-palm/30",
-      cta: "bg-white border-line text-sea-ink hover:bg-sand/55",
+      pill: "bg-palm/10 text-palm border-palm/20",
+      card: "border-line bg-white/70 dark:bg-white/[0.02]",
+      cta: "bg-sand dark:bg-white/10 text-sea-ink hover:bg-sand/80 dark:hover:bg-white/20 border-transparent",
       ctaLabel: "Review",
     },
     "in-progress": {
       Icon: PlayCircle,
       label: "In progress",
-      rail: "bg-lagoon-deep",
-      iconClass: "text-lagoon-deep",
-      pill: "bg-lagoon/15 text-lagoon-deep border-lagoon/40",
-      card: "border-lagoon-deep/40 ring-1 ring-lagoon-deep/15 bg-lagoon/[0.05]",
-      cta: "bg-lagoon-deep text-white dark:text-foam border-lagoon-deep hover:bg-lagoon-deep/90",
+      iconClass: "text-lagoon",
+      pill: "bg-lagoon/10 text-lagoon border-lagoon/20",
+      card: "border-lagoon/20 bg-lagoon/[0.01] dark:bg-lagoon/[0.02] shadow-sm",
+      cta: "bg-lagoon text-white hover:bg-lagoon-deep border-transparent",
       ctaLabel: "Resume",
     },
     pending: {
       Icon: Circle,
       label: "Not started",
-      rail: "bg-line",
       iconClass: "text-sea-ink-soft/40",
-      pill: "bg-sand/50 text-sea-ink-soft border-line",
-      card: "border-line",
-      cta: "bg-white border-line text-sea-ink hover:bg-sand/35",
+      pill: "bg-sand dark:bg-white/5 text-sea-ink-soft border-line",
+      card: "border-line bg-white/70 dark:bg-white/[0.02]",
+      cta: "bg-sand dark:bg-white/10 text-sea-ink hover:bg-sand/80 dark:hover:bg-white/20 border-transparent",
       ctaLabel: "Start",
     },
   } as const;
@@ -369,19 +364,16 @@ function ShortProblemCard({
   return (
     <div
       className={cn(
-        "feature-card relative overflow-hidden rounded-xl border p-4 pl-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors",
+        "feature-card relative overflow-hidden rounded-xl border p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
         s.card,
-        status === "completed" && "opacity-[0.92]"
+        status === "completed" && "opacity-[0.95]"
       )}
     >
-      {/* Status accent rail */}
-      <span className={cn("absolute inset-y-0 left-0 w-1.5", s.rail)} aria-hidden="true" />
-
       {/* Left side: status icon, title, details */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div className="shrink-0" title={s.label}>
           <StatusIcon
-            className={cn("size-5", s.iconClass, status === "in-progress" && "animate-pulse")}
+            className={cn("size-4", s.iconClass, status === "in-progress" && "animate-pulse")}
           />
         </div>
 
@@ -389,41 +381,41 @@ function ShortProblemCard({
           <div className="flex items-center gap-2 flex-wrap">
             <h3
               className={cn(
-                "font-bold text-sm truncate",
+                "font-semibold text-xs truncate",
                 status === "completed" ? "text-sea-ink-soft" : "text-sea-ink"
               )}
             >
               {name}
             </h3>
-            {/* Status pill — the primary at-a-glance cue */}
+            {/* Status pill */}
             <span
               className={cn(
-                "inline-flex items-center gap-1 border text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0",
+                "inline-flex items-center gap-1 border text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded",
                 s.pill
-              )}
+            )}
             >
               {s.label}
             </span>
-            <span className="bg-lagoon/10 text-lagoon-deep border border-lagoon/20 text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0">
+            <span className="bg-sand dark:bg-white/5 text-sea-ink-soft border border-line text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0">
               W{week}
             </span>
             <span
               className={cn(
-                "border text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0",
+                "border text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0",
                 difficultyStyles[difficulty]
               )}
             >
               {difficulty}
             </span>
           </div>
-          <p className="text-xs text-sea-ink-soft truncate mt-0.5 max-w-[320px] md:max-w-[420px]">
+          <p className="text-[11px] text-sea-ink-soft truncate mt-0.5 max-w-[320px] md:max-w-[420px]">
             {description}
           </p>
         </div>
       </div>
 
       {/* Right side: language, tags, solve link */}
-      <div className="flex items-center gap-3 justify-between sm:justify-end w-full sm:w-auto shrink-0 border-t sm:border-t-0 border-line/30 pt-3 sm:pt-0">
+      <div className="flex items-center gap-3 justify-between sm:justify-end w-full sm:w-auto shrink-0 border-t sm:border-t-0 border-line/30 pt-2 sm:pt-0">
         <div className="hidden md:flex flex-wrap gap-1">
           {tags.slice(0, 2).map((tag) => (
             <span
@@ -435,7 +427,7 @@ function ShortProblemCard({
           ))}
         </div>
 
-        <span className="text-[10px] font-bold text-sea-ink-soft bg-sand/50 px-2 py-0.5 rounded border border-line">
+        <span className="text-[10px] font-medium text-sea-ink-soft bg-sand/50 dark:bg-white/5 px-2 py-0.5 rounded border border-line">
           {language}
         </span>
 
@@ -453,7 +445,7 @@ function ShortProblemCard({
             })
           }
           className={cn(
-            "text-xs font-bold px-3 py-1.5 rounded-lg border text-center transition-colors flex items-center gap-1 cursor-pointer",
+            "text-xs font-semibold px-3 py-1 rounded-full border text-center transition-all flex items-center gap-1 cursor-pointer select-none active:scale-95",
             s.cta
           )}
         >

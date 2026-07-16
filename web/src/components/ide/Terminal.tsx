@@ -64,7 +64,7 @@ export function CompilerOutput({ output }: CompilerOutputProps) {
             <span className="text-[10px] uppercase tracking-wider text-red-500/80 font-semibold block">
                 Compiler Output
             </span>
-            <pre className="rounded-md border border-red-500/10 bg-red-950/20 p-3 text-red-400 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-36">
+            <pre className="rounded-lg border border-red-500/15 bg-red-500/5 p-3 text-red-400 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-36 font-mono text-[11px]">
                 {output}
             </pre>
         </div>
@@ -81,7 +81,7 @@ export function RuntimeStderr({ stderr }: RuntimeStderrProps) {
             <span className="text-[10px] uppercase tracking-wider text-rose-500/80 font-semibold block">
                 Runtime Stderr
             </span>
-            <pre className="rounded-md border border-red-500/10 bg-red-950/20 p-3 text-rose-400 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-36">
+            <pre className="rounded-lg border border-red-500/15 bg-red-500/5 p-3 text-rose-450 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-36 font-mono text-[11px]">
                 {stderr}
             </pre>
         </div>
@@ -103,12 +103,12 @@ export function StdoutPreview({ stdout, setActiveTab }: StdoutPreviewProps) {
                 <button
                     type="button"
                     onClick={() => setActiveTab("stdout")}
-                    className="text-[10px] text-emerald-500 hover:underline"
+                    className="text-[10px] text-lagoon hover:underline cursor-pointer"
                 >
                     View full output
                 </button>
             </div>
-            <pre className="rounded-md bg-zinc-950 p-3 text-zinc-300 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-32">
+            <pre className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-zinc-300 overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-32 font-mono text-[11px]">
                 {stdout}
             </pre>
         </div>
@@ -121,7 +121,7 @@ interface FullStdoutProps {
 
 export function FullStdout({ stdout }: FullStdoutProps) {
     return (
-        <pre className="h-full w-full rounded-md bg-zinc-950 p-3 text-zinc-300 overflow-auto whitespace-pre-wrap leading-relaxed">
+        <pre className="h-full w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-zinc-300 overflow-auto whitespace-pre-wrap leading-relaxed font-mono text-[11px]">
             {stdout}
         </pre>
     );
@@ -169,15 +169,15 @@ export default function Terminal({
     const errorText =
         executionResult?.compile_output || executionResult?.stderr || "";
     return (
-        <div className="flex h-full flex-col overflow-hidden text-sm text-zinc-300">
+        <div className="flex h-full flex-col overflow-hidden text-xs text-zinc-350">
             {/* Drawer Header */}
-            <div className="flex h-11 items-stretch justify-between border-b border-zinc-800 bg-zinc-900/50 px-4">
+            <div className="flex h-10 items-stretch justify-between border-b border-zinc-800 bg-zinc-950/70 px-4 flex-shrink-0">
                 <div className="flex items-stretch gap-1">
                     <button
                         type="button"
                         onClick={() => setActiveTab("testcases")}
-                        className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "testcases"
-                            ? "border-emerald-500 text-emerald-500"
+                        className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors cursor-pointer ${activeTab === "testcases"
+                            ? "border-lagoon text-lagoon"
                             : "border-transparent text-zinc-400 hover:text-zinc-200"
                             }`}
                     >
@@ -187,8 +187,8 @@ export default function Terminal({
                         <button
                             type="button"
                             onClick={() => setActiveTab("result")}
-                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "result"
-                                ? "border-emerald-500 text-emerald-500"
+                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors cursor-pointer ${activeTab === "result"
+                                ? "border-lagoon text-lagoon"
                                 : "border-transparent text-zinc-400 hover:text-zinc-200"
                                 }`}
                         >
@@ -199,8 +199,8 @@ export default function Terminal({
                         <button
                             type="button"
                             onClick={() => setActiveTab("stdout")}
-                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors ${activeTab === "stdout"
-                                ? "border-emerald-500 text-emerald-500"
+                            className={`border-b-2 px-3 flex items-center text-xs font-semibold transition-colors cursor-pointer ${activeTab === "stdout"
+                                ? "border-lagoon text-lagoon"
                                 : "border-transparent text-zinc-400 hover:text-zinc-200"
                                 }`}
                         >
@@ -211,7 +211,7 @@ export default function Terminal({
                 <button
                     type="button"
                     onClick={() => setIsConsoleOpen(false)}
-                    className="self-center rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+                    className="self-center rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors cursor-pointer"
                 >
                     <X className="size-4" />
                 </button>
@@ -220,10 +220,10 @@ export default function Terminal({
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-4 font-mono text-xs">
                 {isLoading ? (
-                    <div className="flex h-full w-full flex-col items-center justify-center text-zinc-400">
-                        <Loader2 className="size-6 animate-spin text-emerald-500" />
-                        <span className="mt-2 text-zinc-400">
-                            Executing student code against testing harness...
+                    <div className="flex h-full w-full flex-col items-center justify-center text-zinc-400 font-sans">
+                        <Loader2 className="size-5 animate-spin text-lagoon" />
+                        <span className="mt-2 text-zinc-400 text-xs">
+                            Executing code against testing harness...
                         </span>
                     </div>
                 ) : (
@@ -231,7 +231,7 @@ export default function Terminal({
                         <TestCasesView testCases={testCases} executionResult={executionResult} />
                     ) : executionResult ? (
                         activeTab === "result" ? (
-                            <div className="space-y-4">
+                            <div className="space-y-4 font-sans">
                                 <ExecutionStatus
                                     executionResult={executionResult}
                                     renderStatusBadge={renderStatusBadge}
@@ -262,7 +262,7 @@ export default function Terminal({
                                     <button
                                         type="button"
                                         onClick={() => onSendErrorToChat(errorText)}
-                                        className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors active:scale-95"
+                                        className="inline-flex items-center gap-1.2 rounded-md border border-lagoon/20 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 hover:text-lagoon transition-colors cursor-pointer active:scale-95"
                                     >
                                         <Sparkles className="size-3.5" />
                                         <span>Ask AI about this error</span>

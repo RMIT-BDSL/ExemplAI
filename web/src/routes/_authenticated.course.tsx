@@ -2,16 +2,16 @@ import { usePostHog } from "@posthog/react";
 import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 import axios from "axios";
 import { useMutation, useQuery } from "convex/react";
-import { BookOpen, ChevronLeft } from "lucide-react";
+import { BookOpen, ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import CodeEditor from "#/components/student/CodeEditor";
 import CodingBar from "#/components/student/InteractionBar";
-import Problem from "#/components/student/problem/Problem";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
 import SidePanel from "#/components/student/SidePane";
+import LessonIndex from "#/components/student/LessonIndex";
+import LessonExposition from "#/components/student/LessonExposition";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/course")({
@@ -40,8 +40,6 @@ function Course() {
     problemId ? { id: problemId } : "skip"
   );
 
-  // The Convex client isn't authenticated, so read the session from the
-  // Better Auth client (same pattern as the rest of the app).
   const { data: session } = authClient.useSession();
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
@@ -60,8 +58,8 @@ function Course() {
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
   const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true);
-  // A message pushed into the AI chat from the terminal "Ask AI" button. The
-  // key changes on every push so the same error can be sent more than once.
+  const [isIndexOpen, setIsIndexOpen] = useState<boolean>(false);
+
   const [chatPrompt, setChatPrompt] = useState<{
     key: number;
     content: string;
@@ -75,7 +73,6 @@ function Course() {
 
   const [isSaved, setIsSaved] = useState<boolean>(true);
 
-  // Set dark theme class on document.body for the duration of this page
   useEffect(() => {
     document.body.classList.add("dark");
     return () => {
@@ -83,8 +80,6 @@ function Course() {
     };
   }, []);
 
-  // Opening a problem marks it "in-progress" (the server keeps it "completed"
-  // if it already was, so reviewing a finished problem won't downgrade it).
   const activeQuestionId = activeQuestion?._id;
   const isCompleted = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId)?.status === "completed";
 
@@ -105,6 +100,7 @@ function Course() {
         setIsConsoleOpen(false);
       }
     : undefined;
+
   useEffect(() => {
     if (tokenIdentifier && activeQuestionId) {
       setLessonStatus({
@@ -114,7 +110,6 @@ function Course() {
     }
   }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
 
-  // Load code template from localStorage, falling back to starter_code or defaults
   useEffect(() => {
     if (activeQuestion && problemId) {
       const storageKey = `exemplai_code_${problemId}_${language}`;
@@ -152,7 +147,6 @@ function Course() {
     }
   }, [activeQuestionId, language, problemId]);
 
-  // Autosave code to localStorage every 5 seconds if there are changes
   useEffect(() => {
     if (!problemId) return;
 
@@ -184,7 +178,6 @@ function Course() {
     );
   }
 
-  const sidebarProblems = questions || [];
   const mappedProblem = {
     id: activeQuestion._id,
     title: activeQuestion.problem_name,
@@ -193,8 +186,34 @@ function Course() {
     tags: ["Python"],
   };
 
-  function handleEditorMount(editor: any) {
+  function handleEditorMount(editor: any, monaco: any) {
     editorRef.current = editor;
+
+    // Define an elegant editorial-style theme matching "Academic Nocturne"
+    monaco.editor.defineTheme("academicNocturne", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "6e6d73", fontStyle: "italic" },
+        { token: "keyword", foreground: "c29a53", fontStyle: "bold" },
+        { token: "string", foreground: "769480" },
+        { token: "number", foreground: "b89053" },
+        { token: "operator", foreground: "9f9da4" },
+      ],
+      colors: {
+        "editor.background": "#0c0b0e",
+        "editor.foreground": "#eaeaea",
+        "editorLineNumber.foreground": "#4f4d54",
+        "editorLineNumber.activeForeground": "#c29a53",
+        "editor.lineHighlightBackground": "#131217",
+        "editor.lineHighlightBorder": "#00000000",
+        "editorGutter.background": "#0c0b0e",
+        "editorCursor.foreground": "#c29a53",
+        "editor.selectionBackground": "#282630",
+        "editor.inactiveSelectionBackground": "#1e1d24",
+      },
+    });
+    monaco.editor.setTheme("academicNocturne");
   }
 
   function handleCodeChange(value: string | undefined) {
@@ -240,7 +259,7 @@ function Course() {
     }
 
     setExecutionResult(null);
-    setIsConsoleOpen(true); // Auto-open console drawer when running
+    setIsConsoleOpen(true);
 
     const submissionCode = editorRef.current.getValue();
 
@@ -257,7 +276,6 @@ function Course() {
     const activeLang = language.toLowerCase();
     const languageId = LANGUAGE_IDS[activeLang as keyof typeof LANGUAGE_IDS] || 71;
 
-    // Filter test cases based on actionType
     const allTestCases = activeQuestion?.testCases || [];
     const testCasesToRun =
       actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
@@ -274,7 +292,6 @@ function Course() {
           starter_code: activeQuestion?.starter_code,
           solution_code: activeQuestion?.solution_code,
           test_cases: testCasesToRun,
-          // Server sets has_run + first-submit BKT after Judge0 finishes.
           lesson_id: activeQuestionId ?? undefined,
           action_type: actionType,
         },
@@ -303,9 +320,6 @@ function Course() {
     }
   }
 
-  // Build a prompt from the current error + the student's code + the problem
-  // id, open the chat, and hand it to the AI assistant (which posts it to the
-  // /chat route on the backend).
   function handleSendErrorToChat(error: string) {
     const code = editorRef.current?.getValue() ?? currentCode;
     const content = [
@@ -335,39 +349,84 @@ function Course() {
 
   const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
 
+  function handleSelectLesson(id: string) {
+    navigate({
+      to: "/course",
+      search: { problemId: id },
+    });
+    setExecutionResult(null);
+    setIsConsoleOpen(false);
+  }
+
   return (
     <ClientOnly>
-      <div className="dark flex h-[calc(100vh-57px)] w-full flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
-        {/* Workspace Container */}
-        <div className="relative flex flex-1 flex-row overflow-hidden p-3 w-full gap-3">
-          {/* Problem Description Container */}
-          {!isProblemCollapsed && (
-            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[350px] xl:w-[450px] lg:left-0 lg:top-0 lg:bottom-0 absolute left-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
-              {/* Header */}
-              <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 flex-shrink-0">
-                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
-                  <BookOpen className="size-4 text-indigo-400" />
-                  <span>Problem Description</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsProblemCollapsed(true)}
-                  className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
-                  title="Collapse panel"
-                >
-                  <ChevronLeft className="size-4 text-zinc-400" />
-                </button>
+      <div className="dark flex h-[calc(100vh-48px)] w-full flex-col bg-[#0b0a0d] text-zinc-100 antialiased overflow-hidden">
+        {/* Running Header */}
+        <div className="flex h-9 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0 font-sans text-[10px] uppercase tracking-[0.15em] text-zinc-500 select-none">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-400">ExemplAI</span>
+            <span>·</span>
+            <span>Course Reader</span>
+          </div>
+          <div className="font-serif italic text-zinc-400 font-normal normal-case">
+            {activeQuestion?.problem_name}
+          </div>
+          <div>
+            <span>Lesson {currentIndex + 1}</span>
+          </div>
+        </div>
+
+        {/* Workspace Spread Container */}
+        <div className="relative flex flex-1 flex-row overflow-hidden w-full bg-[#0b0a0d]">
+          {/* Index of Lessons Sidebar */}
+          <LessonIndex
+            isIndexOpen={isIndexOpen}
+            setIsIndexOpen={setIsIndexOpen}
+            questions={questions}
+            activeQuestionId={activeQuestionId}
+            lessonProgress={lessonProgress}
+            onSelectLesson={handleSelectLesson}
+          />
+
+          {/* Description (Problem Panel) */}
+          <LessonExposition
+            isProblemCollapsed={isProblemCollapsed}
+            setIsProblemCollapsed={setIsProblemCollapsed}
+            mappedProblem={mappedProblem}
+          />
+
+          {/* Editor Panel */}
+          <div className="flex flex-1 flex-col overflow-hidden bg-[#0c0b0e] editorial-editor-container">
+            <div className="flex h-10 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0">
+              <div className="flex items-center gap-2 text-[10px] font-semibold text-[#c29a53] uppercase tracking-[0.15em]">
+                <span>Editor</span>
               </div>
-              {/* Problem Content */}
-              <div className="flex-1 min-h-0 bg-zinc-900/50">
-                <Problem problem={mappedProblem} />
+              <div className="flex items-center gap-4">
+                {isProblemCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setIsProblemCollapsed(false)}
+                    className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
+                  >
+                    <BookOpen className="size-3" />
+                    <span>Show Description</span>
+                  </button>
+                )}
+                {isChatCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      posthog.capture("ai_chat_opened", { problem_id: problemId });
+                      setIsChatCollapsed(false);
+                    }}
+                    className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
+                  >
+                    <span>Show Chat</span>
+                  </button>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Code Editor Container */}
-          <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-            {/* Top Toolbar */}
             <CodingBar
               language={language}
               setLanguage={setLanguage}
@@ -383,7 +442,6 @@ function Course() {
               }}
             />
 
-            {/* Editor Container */}
             <div className="flex flex-1 flex-col overflow-hidden relative">
               <CodeEditor
                 onMount={handleEditorMount}
@@ -408,12 +466,42 @@ function Course() {
             </div>
           </div>
 
-          {/* Chat Panel */}
+          {/* AI Chat Assistant Panel */}
           {!isChatCollapsed && (
-            <div className="flex flex-col text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[320px] xl:w-[420px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
-              <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
+            <div className="flex flex-col border-l border-zinc-800 bg-[#0c0b0e] text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[340px] xl:w-[440px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-0 top-0 bottom-0 w-[calc(100vw-20px)] md:w-[360px] transition-all duration-200">
+              <div className="flex h-10 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0">
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-[#c29a53] uppercase tracking-[0.15em]">
+                  <span>AI Assistant</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsChatCollapsed(true)}
+                  className="rounded-md p-1 text-zinc-500 hover:text-zinc-100 transition-colors cursor-pointer"
+                  title="Collapse Chat"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 editorial-chat-container">
+                <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
+              </div>
             </div>
           )}
+        </div>
+
+        {/* Running Foot */}
+        <div className="flex h-8 items-center justify-between border-t border-zinc-800 bg-[#09080b] px-4 text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-sans select-none flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[#c29a53] font-semibold">ExemplAI</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className={isCompleted ? 'text-[#4f8a65]' : 'text-zinc-400'}>
+              {isCompleted ? '❖ Completed' : '✦ In Progress'}
+            </span>
+          </div>
+          <div>
+            <span>Problem {currentIndex + 1} of {questions?.length || 1}</span>
+          </div>
         </div>
 
         {/* Solid Reset Confirmation Modal */}
