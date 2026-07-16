@@ -1,3 +1,8 @@
+## [0.8.2] - 2026-07-16
+
+### 🐛 Bug Fixes
+
+- Remove unused failing steps from release workflow
 ## [0.8.1] - 2026-07-16
 
 ### 🐛 Bug Fixes
