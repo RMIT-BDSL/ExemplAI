@@ -1,3 +1,8 @@
+## [0.8.4] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Add concurrency group to prevent deploy race conditions
 ## [0.8.3] - 2026-07-16
 
 ### ⚙️ Miscellaneous Tasks
