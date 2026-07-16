@@ -63,6 +63,9 @@ jobs:
     name: Deploy Production
     runs-on: ubuntu-latest
     needs: [test]
+    environment:
+      name: production
+      url: ${{ steps.extract_url.outputs.deployment_url }}
 
     defaults:
       run:
