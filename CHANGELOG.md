@@ -1,3 +1,8 @@
+## [0.7.1] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Trigger CI [empty commit]
 ## [0.7.0] - 2026-07-07
 
 ### 🚀 Features
