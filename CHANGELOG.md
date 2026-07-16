@@ -1,3 +1,8 @@
+## [0.8.3] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Temporarily disable lint and test checks in production deploy
 ## [0.8.2] - 2026-07-16
 
 ### 🐛 Bug Fixes
