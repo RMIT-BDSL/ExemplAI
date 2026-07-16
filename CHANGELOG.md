@@ -1,3 +1,8 @@
+## [0.8.5] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Configure distinct github environments for production deployments
 ## [0.8.4] - 2026-07-16
 
 ### ⚙️ Miscellaneous Tasks
