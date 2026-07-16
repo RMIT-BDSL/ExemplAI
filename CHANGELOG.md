@@ -1,3 +1,8 @@
+## [0.8.0] - 2026-07-16
+
+### 🚀 Features
+
+- Convex schema and function for management system (#54)
 ## [0.7.1] - 2026-07-16
 
 ### ⚙️ Miscellaneous Tasks
