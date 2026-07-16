@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
 
+concurrency: production-deploy
+
 jobs:
   test:
     name: Lint & Test
