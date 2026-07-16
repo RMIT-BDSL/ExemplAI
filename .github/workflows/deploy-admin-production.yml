@@ -1,12 +1,8 @@
 name: Deploy Admin Production
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'admin/**'
-      - '.github/workflows/deploy-admin-production.yml'
+  release:
+    types: [published]
 
 permissions:
   contents: read
