@@ -365,3 +365,197 @@ a {
     color: var(--foreground);
   }
 }
+
+/* Editorial / Academic Nocturne Custom Styles */
+.editorial-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.editorial-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.editorial-scroll::-webkit-scrollbar-thumb {
+  background: #1c1b1f;
+  border-radius: 2px;
+}
+.editorial-scroll::-webkit-scrollbar-thumb:hover {
+  background: #c29a53;
+}
+
+.editorial-prose h1 {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+  font-weight: 500 !important;
+  font-size: 1.6rem !important;
+  color: #eaeaea !important;
+  letter-spacing: -0.02em !important;
+  margin-bottom: 0.5em !important;
+}
+.editorial-prose p {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+  font-size: 0.95rem !important;
+  line-height: 1.75 !important;
+  color: #b5b3b9 !important;
+  margin-bottom: 1.25em !important;
+}
+.editorial-prose li {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+  font-size: 0.95rem !important;
+  line-height: 1.7 !important;
+  color: #b5b3b9 !important;
+  margin-bottom: 0.5em !important;
+}
+.editorial-prose code {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.85em !important;
+  background: #121115 !important;
+  color: #c29a53 !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  border: 1px solid #1c1b1f !important;
+}
+.editorial-prose pre {
+  background: #121115 !important;
+  border: 1px solid #1c1b1f !important;
+  border-radius: 4px !important;
+  padding: 1rem !important;
+  margin: 1.25em 0 !important;
+}
+.editorial-prose pre code {
+  background: transparent !important;
+  border: none !important;
+  color: #eaeaea !important;
+  padding: 0 !important;
+}
+.editorial-prose span[class*="rounded-md"] {
+  font-family: 'Inter', sans-serif !important;
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+  color: #828087 !important;
+  font-size: 9px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* Overriding components to match the editorial layout */
+.editorial-editor-container .flex.h-11 {
+  background-color: #0c0b0e !important;
+  border-bottom: 1px solid #1c1b1f !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.editorial-editor-container button {
+  font-family: 'Inter', sans-serif !important;
+}
+.editorial-editor-container .bg-zinc-950\/80 {
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+}
+.editorial-editor-container .flex.h-11.items-center {
+  background-color: #09080b !important;
+  border-top: 1px solid #1c1b1f !important;
+}
+.editorial-editor-container button.bg-lagoon {
+  background-color: #c29a53 !important;
+  color: #0b0a0d !important;
+  border-radius: 2px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  font-weight: 500 !important;
+}
+.editorial-editor-container button.bg-palm {
+  background-color: #4f8a65 !important;
+  color: #eaeaea !important;
+  border-radius: 2px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  font-weight: 500 !important;
+  border: 1px solid #4f8a65 !important;
+}
+.editorial-editor-container button.bg-palm:hover {
+  background-color: #3f6e51 !important;
+}
+.editorial-editor-container button.bg-zinc-850\/60 {
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+  color: #eaeaea !important;
+  border-radius: 2px !important;
+}
+.editorial-editor-container button.bg-zinc-850\/60:hover {
+  background-color: #1c1b1f !important;
+  color: #c29a53 !important;
+}
+.editorial-editor-container button.bg-zinc-800\/40 {
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+  color: #eaeaea !important;
+  border-radius: 2px !important;
+}
+.editorial-editor-container button.bg-zinc-800\/40:hover {
+  background-color: #1c1b1f !important;
+}
+.editorial-editor-container .bg-zinc-900 {
+  background-color: #0c0b0e !important;
+  border-top: 1px solid #1c1b1f !important;
+}
+.editorial-editor-container .monaco-editor,
+.editorial-editor-container .monaco-editor .margin,
+.editorial-editor-container .monaco-editor-background {
+  background-color: #0c0b0e !important;
+}
+
+/* Chat container styling */
+.editorial-chat-container > div {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.editorial-chat-container .flex.h-11.items-center.justify-between {
+  display: none !important;
+}
+.editorial-chat-container .bg-lagoon {
+  background-color: #c29a53 !important;
+  color: #0b0a0d !important;
+  border-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.editorial-chat-container .bg-zinc-800 {
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+  color: #bfbdc4 !important;
+  border-radius: 4px !important;
+  border-top-left-radius: 0 !important;
+}
+.editorial-chat-container .prose {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+}
+.editorial-chat-container .prose code {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.85em !important;
+  background: #19181c !important;
+  color: #c29a53 !important;
+  padding: 2px 4px !important;
+  border-radius: 2px !important;
+}
+.editorial-chat-container form,
+.editorial-chat-container .border-t {
+  background-color: #09080b !important;
+  border-color: #1c1b1f !important;
+}
+.editorial-chat-container textarea,
+.editorial-chat-container input {
+  background-color: #121115 !important;
+  border-color: #1c1b1f !important;
+  color: #eaeaea !important;
+  border-radius: 2px !important;
+}
+.editorial-chat-container button[type="submit"] {
+  background-color: #c29a53 !important;
+  color: #0b0a0d !important;
+  border-radius: 2px !important;
+}
