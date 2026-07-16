@@ -14,24 +14,24 @@ export default function Navbar() {
   const isCoursePage = matches.some((match) => match.routeId === "/_authenticated/course");
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/95 backdrop-blur text-sea-ink dark:text-zinc-100">
-      <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 dark:max-w-none dark:px-6">
-        <div className="flex items-center gap-3.5">
+    <header className="sticky top-0 z-45 border-b border-line bg-white/70 dark:bg-black/70 backdrop-blur-xl text-sea-ink">
+      <nav className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 dark:max-w-none dark:px-6">
+        <div className="flex items-center gap-3">
           <Link
             to="/"
-            className="text-base font-extrabold tracking-tight text-sea-ink dark:text-zinc-100 hover:text-sea-ink-soft dark:hover:text-emerald-400 transition-colors"
+            className="text-[14px] font-semibold tracking-tight text-sea-ink hover:text-lagoon transition-colors"
           >
             ExemplAI
           </Link>
 
           {isCoursePage && (
             <>
-              <div className="h-4 w-px bg-line dark:bg-zinc-800" />
+              <div className="h-3 w-px bg-line" />
               <Link
                 to="/"
-                className="flex items-center gap-1 text-xs font-semibold text-sea-ink-soft dark:text-zinc-400 hover:text-sea-ink dark:hover:text-emerald-400 transition-colors bg-sand/35 dark:bg-zinc-900/40 px-2.5 py-1.5 rounded-lg border border-line dark:border-zinc-800"
+                className="flex items-center gap-1 text-[11px] font-medium text-sea-ink-soft hover:text-sea-ink hover:bg-sand transition-all px-2.5 py-1 rounded-md border border-line bg-white/40 dark:bg-transparent"
               >
-                <ChevronLeft className="size-3.5" />
+                <ChevronLeft className="size-3" />
                 <span>Syllabus</span>
               </Link>
             </>

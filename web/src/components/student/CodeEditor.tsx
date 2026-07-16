@@ -62,24 +62,24 @@ export default function CodeEditor({
 		const statusId = executionResult.status?.id;
 		const statusDesc = executionResult.status?.description || "Unknown Status";
 
-		let badgeColor = "text-red-500 border-red-500/20 bg-red-500/10";
+		let badgeColor = "text-red-500 border-red-500/15 bg-red-500/10";
 		if (statusId === 3) {
 			// Accepted
-			badgeColor = "text-emerald-500 border-emerald-500/20 bg-emerald-500/10";
+			badgeColor = "text-palm border-palm/15 bg-palm/10";
 		} else if (statusId === 4) {
 			// Wrong Answer
-			badgeColor = "text-amber-500 border-amber-500/20 bg-amber-500/10";
+			badgeColor = "text-amber-500 border-amber-500/15 bg-amber-500/10";
 		} else if (statusId === 5 || statusId === 6) {
 			// TLE or Compile Error
-			badgeColor = "text-rose-500 border-rose-500/20 bg-rose-500/10";
+			badgeColor = "text-rose-500 border-rose-500/15 bg-rose-500/10";
 		}
 
 		return (
 			<div
-				className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badgeColor}`}
+				className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${badgeColor}`}
 			>
 				<div
-					className={`size-1.5 rounded-full ${statusId === 3 ? "bg-emerald-500" : "bg-red-500"}`}
+					className={`size-1.5 rounded-full ${statusId === 3 ? "bg-palm" : "bg-red-500"}`}
 				/>
 				<span>{statusDesc}</span>
 			</div>
@@ -100,8 +100,8 @@ export default function CodeEditor({
 						theme="vs-dark"
 						loading={
 							<div className="flex h-full w-full items-center justify-center bg-zinc-950 text-zinc-400">
-								<Loader2 className="size-6 animate-spin text-emerald-500" />
-								<span className="ml-2 text-sm">
+								<Loader2 className="size-5 animate-spin text-lagoon" />
+								<span className="ml-2 text-xs font-medium">
 									Loading code environment...
 								</span>
 							</div>
@@ -111,7 +111,7 @@ export default function CodeEditor({
 							fontSize: fontSize,
 							lineHeight: 22,
 							fontFamily:
-								"'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+								"'JetBrains Mono', 'Fira Code', Menlo, Monaco, monospace",
 							cursorBlinking: "smooth",
 							cursorSmoothCaretAnimation: "on",
 							smoothScrolling: true,
@@ -157,7 +157,7 @@ export default function CodeEditor({
 					<button
 						type="button"
 						onClick={() => setIsConsoleOpen(!isConsoleOpen)}
-						className="flex items-center gap-1.5 rounded-md bg-zinc-800/40 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors font-medium border border-zinc-800"
+						className="flex items-center gap-1.2 rounded-md bg-zinc-800/40 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors font-medium border border-zinc-800"
 					>
 						<span>Console</span>
 						{isConsoleOpen ? (
@@ -172,10 +172,10 @@ export default function CodeEditor({
 							type="button"
 							onClick={onSave}
 							disabled={isSaved}
-							className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-semibold border transition-all ${
+							className={`flex items-center gap-1.2 rounded-md px-3 py-1 text-xs font-semibold transition-all ${
 								isSaved
-									? "bg-zinc-950 text-zinc-600 border-zinc-900 cursor-not-allowed select-none"
-									: "bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500 active:scale-95"
+									? "bg-zinc-950 text-zinc-650 border-zinc-900 cursor-not-allowed select-none"
+									: "bg-lagoon text-white border-transparent hover:bg-lagoon-deep active:scale-95 cursor-pointer"
 							}`}
 						>
 							<span>{isSaved ? "Saved" : "Save"}</span>
@@ -185,7 +185,7 @@ export default function CodeEditor({
 							type="button"
 							onClick={onRun}
 							disabled={isLoading}
-							className="flex items-center gap-1.5 rounded-md border border-zinc-750 bg-zinc-800/60 px-4 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 transition-all active:scale-95"
+							className="flex items-center gap-1.2 rounded-md border border-zinc-750 bg-zinc-850/60 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
 						>
 							{isRunning ? (
 								<Loader2 className="size-3.5 animate-spin" />
@@ -199,7 +199,7 @@ export default function CodeEditor({
 							type="button"
 							onClick={onSubmit}
 							disabled={isLoading}
-							className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-all shadow-md shadow-emerald-950/20 active:scale-95"
+							className="flex items-center gap-1.2 rounded-md bg-palm px-3.5 py-1 text-xs font-semibold text-white hover:bg-palm/90 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
 						>
 							{isSubmitting ? (
 								<Loader2 className="size-3.5 animate-spin" />
@@ -213,7 +213,7 @@ export default function CodeEditor({
 							<button
 								type="button"
 								onClick={onNextLesson}
-								className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-650 px-4 py-1.5 text-xs font-bold text-white hover:from-emerald-500 hover:to-teal-550 transition-all shadow-md active:scale-95 border border-emerald-500/20 animate-pulse cursor-pointer"
+								className="flex items-center gap-1.2 rounded-md bg-palm px-3.5 py-1 text-xs font-semibold text-white hover:bg-palm/90 transition-all active:scale-95 border border-palm/20 animate-pulse cursor-pointer animate-duration-1000"
 							>
 								<span>Next Lesson</span>
 								<ArrowRight className="size-3.5" />

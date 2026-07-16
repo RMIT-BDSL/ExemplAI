@@ -65,27 +65,27 @@ export default function CodingBar({
   const currentLanguageName = LANGUAGES.find((l) => l.id === language)?.name || "Python 3";
 
   return (
-    <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-900/95 px-4 text-sm text-zinc-300">
+    <div className="flex h-11 items-center justify-between border-b border-zinc-850 bg-zinc-900/95 px-3 text-xs text-zinc-300">
       {/* Left controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {/* Toggle Left Sidebar (Problem Description) */}
         <button
           type="button"
           onClick={() => setIsProblemCollapsed(!isProblemCollapsed)}
           title={isProblemCollapsed ? "Show Problem Description" : "Hide Problem Description"}
           className={cn(
-            "flex size-7 items-center justify-center rounded-md border transition-all cursor-pointer",
+            "flex size-6.5 items-center justify-center rounded-md border transition-all cursor-pointer",
             isProblemCollapsed
-              ? "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-              : "bg-indigo-600/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-600/20"
+              ? "bg-transparent border-zinc-800 text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+              : "bg-lagoon/10 border-lagoon/20 text-lagoon hover:bg-lagoon/25"
           )}
         >
           <BookOpen className="size-3.5" />
         </button>
 
         {/* Mock Quest File Tab */}
-        <div className="flex items-center gap-2 rounded-md bg-zinc-950/80 px-3 py-1.5 text-xs font-semibold text-emerald-500 border border-zinc-800">
-          <Code className="size-3.5" />
+        <div className="flex items-center gap-1.5 rounded-md bg-zinc-950/80 px-2.5 py-1 text-[11px] font-medium text-zinc-355 border border-zinc-850">
+          <Code className="size-3.5 text-zinc-400" />
           <span>
             solution.
             {language === "python"
@@ -104,16 +104,16 @@ export default function CodingBar({
         <div className="relative" ref={langRef}>
           <button
             onClick={() => setIsLangOpen(!isLangOpen)}
-            className="flex items-center gap-1.5 rounded-md bg-zinc-800/60 px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            className="flex items-center gap-1.2 rounded-md bg-zinc-800/40 px-2.5 py-1 text-[11px] font-medium hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
           >
             <span>{currentLanguageName}</span>
             <ChevronDown
-              className={`size-3.5 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`}
+              className={`size-3 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`}
             />
           </button>
 
           {isLangOpen && (
-            <div className="absolute left-0 mt-1.5 z-45 w-40 rounded-md border border-zinc-800 bg-slate-900 py-1 shadow-lg">
+            <div className="absolute left-0 mt-1.5 z-45 w-36 rounded-md border border-zinc-850 bg-zinc-950 py-1 shadow-lg">
               {LANGUAGES.map((lang) => (
                 <button
                   key={lang.id}
@@ -121,10 +121,10 @@ export default function CodingBar({
                     setLanguage(lang.id);
                     setIsLangOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
                 >
                   <span>{lang.name}</span>
-                  {language === lang.id && <Check className="size-3.5 text-emerald-500" />}
+                  {language === lang.id && <Check className="size-3.5 text-lagoon" />}
                 </button>
               ))}
             </div>
@@ -135,20 +135,20 @@ export default function CodingBar({
         <button
           onClick={onResetClick}
           title="Reset code template"
-          className="flex size-7 items-center justify-center rounded-md bg-zinc-800/40 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+          className="flex size-6.5 items-center justify-center rounded-md bg-zinc-800/40 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
         >
           <RotateCcw className="size-3.5" />
         </button>
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
 
         {/* Settings / Font Size dropdown */}
         <div className="relative" ref={fontRef}>
           <button
             onClick={() => setIsFontOpen(!isFontOpen)}
-            className="flex items-center gap-1.5 rounded-md bg-zinc-800/40 px-2.5 py-1.5 text-xs hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            className="flex items-center gap-1.2 rounded-md bg-zinc-800/40 px-2.5 py-1 text-[11px] hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
             title="Editor Settings"
           >
             <Settings className="size-3.5" />
@@ -157,11 +157,11 @@ export default function CodingBar({
           </button>
 
           {isFontOpen && (
-            <div className="absolute right-0 mt-1.5 z-45 w-36 rounded-md border border-zinc-800 bg-slate-900 p-2 shadow-lg">
-              <span className="block px-2 pb-1.5 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+            <div className="absolute right-0 mt-1.5 z-45 w-32 rounded-md border border-zinc-850 bg-zinc-950 p-2 shadow-lg">
+              <span className="block px-1.5 pb-1 text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
                 Font Size
               </span>
-              <div className="h-px bg-zinc-800 mb-1" />
+              <div className="h-px bg-zinc-850 mb-1" />
               {FONT_SIZES.map((size) => (
                 <button
                   key={size}
@@ -169,10 +169,10 @@ export default function CodingBar({
                     setFontSize(size);
                     setIsFontOpen(false);
                   }}
-                  className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+                  className="flex w-full items-center justify-between rounded px-1.5 py-1 text-left text-[11px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
                 >
                   <span>{size}px</span>
-                  {fontSize === size && <Check className="size-3.5 text-emerald-500" />}
+                  {fontSize === size && <Check className="size-3.5 text-lagoon" />}
                 </button>
               ))}
             </div>
@@ -187,10 +187,10 @@ export default function CodingBar({
           onClick={() => setIsChatCollapsed(!isChatCollapsed)}
           title={isChatCollapsed ? "Show AI Assistant" : "Hide AI Assistant"}
           className={cn(
-            "flex size-7 items-center justify-center rounded-md border transition-all cursor-pointer",
+            "flex size-6.5 items-center justify-center rounded-md border transition-all cursor-pointer",
             isChatCollapsed
-              ? "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-              : "bg-emerald-600/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20"
+              ? "bg-transparent border-zinc-800 text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200"
+              : "bg-lagoon/10 border-lagoon/20 text-lagoon hover:bg-lagoon/25"
           )}
         >
           <MessageSquare className="size-3.5" />

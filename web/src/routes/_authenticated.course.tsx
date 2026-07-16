@@ -337,16 +337,16 @@ function Course() {
 
   return (
     <ClientOnly>
-      <div className="dark flex h-[calc(100vh-57px)] w-full flex-col bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
+      <div className="dark flex h-[calc(100vh-48px)] w-full flex-col bg-black text-zinc-100 antialiased overflow-hidden">
         {/* Workspace Container */}
-        <div className="relative flex flex-1 flex-row overflow-hidden p-3 w-full gap-3">
+        <div className="relative flex flex-1 flex-row overflow-hidden p-2.5 w-full gap-2.5">
           {/* Problem Description Container */}
           {!isProblemCollapsed && (
-            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[350px] xl:w-[450px] lg:left-0 lg:top-0 lg:bottom-0 absolute left-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
+            <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/90 backdrop-blur-md shadow-xl text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[360px] xl:w-[460px] lg:left-0 lg:top-0 lg:bottom-0 absolute left-2.5 top-2.5 bottom-2.5 w-[calc(100vw-20px)] md:w-[360px]">
               {/* Header */}
-              <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 flex-shrink-0">
-                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
-                  <BookOpen className="size-4 text-indigo-400" />
+              <div className="flex h-11 items-center justify-between border-b border-zinc-850 bg-zinc-950/80 px-4 flex-shrink-0">
+                <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+                  <BookOpen className="size-3.5 text-indigo-400" />
                   <span>Problem Description</span>
                 </div>
                 <button
@@ -355,18 +355,18 @@ function Course() {
                   className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
                   title="Collapse panel"
                 >
-                  <ChevronLeft className="size-4 text-zinc-400" />
+                  <ChevronLeft className="size-3.5 text-zinc-400" />
                 </button>
               </div>
               {/* Problem Content */}
-              <div className="flex-1 min-h-0 bg-zinc-900/50">
+              <div className="flex-1 min-h-0 bg-zinc-950/30">
                 <Problem problem={mappedProblem} />
               </div>
             </div>
           )}
 
           {/* Code Editor Container */}
-          <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl">
             {/* Top Toolbar */}
             <CodingBar
               language={language}
@@ -410,7 +410,7 @@ function Course() {
 
           {/* Chat Panel */}
           {!isChatCollapsed && (
-            <div className="flex flex-col text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[320px] xl:w-[420px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-3 top-3 bottom-3 w-[calc(100vw-24px)] md:w-[360px]">
+            <div className="flex flex-col text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[320px] xl:w-[420px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-2.5 top-2.5 bottom-2.5 w-[calc(100vw-20px)] md:w-[360px]">
               <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
             </div>
           )}

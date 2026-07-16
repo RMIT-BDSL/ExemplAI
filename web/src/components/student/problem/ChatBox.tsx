@@ -23,11 +23,11 @@ export interface ChatHeaderProps {
 
 export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProps) {
   return (
-    <div className="flex h-12 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+    <div className="flex h-11 items-center justify-between border-b border-zinc-850 bg-zinc-950/80 px-4 flex-shrink-0">
+      <div className="flex items-center gap-2 text-xs font-medium text-zinc-250">
         <div className="relative flex items-center justify-center">
-          <MessageSquare className="size-4 text-emerald-400" />
-          <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-emerald-500 border border-zinc-955 animate-pulse" />
+          <MessageSquare className="size-3.5 text-lagoon" />
+          <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-palm border border-zinc-950 animate-pulse" />
         </div>
         <span>AI Assistant</span>
         {isTyping && (
@@ -38,7 +38,7 @@ export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProp
         {onClearChat && (
           <button
             onClick={onClearChat}
-            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            className="rounded-md p-1 hover:bg-zinc-850 hover:text-zinc-100 transition-colors cursor-pointer"
             title="Reset chat"
           >
             <RefreshCw className="size-3.5 text-zinc-400" />
@@ -48,7 +48,7 @@ export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProp
           <button
             type="button"
             onClick={onCollapse}
-            className="rounded-md p-1 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+            className="rounded-md p-1 hover:bg-zinc-850 hover:text-zinc-100 transition-colors cursor-pointer"
             title="Collapse panel"
           >
             <ChevronRight className="size-4 text-zinc-400" />
@@ -68,27 +68,27 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.sender === "user";
 
   return (
-    <div className={cn("flex w-full gap-3 text-sm", isUser ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("flex w-full gap-2.5 text-xs", isUser ? "flex-row-reverse" : "flex-row")}>
       {/* Avatar */}
       <div
         className={cn(
-          "flex size-7 shrink-0 select-none items-center justify-center rounded-full text-xs font-semibold border",
+          "flex size-6.5 shrink-0 select-none items-center justify-center rounded-full text-[10px] font-semibold border",
           isUser
-            ? "bg-zinc-800 border-zinc-700 text-zinc-300"
-            : "bg-indigo-950 border-indigo-800 text-indigo-400"
+            ? "bg-zinc-850 border-zinc-750 text-zinc-300"
+            : "bg-lagoon/15 border-lagoon/20 text-lagoon"
         )}
       >
-        {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
+        {isUser ? <User className="size-3" /> : <Bot className="size-3" />}
       </div>
 
       {/* Content Bubble */}
-      <div className="flex flex-col max-w-[80%] gap-1">
+      <div className="flex flex-col max-w-[82%] gap-1">
         <div
           className={cn(
-            "rounded-2xl px-4 py-2.5 leading-relaxed shadow-sm",
+            "rounded-2xl px-3.5 py-2 leading-relaxed shadow-sm text-xs",
             isUser
-              ? "bg-indigo-600 text-white rounded-tr-none font-medium"
-              : "bg-zinc-800/80 border border-zinc-800 text-zinc-200 rounded-tl-none prose prose-invert prose-sm max-w-none prose-p:my-1 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2"
+              ? "bg-lagoon text-white rounded-tr-none font-normal"
+              : "bg-zinc-800 border border-zinc-750 text-zinc-200 rounded-tl-none prose prose-invert prose-xs max-w-none prose-p:my-0.5 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-0.5 prose-ul:my-0.5 prose-li:my-0.5 prose-pre:my-1.5"
           )}
         >
           {isUser ? message.content : <ReactMarkdown>{message.content}</ReactMarkdown>}
@@ -96,7 +96,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {/* Timestamp */}
         <span
           className={cn(
-            "text-[10px] text-zinc-500 px-1 select-none",
+            "text-[9px] text-zinc-550 px-1 select-none",
             isUser ? "text-right" : "text-left"
           )}
         >
@@ -144,22 +144,22 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
       )}
 
       {isTyping && (
-        <div className="flex w-full gap-3 text-sm flex-row">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full border bg-indigo-950 border-indigo-800 text-indigo-400">
-            <Bot className="size-3.5" />
+        <div className="flex w-full gap-2.5 text-xs flex-row">
+          <div className="flex size-6.5 shrink-0 items-center justify-center rounded-full border bg-lagoon/15 border-lagoon/20 text-lagoon">
+            <Bot className="size-3" />
           </div>
-          <div className="flex flex-col gap-1 max-w-[80%]">
-            <div className="flex items-center gap-1 bg-zinc-800/80 border border-zinc-800 rounded-2xl rounded-tl-none px-4 py-3 text-zinc-400">
+          <div className="flex flex-col gap-1 max-w-[82%]">
+            <div className="flex items-center gap-1 bg-zinc-800 border border-zinc-750 rounded-2xl rounded-tl-none px-3.5 py-2 text-zinc-400">
               <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
                 style={{ animationDelay: "0ms" }}
               />
               <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
                 style={{ animationDelay: "150ms" }}
               />
               <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-500"
+                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
                 style={{ animationDelay: "300ms" }}
               />
             </div>
@@ -196,8 +196,8 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
-      <div className="relative flex items-end gap-2 bg-zinc-950 border border-zinc-800 focus-within:border-zinc-700 rounded-xl px-3.5 py-2 transition-all">
+    <form onSubmit={handleSubmit} className="border-t border-zinc-850 bg-zinc-900/20 p-3 space-y-2">
+      <div className="relative flex items-end gap-2 bg-zinc-950 border border-zinc-800 focus-within:border-zinc-700 rounded-xl px-3.5 py-1.5 transition-all">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -205,19 +205,19 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
           placeholder="Ask a question or request a hint..."
           disabled={disabled}
           rows={1}
-          className="flex-1 max-h-24 resize-none bg-transparent py-1 text-sm text-zinc-100 placeholder-zinc-500 outline-none select-text"
+          className="flex-1 max-h-24 resize-none bg-transparent py-1 text-xs text-zinc-100 placeholder-zinc-650 outline-none select-text leading-relaxed"
         />
         <button
           type="submit"
           disabled={!text.trim() || disabled}
           className={cn(
-            "inline-flex size-8 items-center justify-center rounded-lg transition-all select-none shrink-0",
+            "inline-flex size-7 items-center justify-center rounded-lg transition-all select-none shrink-0 cursor-pointer",
             text.trim() && !disabled
-              ? "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95"
-              : "bg-zinc-900 border border-zinc-850 text-zinc-600 cursor-not-allowed"
+              ? "bg-lagoon text-white hover:bg-lagoon-deep active:scale-95"
+              : "bg-zinc-900 border border-zinc-850 text-zinc-650 cursor-not-allowed"
           )}
         >
-          <Send className="size-3.5" />
+          <Send className="size-3" />
         </button>
       </div>
     </form>
@@ -439,22 +439,22 @@ export default function ChatBox({
   ];
 
   return (
-    <div className="flex h-full flex-col bg-zinc-900/50">
+    <div className="flex h-full flex-col bg-transparent">
       <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} onCollapse={onCollapse} />
 
       <MessageFeed messages={messages} isTyping={isTyping} />
 
       {/* Quick Actions (only visible when not typing) */}
       {!isTyping && (
-        <div className="flex flex-wrap gap-2 px-6 pb-2">
+        <div className="flex flex-wrap gap-1.5 px-4 pb-2">
           {quickPrompts.map((p, idx) => (
             <button
               key={idx}
               onClick={() => handleSendMessage(p.query)}
               disabled={!chatId || !convexLessonId}
-              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-[10px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <Sparkles className="size-3 text-indigo-400" />
+              <Sparkles className="size-3 text-lagoon" />
               {p.label}
             </button>
           ))}
