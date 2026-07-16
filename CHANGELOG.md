@@ -1,5 +1,9 @@
 ## [0.8.1] - 2026-07-16
 
+### 🐛 Bug Fixes
+
+- Ci not working
+
 ### ⚙️ Miscellaneous Tasks
 
 - Automatic production deployment
