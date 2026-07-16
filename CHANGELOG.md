@@ -1,3 +1,8 @@
+## [0.8.1] - 2026-07-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Automatic production deployment
 ## [0.8.0] - 2026-07-16
 
 ### 🚀 Features
