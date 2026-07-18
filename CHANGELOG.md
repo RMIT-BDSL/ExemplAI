@@ -1,3 +1,8 @@
+## [0.8.6] - 2026-07-18
+
+### ⚙️ Miscellaneous Tasks
+
+- Trigger CI/CD
 ## [0.8.5] - 2026-07-16
 
 ### ⚙️ Miscellaneous Tasks
