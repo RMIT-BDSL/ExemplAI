@@ -67,6 +67,11 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
       before: createAuthMiddleware(async (apiCtx) => {
         if (apiCtx.path === "/sign-up/email") {
           const body = apiCtx.body as any;
+          const adminEmail = process.env.ADMIN_EMAIL;
+          if (adminEmail && body?.email === adminEmail) {
+            return;
+          }
+
           const code = body?.code;
           if (!code) {
             throw new APIError("BAD_REQUEST", {
