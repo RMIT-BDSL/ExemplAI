@@ -3,7 +3,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
 import { magicLink, admin } from "better-auth/plugins";
 import { createAuthMiddleware, APIError } from "better-auth/api";
-import { components, internal } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel.d.ts";
@@ -67,6 +67,11 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
       before: createAuthMiddleware(async (apiCtx) => {
         if (apiCtx.path === "/sign-up/email") {
           const body = apiCtx.body as any;
+          const adminEmail = process.env.ADMIN_EMAIL;
+          if (adminEmail && body?.email === adminEmail) {
+            return;
+          }
+
           const code = body?.code;
           if (!code) {
             throw new APIError("BAD_REQUEST", {
@@ -74,24 +79,16 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
             });
           }
 
-          const invitation = await ctx.db
-            .query("invitationCodes")
-            .withIndex("by_code", (q) => q.eq("code", code))
-            .unique();
+          // Better Auth routes run as HTTP actions, so their context does not
+          // expose `db` directly. Delegate this to the existing Convex query.
+          const validation = await ctx.runQuery(api.invitationCodes.validateCode, {
+            code,
+          });
 
-          if (!invitation || !invitation.isValid || invitation.usesCount >= invitation.quantity) {
+          if (!validation.isValid) {
             throw new APIError("BAD_REQUEST", {
-              message: "Invalid or expired invitation code.",
+              message: validation.reason || "Invalid or expired invitation code.",
             });
-          }
-
-          if (invitation.expiryDate) {
-            const expiry = new Date(invitation.expiryDate);
-            if (!isNaN(expiry.getTime()) && expiry.getTime() < Date.now()) {
-              throw new APIError("BAD_REQUEST", {
-                message: "Invitation code has expired.",
-              });
-            }
           }
         }
       }),
