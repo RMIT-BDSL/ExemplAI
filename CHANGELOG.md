@@ -1,3 +1,136 @@
+## [0.9.0] - 2026-07-30
+
+### 🚀 Features
+
+- *(ai)* Add stub route for chat
+- Ai chat now returns mock message
+- *(ai)* Returns langgraph mock message from chatting
+- *(ai)* Chat with OpenAI when asking programming question
+- Add handling exception to chat route
+- Initialize new solidstart project
+- Admin dashboard with authentication and dashboard mock
+- Initial invitation code creation
+- Redesigned dashboard for ux and ui
+- Course status
+- Navigation bar for user
+- Added button to ask ai when test got error.
+- Cloudflare deploy on pull request and on push to main (#18)
+- Input guardrail node
+- Convex schema and function for management system
+- Course management page
+- *(server)* Add constraint to student code execution
+- *(web)* Student code execution with test case.
+- *(web)* Test case for student
+- Convex schema and function for management system
+- Course management page
+- Convex schema and function for management system
+- Course management page
+- *(web)* Telemetry proxying (#29)
+- Magic link is no longer available as auth (#33)
+- Implement authentication for convex operations.
+- Change web title
+- Add lockfile for building the python server
+- *(backend)* Implemented user verfication mechanism (#37)
+- Alembic implementation
+- Implement extra field for passing additional context to backend (#43)
+- Seeding predefined lesson from seed.ts. (#44)
+- Tracking student mastery with Bayesian Knowledge Tracing (#45)
+- *(web)* Support dark mode and improve workspace layout responsiveness (#51)
+- Redesigned application UI to be cleaner
+- Redesigned application UI to be cleaner
+
+### 🐛 Bug Fixes
+
+- Web not working
+- *(admin)* Stuck on loading screen after authentication
+- *(ui)* Invisible button label when student currently doing the application
+- Workflows scripts
+- *(admin)* Lost focus during writing test case.
+- *(admin)* Lost focus during writing test case.
+- *(admin)* Lost focus during writing test case.
+- *(admin)* Wire up better-auth token to convex client
+- *(admin)* Use explicit path for better-auth convex token fetch
+- *(admin)* Admin data not fetching
+- Admin needs reloading to fetch data
+- Add allowed origin for testing
+- Missing import
+- *(railways)* Server can't communicate with the judge0
+- *(railways)* Server can't communicate with the judge0
+- Handling edge cases around backend authentication.
+- Expanded viewport on course page
+- Hidden test case gets leaked into return result. (#50)
+- Merging caused error
+- Create admin user with terminal not being able to execute.
+- *(auth)* Validate invitation codes from HTTP actions
+
+### 💼 Other
+
+- Restore uv.lock to index
+- LangGraph system
+- Update
+- Bring signup validation fix from dev
+
+### 🚜 Refactor
+
+- Moved authentication logic to web instead of admin
+- Admin course modal
+- Admin course modal
+- Admin course modal
+- Update Convex auth token retrieval to use bearer token authentication.
+
+### 🧪 Testing
+
+- Convex database mutation
+- Convex database mutation
+- Convex database mutation
+
+### ⚙️ Miscellaneous Tasks
+
+- Stop tracking uv.lock
+- Delete uv.lock
+- Ignore claude files
+- Initial schema for ai message
+- *(server)* Update configuration instruction
+- Add timeout
+- Instruction cleanup
+- Cleanup code
+- Convex's generated schema
+- Add new package requirements
+- Disable redundant production build and deploy in workflow
+- Rename files for clarity
+- Cleanup old file
+- *(admin)* Improve visual of course components
+- Cleanup old file
+- *(admin)* Improve visual of course components
+- Cleanup old file
+- *(admin)* Improve visual of course components
+- Update lockfile
+- Update ci
+- Update dependencies
+- Update package lockfile
+- Add package
+- Add package
+- Remove pr preview metadata
+- New configuration for separating env
+- Change dev build secrets to preview secrets
+- Update workflow
+- Update
+- Update
+- Display cloudflare development url
+- Display cloudflare development url
+- Automatic deployment
+- Unified env retrieval
+- Commented out convex to prevent error
+- Initial admin deployment (#35)
+- *(admin)* Update variable name to preview.
+- Cleanup older version in trusted origins
+- Fix environment variable removal
+- Log backend request to execute route
+- Update gitignore
+- Fix missing userId and chatId
+- Clear chat will not resume old conversation
+- Update the backend configuration
+- Trigger CI [empty commit]
 ## [0.8.6] - 2026-07-18
 
 ### ⚙️ Miscellaneous Tasks
