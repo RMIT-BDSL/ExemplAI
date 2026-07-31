@@ -10,3 +10,7 @@ data/csedm-2019/
 **/.claude/
 **/.vscode/
 CLAUDE.md
+
+# moon
+.moon/cache
+.moon/docker

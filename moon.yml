@@ -1,0 +1,23 @@
+# moon.yml
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+tasks:
+  dev:
+    preset: "server"
+    deps:
+      - "web:dev"
+      - "server:dev"
+
+  admin-dev:
+    preset: "server"
+    deps:
+      - "admin:dev"
+      - "server:dev"
+
+  # TODO: enable this later
+  # all:
+  #   preset: 'server'
+  #   deps:
+  #     - 'web:dev'
+  #     - 'admin:dev'
+  #     - 'server:dev'
