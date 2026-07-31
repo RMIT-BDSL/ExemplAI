@@ -1,0 +1,10 @@
+# server/moon.yml
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'python'
+stack: 'backend'
+
+tasks:
+  dev:
+    command: 'uv run fastapi dev'
+    preset: 'server'

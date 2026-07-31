@@ -1,0 +1,10 @@
+# .moon/workspace.yml
+projects:
+  root: "."
+  web: "web"
+  server: "server"
+  admin: "admin"
+
+vcs:
+  defaultBranch: "dev"
+  provider: "github"
