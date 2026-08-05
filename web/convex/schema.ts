@@ -98,6 +98,16 @@ export default defineSchema({
     userId: v.id("users"),
     lessonId: v.id("questions"),
   }).index("by_user_lesson", ["userId", "lessonId"]),
+  releaseNotes: defineTable({
+    type: v.union(
+      v.literal("feature"),
+      v.literal("fix"),
+      v.literal("improvement"),
+    ),
+    timestamp: v.number(),
+    title: v.string(),
+    content: v.string(),
+  }).index("by_timestamp", ["timestamp"]),
   chatMessages: defineTable({
     chatId: v.id("chats"),
     sender: v.union(v.literal("user"), v.literal("assistant")),
