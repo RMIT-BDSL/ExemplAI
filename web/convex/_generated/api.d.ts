@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
 import type * as lessons from "../lessons.js";
+import type * as releaseNotes from "../releaseNotes.js";
 import type * as seed from "../seed.js";
 import type * as validators from "../validators.js";
 
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   init: typeof init;
   invitationCodes: typeof invitationCodes;
   lessons: typeof lessons;
+  releaseNotes: typeof releaseNotes;
   seed: typeof seed;
   validators: typeof validators;
 }>;

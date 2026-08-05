@@ -148,6 +148,24 @@ export type PublicApiType = {
       any
     >;
   };
+  releaseNotes: {
+    create: FunctionReference<
+      "mutation",
+      "public",
+      {
+        type: "feature" | "fix" | "improvement";
+        title: string;
+        content: string;
+      },
+      any
+    >;
+    list: FunctionReference<
+      "query",
+      "public",
+      Record<string, never>,
+      any
+    >;
+  };
   lessons: {
     createLesson: FunctionReference<
       "mutation",

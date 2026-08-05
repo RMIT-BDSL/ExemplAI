@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import InvitationCodesPage from './pages/InvitationCodesPage';
 import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
+import ReleaseNotesPage from './pages/ReleaseNotesPage';
 
 const ProtectedRoute: Component<{ children?: any }> = (props) => {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ const App: Component = () => {
           <Route path="invitation-codes" component={InvitationCodesPage} />
           <Route path="courses" component={CoursesPage} />
           <Route path="courses/:id" component={CourseDetailPage} />
+          <Route path="release-notes" component={ReleaseNotesPage} />
         </Route>
         <Route path="*" component={() => <Navigate href="/" />} />
       </Router>
