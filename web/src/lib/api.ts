@@ -43,3 +43,36 @@ export async function sendChatMessage(
   );
   return response.data;
 }
+
+export interface ScratchpadRunResult {
+  stdout?: string;
+  stderr?: string;
+  compile_output?: string;
+  time?: string;
+  memory?: number;
+  status?: { id: number; description: string };
+  status_id?: number;
+}
+
+export async function scratchpadExecute(
+  code: string,
+  languageId = 71,
+  stdin = ""
+): Promise<ScratchpadRunResult> {
+  const tokenRes = await authClient.convex.token();
+  const token = tokenRes.data?.token;
+
+  const response = await axios.post<ScratchpadRunResult>(
+    `${BACKEND_URL}/scratchpad/execute`,
+    {
+      code,
+      language_id: languageId,
+      stdin: stdin || undefined,
+    },
+    {
+      timeout: 30000,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  return response.data;
+}
