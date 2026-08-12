@@ -53,6 +53,6 @@ export const listPublic = zAuthenticatedQuery({
       .query("releaseNotes")
       .withIndex("by_timestamp")
       .order("desc")
-      .collect();
+      .take(20);
   },
 });
