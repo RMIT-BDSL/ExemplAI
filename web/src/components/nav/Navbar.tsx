@@ -1,5 +1,6 @@
 import { Link, useMatches } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
+import ChangelogButton from "../changelog/ChangelogButton";
 import UserStatusButton from "./UserStatusButton";
 
 /**
@@ -11,7 +12,9 @@ import UserStatusButton from "./UserStatusButton";
  */
 export default function Navbar() {
   const matches = useMatches();
-  const isCoursePage = matches.some((match) => match.routeId === "/_authenticated/course");
+  const isCoursePage = matches.some(
+    (match) => match.routeId === "/_authenticated/course",
+  );
 
   return (
     <header className="sticky top-0 z-45 border-b border-line bg-white/70 dark:bg-black/70 backdrop-blur-xl text-sea-ink">
@@ -38,7 +41,10 @@ export default function Navbar() {
           )}
         </div>
 
-        <UserStatusButton />
+        <div className="flex items-center gap-2">
+          <ChangelogButton />
+          <UserStatusButton />
+        </div>
       </nav>
     </header>
   );

@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { zAdminQuery, zAdminMutation } from "./functions";
+import { zAdminQuery, zAdminMutation, zAuthenticatedQuery } from "./functions";
 
 const releaseNoteType = z.enum(["feature", "fix", "improvement"]);
 
@@ -39,5 +39,20 @@ export const list = zAdminQuery({
       .withIndex("by_timestamp")
       .order("desc")
       .collect();
+  },
+});
+
+/**
+ * Authenticated read used by the in-app changelog. Gated on session + student
+ * profile (eligible users only). Newest first.
+ */
+export const listPublic = zAuthenticatedQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("releaseNotes")
+      .withIndex("by_timestamp")
+      .order("desc")
+      .take(20);
   },
 });
