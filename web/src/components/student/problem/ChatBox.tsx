@@ -243,6 +243,9 @@ export function MessageBubble({ message, onOpenScratchpad, onAskAboutOutput }: M
           ) : (
             <ReactMarkdown
               components={{
+                pre(props) {
+                  return <>{props.children}</>;
+                },
                 code(props) {
                   const { children, className, ...rest } = props;
                   const match = /language-(\w+)/.exec(className || "");
