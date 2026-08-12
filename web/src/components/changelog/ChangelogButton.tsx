@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Button } from "#/components/ui/button";
 import * as Dialog from "#/components/ui/dialog";
+import { authClient } from "#/lib/auth-client";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../convex/_generated/api";
 
@@ -63,6 +64,16 @@ function writeSeenTimestamp(ts: number) {
  * - Dedicated button always opens the modal and marks everything seen.
  */
 export default function ChangelogButton() {
+  const { data: session } = authClient.useSession();
+
+  if (!session?.user) {
+    return null;
+  }
+
+  return <AuthenticatedChangelogButton />;
+}
+
+function AuthenticatedChangelogButton() {
   const notes = useQuery(api.releaseNotes.listPublic);
   const posthog = usePostHog();
   const [open, setOpen] = useState(false);
