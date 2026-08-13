@@ -13,6 +13,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from model.student_code import StudentCode
+from model.scratchpad import ScratchpadCode
 from model.chat import Chat
 import services
 from dependencies import get_current_user, get_current_user_with_token
@@ -37,6 +38,16 @@ async def judge0_execution(
     auth: dict = Depends(get_current_user_with_token),
 ):
     return await services.execute_code(student_code, background_tasks, auth_token=auth["token"])
+
+
+@router.post('/scratchpad/execute')
+@limiter.limit("30/minute")
+async def scratchpad_execution(
+    body: ScratchpadCode,
+    request: Request,
+    auth: dict = Depends(get_current_user_with_token),
+):
+    return await services.run_scratchpad(body.code, body.language_id, body.stdin)
 
 
 @router.get("/items/{item_id}")

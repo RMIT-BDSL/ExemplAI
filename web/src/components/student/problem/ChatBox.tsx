@@ -1,8 +1,8 @@
-import { Bot, RefreshCw, Send, Sparkles, User, ChevronRight, MessageSquare } from "lucide-react";
+import { Bot, RefreshCw, Send, Sparkles, User, ChevronRight, MessageSquare, Play, Square, Loader2 } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
-import { sendChatMessage } from "#/lib/api.ts";
+import { sendChatMessage, scratchpadExecute } from "#/lib/api.ts";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -62,9 +62,156 @@ export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProp
 // 2. Individual Message Bubble Component
 export interface MessageBubbleProps {
   message: Message;
+  onOpenScratchpad?: (code: string, language?: string) => void;
+  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+// Normalise a markdown fence language tag to a monaco/language key.
+function normalizeCodeLanguage(lang?: string): string {
+  if (!lang) return "python";
+  const key = lang.toLowerCase();
+  if (key === "python3" || key === "py") return "python";
+  if (key === "js" || key === "node") return "javascript";
+  if (key === "ts") return "typescript";
+  if (key === "c++" || key === "cc" || key === "cpp") return "cpp";
+  if (key === "golang") return "go";
+  return key;
+}
+
+function CodeBlock({
+  language,
+  code,
+  onOpenScratchpad,
+  onAskAboutOutput,
+}: {
+  language?: string;
+  code: string;
+  onOpenScratchpad?: (code: string, language?: string) => void;
+  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
+}) {
+  const [isRunning, setIsRunning] = React.useState(false);
+  const [result, setResult] = React.useState<any>(null);
+
+  const lang = normalizeCodeLanguage(language);
+
+  const LANGUAGE_IDS: Record<string, number> = {
+    python: 71,
+    javascript: 63,
+    typescript: 74,
+    java: 62,
+    cpp: 54,
+    go: 60,
+    rust: 73,
+  };
+
+  async function handleRun() {
+    if (isRunning) return;
+    setIsRunning(true);
+    setResult(null);
+    try {
+      const output = await scratchpadExecute(code, LANGUAGE_IDS[lang] ?? 71, "");
+      setResult(output);
+    } catch (err: any) {
+      setResult({
+        error: true,
+        stderr: err?.response?.data?.detail || err?.message || "Execution failed",
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  const statusId = result?.status?.id ?? result?.status_id;
+  const isAccepted = statusId === 3;
+  const outputText = result?.stdout?.trim() || "(empty output)";
+  const hasError = Boolean(result?.stderr || result?.compile_output || result?.error);
+
+  return (
+    <div className="my-1.5 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+      {/* Code header */}
+      <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/70 px-3 py-1">
+        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">
+          {language || "code"}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onOpenScratchpad?.(code, language)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+            title="Open in scratchpad"
+          >
+            <Square className="size-3" />
+            <span>Scratchpad</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleRun}
+            disabled={isRunning}
+            className="inline-flex items-center gap-1 rounded-md bg-lagoon px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lagoon-deep disabled:opacity-50 transition-colors cursor-pointer"
+            title="Run this snippet"
+          >
+            {isRunning ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Play className="size-3 fill-current" />
+            )}
+            <span>Run</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Code body */}
+      <pre className="overflow-x-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200">
+        <code className="font-mono">{code}</code>
+      </pre>
+
+      {/* Output */}
+      {isRunning && (
+        <div className="flex items-center gap-2 border-t border-zinc-800 px-3 py-2 text-[10px] text-zinc-400 font-mono">
+          <Loader2 className="size-3 animate-spin text-lagoon" />
+          Executing...
+        </div>
+      )}
+      {!isRunning && result && (
+        <div className="border-t border-zinc-800 bg-zinc-900/40">
+          <div className="flex items-center justify-between px-3 pt-2 pb-1">
+            <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">
+              Output
+            </span>
+            <span
+              className={`rounded-full border px-1.5 py-px text-[9px] font-medium ${
+                isAccepted
+                  ? "text-palm border-palm/15 bg-palm/10"
+                  : "text-red-500 border-red-500/15 bg-red-500/10"
+              }`}
+            >
+              {isAccepted ? "Ran successfully" : result?.status?.description || "Error"}
+            </span>
+          </div>
+          <pre className="max-h-32 overflow-auto whitespace-pre-wrap px-3 pb-2 font-mono text-[11px] text-zinc-300">
+            {result.stdout ? result.stdout : hasError ? result.stderr || result.compile_output : "(empty output)"}
+          </pre>
+          {onAskAboutOutput && (
+            <div className="px-3 pb-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onAskAboutOutput(code, hasError ? result.stderr || result.compile_output || "" : outputText, language)
+                }
+                className="inline-flex items-center gap-1 rounded-md border border-lagoon/20 bg-lagoon/10 px-2 py-0.5 text-[10px] font-semibold text-lagoon hover:bg-lagoon/20 transition-colors cursor-pointer"
+              >
+                <Sparkles className="size-3" />
+                <span>Ask AI about this result</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MessageBubble({ message, onOpenScratchpad, onAskAboutOutput }: MessageBubbleProps) {
   const isUser = message.sender === "user";
 
   return (
@@ -91,7 +238,39 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               : "bg-zinc-800 border border-zinc-750 text-zinc-200 rounded-tl-none prose prose-invert prose-xs max-w-none prose-p:my-0.5 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-0.5 prose-ul:my-0.5 prose-li:my-0.5 prose-pre:my-1.5"
           )}
         >
-          {isUser ? message.content : <ReactMarkdown>{message.content}</ReactMarkdown>}
+          {isUser ? (
+            message.content
+          ) : (
+            <ReactMarkdown
+              components={{
+                pre(props) {
+                  return <>{props.children}</>;
+                },
+                code(props) {
+                  const { children, className, ...rest } = props;
+                  const match = /language-(\w+)/.exec(className || "");
+                  const codeText = String(children).replace(/\n$/, "");
+                  if (match) {
+                    return (
+                      <CodeBlock
+                        language={match[1]}
+                        code={codeText}
+                        onOpenScratchpad={onOpenScratchpad}
+                        onAskAboutOutput={onAskAboutOutput}
+                      />
+                    );
+                  }
+                  return (
+                    <code className={className} {...rest}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
         </div>
         {/* Timestamp */}
         <span
@@ -114,9 +293,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 export interface MessageFeedProps {
   messages: Message[];
   isTyping?: boolean;
+  onOpenScratchpad?: (code: string, language?: string) => void;
+  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }
 
-export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
+export function MessageFeed({ messages, isTyping, onOpenScratchpad, onAskAboutOutput }: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -140,7 +321,14 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
           </div>
         </div>
       ) : (
-        messages.map((message) => <MessageBubble key={message.id} message={message} />)
+        messages.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onOpenScratchpad={onOpenScratchpad}
+            onAskAboutOutput={onAskAboutOutput}
+          />
+        ))
       )}
 
       {isTyping && (
@@ -239,12 +427,16 @@ export default function ChatBox({
   currentCode,
   lessonId,
   onCollapse,
+  onOpenScratchpad,
+  onAskAboutOutput,
 }: {
   pendingMessage?: PendingMessage | null;
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
   onCollapse?: () => void;
+  onOpenScratchpad?: (code: string, language?: string) => void;
+  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -442,7 +634,7 @@ export default function ChatBox({
     <div className="flex h-full flex-col bg-transparent">
       <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} onCollapse={onCollapse} />
 
-      <MessageFeed messages={messages} isTyping={isTyping} />
+      <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} onAskAboutOutput={onAskAboutOutput} />
 
       {/* Quick Actions (only visible when not typing) */}
       {!isTyping && (

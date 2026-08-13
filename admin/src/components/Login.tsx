@@ -175,7 +175,12 @@ export default function Login() {
         if (error) {
           setErrorMsg(error.message || "Invalid credentials or login failed.");
         } else {
-          navigate("/", { replace: true });
+          // Hard reload so the Convex client (which caches the auth token at
+          // module load, when the user was still unauthenticated) re-initializes
+          // with a live session. A client-side navigate would leave Convex
+          // caching a missing token and the first data fetch failing with an
+          // unauthorized error that Solid's createResource never retries.
+          window.location.assign("/");
         }
       } catch (err: any) {
         setErrorMsg(err.message || "An unexpected error occurred.");

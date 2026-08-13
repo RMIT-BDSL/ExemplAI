@@ -2,11 +2,12 @@ import { usePostHog } from "@posthog/react";
 import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 import axios from "axios";
 import { useMutation, useQuery } from "convex/react";
-import { BookOpen, ChevronRight, Loader2 } from "lucide-react";
+import { BookOpen, ChevronRight, Loader2, TerminalSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import CodeEditor from "#/components/student/CodeEditor";
 import CodingBar from "#/components/student/InteractionBar";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
+import Scratchpad, { type ScratchpadHandle } from "#/components/student/Scratchpad";
 import SidePanel from "#/components/student/SidePane";
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
@@ -64,6 +65,9 @@ function Course() {
     key: number;
     content: string;
   } | null>(null);
+
+  const [isScratchpadVisible, setIsScratchpadVisible] = useState<boolean>(false);
+  const scratchpadRef = useRef<ScratchpadHandle | null>(null);
 
   const activeQuestion = problemId
     ? fetchedQuestion
@@ -349,8 +353,36 @@ function Course() {
 
   const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
 
-  function handleSelectLesson(id: string) {
-    navigate({
+  function handleOpenScratchpad(code: string, snippetLanguage?: string) {
+    setIsScratchpadVisible(true);
+    // Defer so the Scratchpad mounts before we try to preload it.
+    setTimeout(() => {
+      scratchpadRef.current?.openWith(code, snippetLanguage);
+    }, 0);
+  }
+
+  function handleAskAboutOutput(code: string, output: string, snippetLanguage?: string) {
+    const content = [
+      `I ran this snippet in the scratchpad:`,
+      "```" + (snippetLanguage || "python"),
+      code,
+      "```",
+      "",
+      "And got this output:",
+      "```",
+      output || "(empty output)",
+      "```",
+      "",
+      "Can you help me understand what happened?",
+    ].join("\n");
+
+    posthog.capture("scratchpad_output_asked", { problem_id: problemId });
+
+    setIsChatCollapsed(false);
+    setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
+  }
+
+  function handleSelectLesson(id: string) {    navigate({
       to: "/course",
       search: { problemId: id },
     });
@@ -402,6 +434,15 @@ function Course() {
                 <span>Editor</span>
               </div>
               <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIsScratchpadVisible(!isScratchpadVisible)}
+                  className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
+                  title="Toggle scratchpad"
+                >
+                  <TerminalSquare className="size-3" />
+                  <span>{isScratchpadVisible ? "Show Editor" : "Scratchpad"}</span>
+                </button>
                 {isProblemCollapsed && (
                   <button
                     type="button"
@@ -443,26 +484,30 @@ function Course() {
             />
 
             <div className="flex flex-1 flex-col overflow-hidden relative">
-              <CodeEditor
-                onMount={handleEditorMount}
-                language={language}
-                value={currentCode}
-                onChange={handleCodeChange}
-                fontSize={fontSize}
-                isRunning={isRunning}
-                isSubmitting={isSubmitting}
-                executionResult={executionResult}
-                isConsoleOpen={isConsoleOpen}
-                setIsConsoleOpen={setIsConsoleOpen}
-                onRun={() => handleExecute("run")}
-                onSubmit={() => handleExecute("submit")}
-                onSendErrorToChat={handleSendErrorToChat}
-                isSaved={isSaved}
-                onSave={handleSave}
-                testCases={activeQuestion?.testCases || []}
-                isCompleted={isCompleted}
-                onNextLesson={handleNextLesson}
-              />
+              {isScratchpadVisible ? (
+                <Scratchpad ref={scratchpadRef} />
+              ) : (
+                <CodeEditor
+                  onMount={handleEditorMount}
+                  language={language}
+                  value={currentCode}
+                  onChange={handleCodeChange}
+                  fontSize={fontSize}
+                  isRunning={isRunning}
+                  isSubmitting={isSubmitting}
+                  executionResult={executionResult}
+                  isConsoleOpen={isConsoleOpen}
+                  setIsConsoleOpen={setIsConsoleOpen}
+                  onRun={() => handleExecute("run")}
+                  onSubmit={() => handleExecute("submit")}
+                  onSendErrorToChat={handleSendErrorToChat}
+                  isSaved={isSaved}
+                  onSave={handleSave}
+                  testCases={activeQuestion?.testCases || []}
+                  isCompleted={isCompleted}
+                  onNextLesson={handleNextLesson}
+                />
+              )}
             </div>
           </div>
 
@@ -483,7 +528,15 @@ function Course() {
                 </button>
               </div>
               <div className="flex-1 min-h-0 editorial-chat-container">
-                <SidePanel onCollapse={() => setIsChatCollapsed(true)} pendingMessage={chatPrompt} editorRef={editorRef} currentCode={currentCode} lessonId={activeQuestionId} />
+                <SidePanel
+                  onCollapse={() => setIsChatCollapsed(true)}
+                  pendingMessage={chatPrompt}
+                  editorRef={editorRef}
+                  currentCode={currentCode}
+                  lessonId={activeQuestionId}
+                  onOpenScratchpad={handleOpenScratchpad}
+                  onAskAboutOutput={handleAskAboutOutput}
+                />
               </div>
             </div>
           )}

@@ -218,6 +218,101 @@ async def run_single_test_case(client, code, language_id, test_case, exec_url, h
     }
 
 
+def _judge0_headers() -> dict:
+    """Build Judge0 auth headers for the configured endpoint."""
+    headers = {}
+    auth_key = settings.JUDGE0_AUTH_KEY.get_secret_value()
+    if auth_key and not settings.IS_RAPIDAPI:
+        headers['X-Auth-Token'] = auth_key
+
+    is_rapidapiconfig_valid = settings.RAPIDAPI_KEY.get_secret_value().strip() and settings.RAPIDAPI_HOST.strip()
+    if settings.IS_RAPIDAPI and is_rapidapiconfig_valid:
+        headers['X-RapidAPI-Key'] = settings.RAPIDAPI_KEY.get_secret_value()
+        host = settings.RAPIDAPI_HOST
+        if "://" in host:
+            host = host.split("://")[-1]
+        headers['X-RapidAPI-Host'] = host
+    return headers
+
+
+def _exec_url() -> str:
+    endpoint = settings.JUDGE0_ENDPOINT
+    if not endpoint:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JUDGE0_ENDPOINT environment variable is not configured."
+        )
+    return endpoint.rstrip('/') + '/submissions?base64_encoded=false&wait=true'
+
+
+async def _judge0_submit(
+    code: str,
+    language_id: int,
+    stdin: Optional[str] = None,
+    cpu_time_limit: float = 5.0,
+    wall_time_limit: float = 10.0,
+) -> dict:
+    """Submit code to Judge0 in free-run mode and return the raw execution dict.
+
+    Free-run posts the code as-is (no test-case wrapper), so it works with
+    standalone scripts that don't expose a named function.
+    """
+    payload = {
+        'source_code': code,
+        'language_id': language_id,
+        'cpu_time_limit': cpu_time_limit,
+        'wall_time_limit': wall_time_limit,
+    }
+    if stdin:
+        payload['stdin'] = stdin
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                _exec_url(), json=payload, headers=_judge0_headers(), timeout=15.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.TimeoutException as e:
+        log.error(f"Judge0 request timed out: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Code execution request timed out."
+        )
+    except httpx.HTTPStatusError as e:
+        log.error(f"Judge0 error response {e.response.status_code}: {e.response.text}")
+        try:
+            err_data = e.response.json()
+            detail = err_data.get("message") or err_data.get("error") or str(e)
+        except Exception:
+            detail = f"Execution service returned error: {e.response.text}"
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=detail
+        )
+    except httpx.RequestError as e:
+        log.error(f"Judge0 connection error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to connect to the code execution service."
+        )
+
+
+async def run_scratchpad(
+    code: str,
+    language_id: int = 71,
+    stdin: Optional[str] = None,
+) -> dict:
+    """Execute a scratchpad snippet in free-run mode.
+
+    Exploratory only — no test-case grading and no BKT / lesson progress
+    recording. Returns Judge0's raw execution result so the frontend can
+    display stdout/stderr independently of the grading harness.
+    """
+    metrics.count("code.scratchpad", 1)
+    return await _judge0_submit(code, language_id, stdin)
+
+
 async def execute_code(
     student_code: StudentCode,
     background_tasks: BackgroundTasks,
@@ -233,26 +328,8 @@ async def execute_code(
     when lesson_id is present.
     """
     metrics.count("code.execution", 1)
-    endpoint = settings.JUDGE0_ENDPOINT
-    if not endpoint:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="JUDGE0_ENDPOINT environment variable is not configured."
-        )
-    exec_url = endpoint.rstrip('/') + '/submissions?base64_encoded=false&wait=true'
-
-    headers = {}
-    auth_key = settings.JUDGE0_AUTH_KEY.get_secret_value()
-    if auth_key and not settings.IS_RAPIDAPI:
-        headers['X-Auth-Token'] = auth_key
-
-    is_rapidapiconfig_valid = settings.RAPIDAPI_KEY.get_secret_value().strip() and settings.RAPIDAPI_HOST.strip()
-    if settings.IS_RAPIDAPI and is_rapidapiconfig_valid:
-        headers['X-RapidAPI-Key'] = settings.RAPIDAPI_KEY.get_secret_value()
-        host = settings.RAPIDAPI_HOST
-        if "://" in host:
-            host = host.split("://")[-1]
-        headers['X-RapidAPI-Host'] = host
+    exec_url = _exec_url()
+    headers = _judge0_headers()
 
     language_id = student_code.language_id or 71
     action_type = student_code.action_type or "run"
@@ -418,51 +495,17 @@ async def execute_code(
         return result
 
     # Fallback to single execution if no test cases are provided
-    payload = {
-        'source_code': student_code.code,
-        'language_id': language_id,
-        'cpu_time_limit': 5.0,
-        'wall_time_limit': 10.0,
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(exec_url, json=payload, headers=headers, timeout=15.0)
-            response.raise_for_status()
-            output = response.json()
-            # Judge0 status id 3 = Accepted
-            passed = (output.get("status") or {}).get("id") == 3
-            background_tasks.add_task(
-                _record_code_execution,
-                auth_token,
-                lesson_id,
-                action_type,
-                passed
-            )
-            return output
-    except httpx.TimeoutException as e:
-        log.error(f"Judge0 request timed out: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Code execution request timed out."
-        )
-    except httpx.HTTPStatusError as e:
-        log.error(f"Judge0 error response {e.response.status_code}: {e.response.text}")
-        try:
-            err_data = e.response.json()
-            detail = err_data.get("message") or err_data.get("error") or str(e)
-        except Exception:
-            detail = f"Execution service returned error: {e.response.text}"
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=detail
-        )
-    except httpx.RequestError as e:
-        log.error(f"Judge0 connection error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to connect to the code execution service."
-        )
+    output = await _judge0_submit(student_code.code, language_id)
+    # Judge0 status id 3 = Accepted
+    passed = (output.get("status") or {}).get("id") == 3
+    background_tasks.add_task(
+        _record_code_execution,
+        auth_token,
+        lesson_id,
+        action_type,
+        passed
+    )
+    return output
 
 
 # Import chat functions to expose them on the services module
