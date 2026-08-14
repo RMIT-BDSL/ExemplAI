@@ -39,7 +39,7 @@ from typing import Literal, Optional, cast
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from ai.llm.openai import llm
+from ai.llm import llm
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")

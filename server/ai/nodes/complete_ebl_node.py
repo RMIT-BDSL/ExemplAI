@@ -12,7 +12,7 @@ import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ai.llm.openai import llm
+from ai.llm import llm
 from ai.nodes.context import student_context
 from ai.state import TutorGraphState
 
