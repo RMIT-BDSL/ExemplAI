@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown, LogOut } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { authClient } from "#/lib/auth-client";
@@ -11,6 +12,7 @@ import { cn } from "#/lib/utils.ts";
  */
 export default function UserStatusButton() {
   const { data: session, isPending } = authClient.useSession();
+  const navigate = useNavigate();
 
   if (isPending) {
     return (
@@ -58,7 +60,9 @@ export default function UserStatusButton() {
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
 
           <DropdownMenu.Item
-            onSelect={() => void authClient.signOut()}
+            onSelect={() => {
+              navigate({ to: "/sign-out" });
+            }}
             className={cn(
               "flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-sea-ink",
               "outline-none data-[highlighted]:bg-sand dark:data-[highlighted]:bg-white/10 cursor-pointer transition-colors",

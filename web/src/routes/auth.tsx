@@ -1,5 +1,5 @@
 import { usePostHog } from "@posthog/react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import * as React from "react";
@@ -13,6 +13,7 @@ import { SignUpForm } from "#/components/auth/forms/SignUpForm";
 // import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
+import { getSession } from "#/lib/auth.functions";
 
 interface AuthSearch {
   redirect?: string;
@@ -48,6 +49,13 @@ export function sanitizeRedirect(
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
+  beforeLoad: async ({ search }) => {
+    const session = await getSession();
+    // redirect user to the index page
+    if (session?.user) {
+      throw redirect({ to: sanitizeRedirect(search.redirect || "/") });
+    }
+  },
   validateSearch: (search: Record<string, unknown>): AuthSearch => {
     return {
       redirect:
@@ -188,21 +196,21 @@ function AuthPage() {
           activeTab === "signin"
             ? "Welcome Back"
             : "Create Account"
-            /*
-            : activeTab === "magiclink"
-              ? "Magic Link"
-              : "Create Account"
-            */
+          /*
+          : activeTab === "magiclink"
+            ? "Magic Link"
+            : "Create Account"
+          */
         }
         subtitle={
           activeTab === "signin"
             ? "Sign in with your email and password to access the platform."
             : "Sign up to start tracking your learning progress and assignments."
-            /*
-            : activeTab === "magiclink"
-              ? "Enter your email to receive a passwordless sign-in link."
-              : "Sign up to start tracking your learning progress and assignments."
-            */
+          /*
+          : activeTab === "magiclink"
+            ? "Enter your email to receive a passwordless sign-in link."
+            : "Sign up to start tracking your learning progress and assignments."
+          */
         }
       >
         {/* M3 Segmented Tabs */}

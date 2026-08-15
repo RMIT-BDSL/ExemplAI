@@ -12,8 +12,9 @@ import UserStatusButton from "./UserStatusButton";
  */
 export default function Navbar() {
   const matches = useMatches();
-  const isCoursePage = matches.some(
-    (match) => match.routeId === "/_authenticated/course",
+  const isSubPage = matches.some(
+    (match) =>
+      match.routeId === "/_authenticated/course"
   );
 
   return (
@@ -27,7 +28,7 @@ export default function Navbar() {
             ExemplAI
           </Link>
 
-          {isCoursePage && (
+          {isSubPage && (
             <>
               <div className="h-3 w-px bg-line" />
               <Link
