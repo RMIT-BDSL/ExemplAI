@@ -3,7 +3,6 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import * as React from "react";
-import { AlreadySignedIn } from "#/components/auth/AlreadySignedIn";
 import { AuthCard } from "#/components/auth/AuthCard";
 import { AuthTabs } from "#/components/auth/AuthTabs";
 // import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
@@ -20,21 +19,24 @@ interface AuthSearch {
 }
 
 export function sanitizeRedirect(
-  redirect: string,
-  allowedOrigin: string = window.location.origin
+  redirect?: string,
+  allowedOrigin?: string
 ): string {
   if (!redirect) return "/";
 
   try {
-    const url = new URL(redirect, window.location.origin);
+    const defaultOrigin =
+      typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const origin = allowedOrigin || defaultOrigin;
+    const url = new URL(redirect, defaultOrigin);
 
     const envOrigins = (import.meta.env.VITE_TRUSTED_ORIGINS || "")
       .split(",")
       .map((item: string) => item.trim())
       .filter(Boolean);
 
-    const allowedOrigins = [allowedOrigin, ...envOrigins].map((origin) =>
-      origin.toLowerCase()
+    const allowedOrigins = [origin, ...envOrigins].map((item) =>
+      item.toLowerCase()
     );
 
     if (!allowedOrigins.includes(url.origin.toLowerCase())) {
@@ -48,20 +50,20 @@ export function sanitizeRedirect(
 }
 
 export const Route = createFileRoute("/auth")({
-  component: AuthPage,
-  beforeLoad: async ({ search }) => {
-    const session = await getSession();
-    // redirect user to the index page
-    if (session?.user) {
-      throw redirect({ to: sanitizeRedirect(search.redirect || "/") });
-    }
-  },
   validateSearch: (search: Record<string, unknown>): AuthSearch => {
     return {
       redirect:
         typeof search.redirect === "string" ? search.redirect : undefined,
     };
   },
+  beforeLoad: async ({ search }) => {
+    const session = await getSession();
+    // redirect user to the index or target page
+    if (session?.user) {
+      throw redirect({ to: sanitizeRedirect(search.redirect || "/") });
+    }
+  },
+  component: AuthPage,
 });
 
 function AuthPage() {
@@ -132,6 +134,8 @@ function AuthPage() {
   };
   */
 
+
+
   // Reset message states when tab changes
   React.useEffect(() => {
     setGlobalError("");
@@ -174,17 +178,17 @@ function AuthPage() {
     );
   }
 
-  // Already authenticated UI
+  // Already authenticated / redirecting
   if (session?.user) {
     return (
-      <AlreadySignedIn
-        session={session}
-        onGoToDashboard={() =>
-          navigate({ to: sanitizeRedirect(redirect || "/") })
-        }
-        onSignOut={handleSignOut}
-        isSigningOut={isSigningOut}
-      />
+      <div className="flex min-h-screen w-full items-center justify-center bg-[var(--bg-base)] text-[var(--sea-ink)]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-12 rounded-full border-4 border-zinc-200 border-t-[var(--lagoon-deep)] animate-spin" />
+          <p className="text-sm font-semibold tracking-wider animate-pulse">
+            Redirecting...
+          </p>
+        </div>
+      </div>
     );
   }
 
