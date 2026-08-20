@@ -46,11 +46,12 @@ class Settings(BaseSettings):
 
     # ── LLM ────────────────────────────────────────────────────────────
     OPENAI_API_KEY: SecretStr = SecretStr("")
-    # OpenRouter (OpenAI-compatible) can be selected as an additional route
-    # behind OpenAI by setting OPENROUTER_ENABLED=true and an API key.
+    # OpenRouter (OpenAI-compatible) replaces OpenAI as the agent's LLM route.
+    # Supply OPENROUTER_API_KEY to use it; OPENROUTER_MODEL defaults to DeepSeek
+    # V4 Flash 0731.
     OPENROUTER_API_KEY: SecretStr = SecretStr("")
     OPENROUTER_MODEL: str = "deepseek/deepseek-v4-flash-0731"
-    OPENROUTER_ENABLED: bool = False
+    OPENROUTER_ENABLED: bool = True
 
     # ── Code execution (Judge0) ────────────────────────────────────────
     JUDGE0_ENDPOINT: str = ""
