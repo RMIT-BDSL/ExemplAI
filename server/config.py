@@ -46,6 +46,12 @@ class Settings(BaseSettings):
 
     # ── LLM ────────────────────────────────────────────────────────────
     OPENAI_API_KEY: SecretStr = SecretStr("")
+    # OpenRouter (OpenAI-compatible) replaces OpenAI as the agent's LLM route.
+    # Supply OPENROUTER_API_KEY to use it; OPENROUTER_MODEL defaults to DeepSeek
+    # V4 Flash 0731.
+    OPENROUTER_API_KEY: SecretStr = SecretStr("")
+    OPENROUTER_MODEL: str = "deepseek/deepseek-v4-flash-0731"
+    OPENROUTER_ENABLED: bool = True
 
     # ── Code execution (Judge0) ────────────────────────────────────────
     JUDGE0_ENDPOINT: str = ""
@@ -90,9 +96,10 @@ def log_config_summary() -> None:
     without ever printing the secret itself.
     """
     log.info(
-        "config loaded — openai=%s judge0=%s rapidapi=%s supabase=%s "
+        "config loaded — openai=%s openrouter=%s judge0=%s rapidapi=%s supabase=%s "
         "database_url=%s sentry=%s langfuse=%s convex_url=%s",
         _is_set(settings.OPENAI_API_KEY),
+        settings.OPENROUTER_ENABLED and _is_set(settings.OPENROUTER_API_KEY),
         _is_set(settings.JUDGE0_ENDPOINT),
         settings.IS_RAPIDAPI,
         _is_set(settings.SUPABASE_URL) and _is_set(settings.SUPABASE_SECRET_KEY),
@@ -104,6 +111,11 @@ def log_config_summary() -> None:
 
     if not _is_set(settings.OPENAI_API_KEY):
         log.warning("config — OPENAI_API_KEY is not set; LLM calls will fail")
+    if settings.OPENROUTER_ENABLED and not _is_set(settings.OPENROUTER_API_KEY):
+        log.warning(
+            "config — OPENROUTER_ENABLED is true but OPENROUTER_API_KEY is not set; "
+            "OpenRouter route will fail"
+        )
     if not _is_set(settings.JUDGE0_ENDPOINT):
         log.warning("config — JUDGE0_ENDPOINT is not set; /execute will return 500")
     if not _is_set(settings.CONVEX_URL):

@@ -46,3 +46,20 @@ uv run fastapi dev
 ```
 
 This will start the server on [http://localhost:8000](http://localhost:8000).
+
+## LLM configuration
+
+The agent uses **OpenRouter** as its LLM route by default. To set it up:
+
+1. Create an API key at https://openrouter.ai and copy it.
+2. In `server/.env`, set:
+   ```
+   OPENROUTER_API_KEY=<your key>
+   OPENROUTER_MODEL=            # optional; defaults to deepseek/deepseek-v4-flash-0731
+   OPENROUTER_ENABLED=True      # enabled by default
+   ```
+3. Restart the server.
+
+The agent routes the OpenRouter model through every node. Set
+`OPENROUTER_ENABLED=False` (and supply `OPENAI_API_KEY`) to fall back to OpenAI —
+no code changes needed.
