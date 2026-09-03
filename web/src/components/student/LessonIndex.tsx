@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { ChevronLeft, Menu } from "lucide-react";
 
 interface LessonIndexProps {
@@ -6,6 +7,7 @@ interface LessonIndexProps {
   questions: any[] | undefined;
   activeQuestionId: string | undefined;
   lessonProgress: any[] | undefined;
+  /** Side effects to run when a lesson is picked (navigation is handled by the Link). */
   onSelectLesson: (id: string) => void;
 }
 
@@ -59,8 +61,10 @@ export default function LessonIndex({
           const isQInProgress = qProgress?.status === "in-progress";
 
           return (
-            <button
+            <Link
               key={q._id}
+              to="/course"
+              search={{ problemId: q._id }}
               onClick={() => onSelectLesson(q._id)}
               className="w-full text-left flex flex-col gap-1 group cursor-pointer transition-colors"
             >
@@ -83,7 +87,7 @@ export default function LessonIndex({
                   {isQCompleted ? '❖ Done' : isQInProgress ? '✦ Active' : '✧ Muted'}
                 </span>
               </div>
-            </button>
+            </Link>
           );
         })}
       </div>

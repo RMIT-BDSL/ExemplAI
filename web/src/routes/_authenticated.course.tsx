@@ -1,16 +1,22 @@
 import { usePostHog } from "@posthog/react";
-import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
-import axios from "axios";
-import { useMutation, useQuery } from "convex/react";
-import { BookOpen, ChevronRight, Loader2, TerminalSquare } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import CodeEditor from "#/components/student/CodeEditor";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { BookOpen, ChevronRight, TerminalSquare } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import CodingBar from "#/components/student/InteractionBar";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
-import Scratchpad, { type ScratchpadHandle } from "#/components/student/Scratchpad";
-import SidePanel from "#/components/student/SidePane";
+import type { ScratchpadHandle } from "#/components/student/Scratchpad";
+
+// Heavy, non-LCP subtrees — kept out of the initial route chunk.
+// Monaco (via CodeEditor) alone is several hundred KB of JS.
+const CodeEditor = lazy(() => import("#/components/student/CodeEditor"));
+const Scratchpad = lazy(() => import("#/components/student/Scratchpad"));
+const SidePanel = lazy(() => import("#/components/student/SidePane"));
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
+import LessonSkeleton from "#/components/student/LessonSkeleton";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
@@ -21,6 +27,20 @@ export const Route = createFileRoute("/_authenticated/course")({
     return {
       problemId: (search.problemId as string) || undefined,
     };
+  },
+  loaderDeps: ({ search: { problemId } }) => ({ problemId }),
+  loader: ({ context, deps }) => {
+    // Warm the cache on hover-preload so the reactive subscriptions are already
+    // populated by the time the component mounts. Non-blocking on purpose.
+    void context.queryClient.prefetchQuery(
+      convexQuery(api.courses.getAllCourses, {})
+    );
+    void context.queryClient.prefetchQuery(
+      convexQuery(
+        api.courses.getQuestionById,
+        deps.problemId ? { id: deps.problemId } : "skip"
+      )
+    );
   },
 });
 
@@ -35,18 +55,22 @@ function Course() {
 
   const { problemId } = Route.useSearch();
 
-  const questions = useQuery(api.courses.getAllCourses);
-  const fetchedQuestion = useQuery(
-    api.courses.getQuestionById,
-    problemId ? { id: problemId } : "skip"
+  const { data: questions } = useQuery(convexQuery(api.courses.getAllCourses, {}));
+  const { data: fetchedQuestion } = useQuery(
+    convexQuery(
+      api.courses.getQuestionById,
+      problemId ? { id: problemId } : "skip"
+    )
   );
 
   const { data: session } = authClient.useSession();
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
-  const lessonProgress = useQuery(
-    api.courses.getLessonProgress,
-    tokenIdentifier ? {} : "skip"
+  const { data: lessonProgress } = useQuery(
+    convexQuery(
+      api.courses.getLessonProgress,
+      tokenIdentifier ? {} : "skip"
+    )
   );
 
   const [language, setLanguage] = useState<string>("python");
@@ -71,9 +95,11 @@ function Course() {
 
   const activeQuestion = problemId
     ? fetchedQuestion
-    : questions && questions.length > 0
-      ? questions[0]
-      : null;
+    : questions === undefined
+      ? undefined
+      : questions.length > 0
+        ? questions[0]
+        : null;
 
   const [isSaved, setIsSaved] = useState<boolean>(true);
 
@@ -167,11 +193,7 @@ function Course() {
   }, [problemId, language, isSaved]);
 
   if (activeQuestion === undefined) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-        <Loader2 className="size-8 animate-spin text-emerald-500" />
-      </div>
-    );
+    return <LessonSkeleton />;
   }
 
   if (activeQuestion === null) {
@@ -285,6 +307,7 @@ function Course() {
       actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
 
     try {
+      const { default: axios } = await import("axios");
       const tokenRes = await authClient.convex.token();
       const token = tokenRes.data?.token;
 
@@ -382,16 +405,14 @@ function Course() {
     setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
   }
 
-  function handleSelectLesson(id: string) {    navigate({
-      to: "/course",
-      search: { problemId: id },
-    });
+  // Navigation is handled by the <Link> in LessonIndex; this just resets
+  // the transient run state so the console doesn't carry over between lessons.
+  function handleSelectLesson(_id: string) {
     setExecutionResult(null);
     setIsConsoleOpen(false);
   }
 
   return (
-    <ClientOnly>
       <div className="dark flex h-[calc(100vh-48px)] w-full flex-col bg-[#0b0a0d] text-zinc-100 antialiased overflow-hidden">
         {/* Running Header */}
         <div className="flex h-9 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0 font-sans text-[10px] uppercase tracking-[0.15em] text-zinc-500 select-none">
@@ -484,6 +505,13 @@ function Course() {
             />
 
             <div className="flex flex-1 flex-col overflow-hidden relative">
+              <Suspense
+                fallback={
+                  <div className="flex flex-1 items-center justify-center bg-[#0c0b0e] text-[10px] uppercase tracking-[0.15em] text-zinc-600">
+                    Loading editor…
+                  </div>
+                }
+              >
               {isScratchpadVisible ? (
                 <Scratchpad ref={scratchpadRef} />
               ) : (
@@ -508,6 +536,7 @@ function Course() {
                   onNextLesson={handleNextLesson}
                 />
               )}
+              </Suspense>
             </div>
           </div>
 
@@ -528,15 +557,23 @@ function Course() {
                 </button>
               </div>
               <div className="flex-1 min-h-0 editorial-chat-container">
-                <SidePanel
-                  onCollapse={() => setIsChatCollapsed(true)}
-                  pendingMessage={chatPrompt}
-                  editorRef={editorRef}
-                  currentCode={currentCode}
-                  lessonId={activeQuestionId}
-                  onOpenScratchpad={handleOpenScratchpad}
-                  onAskAboutOutput={handleAskAboutOutput}
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-[0.15em] text-zinc-600">
+                      Loading assistant…
+                    </div>
+                  }
+                >
+                  <SidePanel
+                    onCollapse={() => setIsChatCollapsed(true)}
+                    pendingMessage={chatPrompt}
+                    editorRef={editorRef}
+                    currentCode={currentCode}
+                    lessonId={activeQuestionId}
+                    onOpenScratchpad={handleOpenScratchpad}
+                    onAskAboutOutput={handleAskAboutOutput}
+                  />
+                </Suspense>
               </div>
             </div>
           )}
@@ -562,6 +599,5 @@ function Course() {
           <ResetCodeForm setShowResetModal={setShowResetModal} handleReset={handleReset} />
         )}
       </div>
-    </ClientOnly>
   );
 }

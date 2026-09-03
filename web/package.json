@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "latest",
+    "@convex-dev/react-query": "^0.1.0",
     "@monaco-editor/react": "^4.7.0",
     "@posthog/react": "^1.10.3",
     "@tailwindcss/vite": "^4.3.1",
