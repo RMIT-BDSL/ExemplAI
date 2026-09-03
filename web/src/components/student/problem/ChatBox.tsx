@@ -161,9 +161,7 @@ function CodeBlock({
       </div>
 
       {/* Code body */}
-      <pre className="overflow-x-auto whitespace-pre-wrap p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200">
-        <code className="font-mono">{code}</code>
-      </pre>
+      <pre className="chat-code editorial-scroll max-h-80">{code}</pre>
 
       {/* Output */}
       {isRunning && (
@@ -188,7 +186,7 @@ function CodeBlock({
               {isAccepted ? "Ran successfully" : result?.status?.description || "Error"}
             </span>
           </div>
-          <pre className="max-h-32 overflow-auto whitespace-pre-wrap px-3 pb-2 font-mono text-[11px] text-zinc-300">
+          <pre className="chat-code chat-code-wrap editorial-scroll max-h-32">
             {result.stdout ? result.stdout : hasError ? result.stderr || result.compile_output : "(empty output)"}
           </pre>
           {onAskAboutOutput && (
@@ -243,25 +241,36 @@ export function MessageBubble({ message, onOpenScratchpad, onAskAboutOutput }: M
           ) : (
             <ReactMarkdown
               components={{
+                // Unwrap <pre> so our CodeBlock's <div> isn't nested in it.
                 pre(props) {
                   return <>{props.children}</>;
                 },
                 code(props) {
                   const { children, className, ...rest } = props;
                   const match = /language-(\w+)/.exec(className || "");
-                  const codeText = String(children).replace(/\n$/, "");
-                  if (match) {
+                  const raw = String(children ?? "");
+                  // react-markdown v10 dropped the `inline` prop, so treat a
+                  // fence with a language tag OR any multi-line snippet as a
+                  // block; everything else renders as inline code.
+                  const isBlock = Boolean(match) || raw.includes("\n");
+                  if (isBlock) {
                     return (
                       <CodeBlock
-                        language={match[1]}
-                        code={codeText}
+                        language={match?.[1]}
+                        code={raw.replace(/\n$/, "")}
                         onOpenScratchpad={onOpenScratchpad}
                         onAskAboutOutput={onAskAboutOutput}
                       />
                     );
                   }
                   return (
-                    <code className={className} {...rest}>
+                    <code
+                      className={cn(
+                        "rounded border border-zinc-750 bg-zinc-950/60 px-1 py-px font-mono text-[0.85em] text-zinc-100",
+                        className
+                      )}
+                      {...rest}
+                    >
                       {children}
                     </code>
                   );

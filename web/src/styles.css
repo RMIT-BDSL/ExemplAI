@@ -251,6 +251,36 @@ pre code {
   color: #f5f5f7;
 }
 
+/* Fenced code / output blocks rendered inside chat message bubbles. The bubble
+   carries `.prose` and lives under `.editorial-chat-container`, both of which
+   push serif fonts, inflated line-height and pill styling onto descendant
+   `pre`/`code`. Reset all of that here so snippets read as plain preformatted
+   code. Theme-fighting properties use `!important`; layout stays overridable
+   by utilities (e.g. `whitespace-pre-wrap`, `max-h-*`). */
+.chat-code,
+.editorial-chat-container .prose .chat-code {
+  margin: 0 !important;
+  padding: 0.625rem 0.75rem !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #e4e4e7 !important;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
+  letter-spacing: 0 !important;
+  tab-size: 4;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Program output reads better wrapped than horizontally scrolled. */
+.chat-code.chat-code-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .page-wrap {
   width: min(1120px, calc(100% - 2rem));
   margin-inline: auto;
