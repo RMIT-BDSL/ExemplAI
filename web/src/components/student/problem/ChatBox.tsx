@@ -441,6 +441,19 @@ export default function ChatBox({
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
 
+  // When the POST /chat connection dies (e.g. Firefox NS_BINDING_ERROR, a reset
+  // tunnel, or a malformed response) the assistant reply is usually still
+  // persisted to Convex by the backend and arrives through `dbMessages` a moment
+  // later. While `awaitingReply` is set we hold the typing indicator and wait
+  // for that reply instead of showing a hard error right away.
+  const [awaitingReply, setAwaitingReply] = React.useState(false);
+  const assistantCountRef = React.useRef(0);
+  const replyBaselineRef = React.useRef(0);
+  // Stays true from a failed send until its reply lands (or the next send).
+  // Outlives `awaitingReply` so a reply that arrives *after* we've shown the
+  // timeout error still retracts that error.
+  const expectingReplyRef = React.useRef(false);
+
   // Convex integration
   const convexLessonId = lessonId as Id<"questions"> | undefined;
   
@@ -487,6 +500,46 @@ export default function ChatBox({
     }
     return result;
   }, [dbMessages, localError]);
+
+  // Track how many assistant messages Convex currently holds so a failed POST
+  // /chat can tell whether the reply landed anyway.
+  const assistantCount = React.useMemo(
+    () => (dbMessages ?? []).filter((m) => m.sender === "assistant").length,
+    [dbMessages]
+  );
+  React.useEffect(() => {
+    assistantCountRef.current = assistantCount;
+  }, [assistantCount]);
+
+  // A reply landed in Convex for a send whose HTTP call failed — clear the
+  // waiting state (and any timeout error we may have already shown). Runs
+  // whenever the message list grows, regardless of `awaitingReply`.
+  React.useEffect(() => {
+    if (!expectingReplyRef.current) return;
+    if (assistantCount > replyBaselineRef.current) {
+      expectingReplyRef.current = false;
+      setAwaitingReply(false);
+      setIsTyping(false);
+      setLocalError(null);
+    }
+  }, [assistantCount]);
+
+  // The connection failed and no reply has shown up after a generous grace
+  // period — tentatively surface the error. This timer only starts *after* the
+  // browser request has already died, so it never interrupts an in-flight run;
+  // and a late reply still clears it via the effect above.
+  React.useEffect(() => {
+    if (!awaitingReply) return;
+    const timer = setTimeout(() => {
+      setAwaitingReply(false);
+      setIsTyping(false);
+      setLocalError(
+        "The connection dropped before a reply came back. If nothing appears shortly, please send your message again."
+      );
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [awaitingReply]);
+
   React.useEffect(() => {
     setChatId(null);
     let isActive = true;
@@ -518,6 +571,7 @@ export default function ChatBox({
     // Optmistically show typing state
     setIsTyping(true);
     setLocalError(null);
+    expectingReplyRef.current = false;
 
     try {
       // 1. Add User Message to Convex
@@ -571,25 +625,19 @@ export default function ChatBox({
         }
       }
 
-      const response = await sendChatMessage(conversationPayload, chatId, 1, editorContext);
-
-      // Find the last AI assistant message content from the response messages
-      const aiMessages = response.messages.filter(
-        (msg) => msg.type === "ai" || msg.type === "assistant"
-      );
-      const lastAiMessage = aiMessages[aiMessages.length - 1];
-      const replyContent = lastAiMessage
-        ? lastAiMessage.content
-        : "Sorry, I couldn't get a response.";
-
-      // The AI message will automatically appear in the UI once the backend 
-      // pushes it to Convex. We no longer save it from the frontend to avoid
-      // duplication and sync issues.
+      // The response body is intentionally unused: the backend persists the
+      // assistant reply to Convex and it renders from the reactive `dbMessages`
+      // query. This POST just triggers the run.
+      await sendChatMessage(conversationPayload, chatId, 1, editorContext);
+      setIsTyping(false);
     } catch (error) {
       console.error("Error communicating with chat server:", error);
-      setLocalError("Sorry, I encountered an error connecting to the server.");
-    } finally {
-      setIsTyping(false);
+      // The connection to POST /chat failed, but the graph may have still run
+      // and saved the reply to Convex. Wait for it to arrive before showing a
+      // hard error (see the `awaitingReply` effects above).
+      replyBaselineRef.current = assistantCountRef.current;
+      expectingReplyRef.current = true;
+      setAwaitingReply(true);
     }
   };
 

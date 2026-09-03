@@ -169,7 +169,14 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         chosen_model = _determine_chosen_model(result)
         await _save_assistant_message(client, chat.chat_id, text, chosen_model)
 
-        return result
+        # Return a small, guaranteed-serializable payload rather than the raw
+        # graph state (which carries LangChain message objects and can be large
+        # or awkward to encode). The client renders the reply from Convex, not
+        # from this body, so this only needs to confirm the run happened.
+        return {
+            "messages": [{"type": "ai", "content": text}],
+            "chosen_model": chosen_model,
+        }
     except Exception as e:
         log.error(f"AI service error: {e}")
         raise HTTPException(

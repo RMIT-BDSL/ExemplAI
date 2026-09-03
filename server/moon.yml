@@ -8,3 +8,5 @@ tasks:
   dev:
     command: 'uv run fastapi dev'
     preset: 'server'
+    env:
+      PYTHONUTF8: '1'
