@@ -18,7 +18,7 @@ from convex import ConvexClient
 from fastapi import HTTPException, status, BackgroundTasks
 from sentry_sdk import metrics
 
-from bkt import initial_mastery, update_mastery
+from bkt import initial_mastery, is_mastered, update_mastery
 from config import settings
 from model.student_code import StudentCode
 
@@ -75,6 +75,7 @@ async def _record_code_execution(
                 new_mastery = update_mastery(current, passed, kc)
                 mutation_args["probMastery"] = new_mastery
                 mutation_args["knowledgeComponent"] = kc
+                mutation_args["mastered"] = is_mastered(new_mastery)
 
         await asyncio.wait_for(
             asyncio.to_thread(

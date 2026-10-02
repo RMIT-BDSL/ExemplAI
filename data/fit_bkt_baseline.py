@@ -6,8 +6,11 @@ Reads the CSEDM 2019 Data Challenge dataset (ProgSnap2 format), maps each of
 the 19 evaluated problems to a Knowledge Component (KC) based on the Python
 concepts exercised, then fits a Bayesian Knowledge Tracing model using pyBKT.
 
-The output is a JSON file (bktParams.json) containing the four BKT parameters
-(prior, learn, guess, slip) for every KC, ready to be loaded by the live tutor.
+The output is a JSON file (bktParams.fitted.json) containing the four BKT
+parameters (prior, learn, guess, slip) for every KC. It is written next to, not
+over, the live bktParams.json: review the fitted values (watch for guess + slip
+>= 1, learn = 1.0, or KCs with too few problems) and copy accepted values into
+bktParams.json by hand.
 
 Usage:
     python fit_bkt_baseline.py
@@ -149,59 +152,58 @@ except ImportError:
 # dominant Python concept it exercises.  Problems that share a KC are treated
 # as repeated practice of the same underlying skill.
 #
-# KC taxonomy (7 components):
-#   io_basics         — console I/O, type conversion, string formatting
-#   arithmetic        — numeric operators, math expressions
-#   conditionals      — if / elif / else, boolean logic
-#   loops             — for / while iteration
-#   string_manip      — slicing, concatenation, character tests
-#   functions_params  — defining functions, parameters, return values
-#   modular_arith     — modulo / integer division for real-world problems
+# KCs are the COSC3104/5 syllabus topics (one per teaching week; no class in
+# week 7) and must match the keys in bktParams.json and the lesson tags in
+# web/convex/seed.ts. Each problem is placed in the same topic as its seed
+# lesson. Topics with no CSEDM problem (advanced_loops, collections, files,
+# basic_libraries, advanced_topics) are not fitted.
 
 PROBLEM_TO_KC = {
-    # --- io_basics: basic I/O and type conversion ---
-    "helloWorld":        "io_basics",        # print a greeting
-    "intToFloat":        "io_basics",        # int ↔ float conversion
-    "doubleX":           "io_basics",        # simple return of 2*x
+    # --- intro_setup (week 1): first programs ---
+    "helloWorld":        "intro_setup",            # print a greeting
 
-    # --- arithmetic: numeric computation ---
-    "raiseToPower":      "arithmetic",       # exponentiation
-    "convertToDegrees":  "arithmetic",       # formula application
+    # --- variables_expressions (week 2): types, arithmetic, mod / int division ---
+    "intToFloat":        "variables_expressions",  # int ↔ float conversion
+    "doubleX":           "variables_expressions",  # simple return of 2*x
+    "raiseToPower":      "variables_expressions",  # exponentiation
+    "convertToDegrees":  "variables_expressions",  # formula application
+    "leftoverCandy":     "variables_expressions",  # modulo operator
+    "howManyEggCartons": "variables_expressions",  # ceiling division
+    "kthDigit":          "variables_expressions",  # digit extraction via mod/div
+    "nearestBusStop":    "variables_expressions",  # rounding with mod
 
-    # --- modular_arith: mod / integer division in context ---
-    "leftoverCandy":     "modular_arith",    # modulo operator
-    "howManyEggCartons": "modular_arith",    # ceiling division
-    "kthDigit":          "modular_arith",    # digit extraction via mod/div
-    "nearestBusStop":    "modular_arith",    # rounding with mod
+    # --- strings_formatting (week 3): slicing and character tests ---
+    "isPunctuation":     "strings_formatting",     # character membership test
+    "firstAndLast":      "strings_formatting",     # string slicing
+    "backwardsCombine":  "strings_formatting",     # reverse + concatenate
+    "singlePigLatin":    "strings_formatting",     # string manipulation
 
-    # --- conditionals: branching logic ---
-    "hasTwoDigits":      "conditionals",     # range check with if
-    "overNineThousand":  "conditionals",     # threshold comparison
-    "canDrinkAlcohol":   "conditionals",     # age check
-    "isEvenPositiveInt": "conditionals",     # compound boolean
+    # --- branching (week 4): comparisons and boolean logic ---
+    "hasTwoDigits":      "branching",              # range check
+    "overNineThousand":  "branching",              # threshold comparison
+    "canDrinkAlcohol":   "branching",              # age check
+    "isEvenPositiveInt": "branching",              # compound boolean
 
-    # --- functions_params: sqrt / math library usage ---
-    "findRoot":          "functions_params", # math.sqrt, return value
+    # --- loops (week 5): iteration ---
+    "oneToN":            "loops",                  # 1..n
 
-    # --- string_manip: string slicing and character tests ---
-    "isPunctuation":     "string_manip",     # character membership test
-    "firstAndLast":      "string_manip",     # string slicing
-    "backwardsCombine":  "string_manip",     # reverse + concatenate
-    "singlePigLatin":    "string_manip",     # string manipulation
-
-    # --- loops: iteration ---
-    "oneToN":            "loops",            # for loop 1..n
+    # --- functions (week 8): seeded here, though it is really a math-library call ---
+    "findRoot":          "functions",              # math.sqrt, return value
 }
 
-# Friendly descriptions for the output JSON
+# Friendly descriptions for the output JSON (same wording as bktParams.json)
 KC_DESCRIPTIONS = {
-    "io_basics":        "Console I/O, type conversion, simple returns",
-    "arithmetic":       "Numeric operators and math expressions",
-    "modular_arith":    "Modulo and integer division in context",
-    "conditionals":     "If/elif/else branching and boolean logic",
-    "functions_params": "Function definitions, parameters, library calls",
-    "string_manip":     "String slicing, concatenation, character tests",
-    "loops":            "For/while iteration",
+    "intro_setup":           "Running Python, print output, first programs",
+    "variables_expressions": "Variables, types and conversion, arithmetic, modulo and integer division",
+    "strings_formatting":    "String indexing, slicing, concatenation, methods and formatting",
+    "branching":             "If/elif/else, comparisons and boolean logic",
+    "loops":                 "For/while iteration and range",
+    "advanced_loops":        "Nested loops, break/continue, loop patterns and accumulators",
+    "functions":             "Defining functions, parameters, return values, calling library functions",
+    "collections":           "Lists, tuples, dictionaries and sets",
+    "files":                 "Reading and writing files",
+    "basic_libraries":       "Using standard-library modules for practical tasks",
+    "advanced_topics":       "Advanced course topics",
 }
 
 
@@ -359,7 +361,8 @@ def main():
     print("-" * 72)
 
     # --- Save ---
-    out_path = script_dir / "bktParams.json"
+    # Never overwrite the live parameters; a person reviews and promotes them.
+    out_path = script_dir / "bktParams.fitted.json"
     output = {
         "meta": {
             "source": "CSEDM 2019 Data Challenge (ProgSnap2)",
@@ -377,7 +380,8 @@ def main():
         json.dump(output, f, indent=2)
     print(f"  ✓ Saved to {out_path}")
 
-    print("\n✅ Done! These baseline parameters can now be loaded by the tutor.")
+    print("\n✅ Done! Review these values, then copy accepted ones into "
+          "bktParams.json (the tutor only reads bktParams.json).")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from convex import ConvexClient
 from posthog import Posthog
 
+from bkt import initial_mastery
 from config import settings
 from model.chat import Chat
 
@@ -97,7 +98,11 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> None:
             if context:
                 chat.original_problem = context.get("original_problem", "")
                 chat.current_knowledge_component = context.get("current_knowledge_component", "")
-                chat.bkt_prob_mastery = context.get("bkt_prob_mastery", 0.0)
+                # No mastery row yet (no graded Submit on this KC) → cold-start P-Init.
+                mastery = context.get("bkt_prob_mastery")
+                if mastery is None:
+                    mastery = initial_mastery(chat.current_knowledge_component or None)
+                chat.bkt_prob_mastery = mastery
                 if context.get("experiment_condition"):
                     chat.experiment_condition = context.get("experiment_condition")
         except Exception as cvx_err:

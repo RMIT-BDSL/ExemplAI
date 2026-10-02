@@ -7,7 +7,11 @@ transition. Offline fitting still belongs in `data/fit_bkt_baseline.py`
 
 Defaults follow LangGraph_BKT_Architecture_Spec.md (P-Init = 0.15).
 Optional per-KC overrides load from `data/bktParams.json` when present
-(output of fit_bkt_baseline: `{ "kc_parameters": { kc: {prior, learn, ...} } }`).
+(`{ "kc_parameters": { kc: {prior, learn, ...} } }`; currently hand-set by the
+research team — fit_bkt_baseline.py writes the same shape to
+bktParams.fitted.json for review; only bktParams.json is read here).
+
+A student has mastered a KC (cleared to move on) once P(L) ≥ MASTERY_THRESHOLD.
 """
 
 from __future__ import annotations
@@ -20,16 +24,20 @@ from typing import Optional, Sequence
 
 log = logging.getLogger("rich")
 
-# P-Init baseline + typical BKT transit / emission defaults until CSEDM-fitted
-# params are available. forget=0 matches classic Corbett & Anderson BKT
-# (and pyBKT's default non-forgets model).
+# P-Init baseline + research-team transit / emission defaults until CSEDM-fitted
+# params are available. Keep in sync with data/bktParams.json. forget=0 matches
+# classic Corbett & Anderson BKT (and pyBKT's default non-forgets model).
 DEFAULT_PARAMS = {
     "prior": 0.15,
-    "learn": 0.3,
-    "guess": 0.2,
+    "learn": 0.25,
+    "guess": 0.4,
     "slip": 0.1,
     "forget": 0.0,
 }
+
+# Conventional BKT mastery criterion (Corbett & Anderson): at or above this the
+# student is cleared to progress to the next topic. Research-team decision.
+MASTERY_THRESHOLD = 0.95
 
 _PARAM_ALIASES = {
     "prior": ("prior", "p_init", "pL0"),
@@ -122,6 +130,11 @@ def params_for_kc(knowledge_component: Optional[str] = None) -> dict[str, float]
 def initial_mastery(knowledge_component: Optional[str] = None) -> float:
     """Cold-start P(L₀) before any observations (P-Init / fitted prior)."""
     return params_for_kc(knowledge_component)["prior"]
+
+
+def is_mastered(prob_mastery: float) -> bool:
+    """True once P(L) reaches the mastery criterion (cleared to move on)."""
+    return _clamp_prob(prob_mastery) >= MASTERY_THRESHOLD
 
 
 def p_correct(prob_mastery: float, knowledge_component: Optional[str] = None) -> float:

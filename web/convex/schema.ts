@@ -77,11 +77,16 @@ export default defineSchema({
     .index("by_user_lesson", ["userId", "lessonId"]),
   // Per-student BKT mastery for a knowledge component (shared across lessons
   // tagged with the same KC). Updated once per lesson on first Submit only.
+  // `mastered` is sticky: set the first time prob_mastery reaches the mastery
+  // threshold (server/bkt.py MASTERY_THRESHOLD) and never cleared, so a student
+  // cleared to the next topic stays cleared.
   bktMastery: defineTable({
     userId: v.id("users"),
     knowledge_component: v.string(),
     prob_mastery: v.number(),
     updatedAt: v.number(),
+    mastered: v.optional(v.boolean()),
+    masteredAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_kc", ["userId", "knowledge_component"]),

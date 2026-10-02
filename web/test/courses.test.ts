@@ -494,4 +494,49 @@ describe("recordCodeExecution", () => {
     expect(masteryAfterSecond).toHaveLength(1);
     expect(masteryAfterSecond[0].prob_mastery).toBe(serverMastery);
   });
+
+  it("sets mastered once and keeps it after a later fail", async () => {
+    const t = setup();
+    const admin = await createMockAdmin(t);
+    const course = await makeCourse(admin);
+    const lessonIds = await Promise.all(
+      ["A", "B", "C"].map((name) =>
+        admin.mutation(api.lessons.createLesson, {
+          course,
+          week: 1,
+          problem_name: `Loops ${name}`,
+          problem_description: "x",
+          knowledge_component: "loops",
+        })
+      )
+    );
+    const student = await createMockStudent(t);
+    const submit = (lessonId: (typeof lessonIds)[number], passed: boolean, probMastery: number, mastered: boolean) =>
+      student.mutation(api.courses.recordCodeExecution, {
+        lessonId,
+        passed,
+        actionType: "submit",
+        probMastery,
+        knowledgeComponent: "loops",
+        mastered,
+      });
+
+    const first = await submit(lessonIds[0], true, 0.58, false);
+    expect(first.mastered).toBe(false);
+
+    const second = await submit(lessonIds[1], true, 0.97, true);
+    expect(second.mastered).toBe(true);
+    const [row] = await t.run(async (ctx) => ctx.db.query("bktMastery").collect());
+    expect(row.mastered).toBe(true);
+    const masteredAt = row.masteredAt;
+    expect(masteredAt).toBeTypeOf("number");
+
+    // A later fail lowers prob_mastery but the student stays cleared.
+    const third = await submit(lessonIds[2], false, 0.6, false);
+    expect(third.mastered).toBe(true);
+    const [after] = await t.run(async (ctx) => ctx.db.query("bktMastery").collect());
+    expect(after.prob_mastery).toBe(0.6);
+    expect(after.mastered).toBe(true);
+    expect(after.masteredAt).toBe(masteredAt);
+  });
 });
