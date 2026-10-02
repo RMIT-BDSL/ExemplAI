@@ -16,7 +16,7 @@ from bkt import (
 
 def test_defaults_match_p_init_spec():
     assert DEFAULT_PARAMS["prior"] == 0.15
-    assert DEFAULT_PARAMS["learn"] == 0.25
+    assert DEFAULT_PARAMS["learn"] == 0.2
     assert DEFAULT_PARAMS["guess"] == 0.4
     assert DEFAULT_PARAMS["forget"] == 0.0
     assert initial_mastery() == 0.15
@@ -53,15 +53,15 @@ def test_transition_with_forget():
 def test_update_correct_matches_hand_formula():
     # full step from P-Init with defaults
     post = 0.135 / 0.475
-    expected = post + (1 - post) * 0.25
+    expected = post + (1 - post) * 0.2
     got = update_mastery(0.15, True)
     assert abs(got - expected) < 1e-9
-    assert abs(got - 0.46315789473684216) < 1e-9
+    assert abs(got - 0.4273684210526316) < 1e-9
 
 
 def test_update_incorrect_matches_hand_formula():
     post = 0.015 / 0.525
-    expected = post + (1 - post) * 0.25
+    expected = post + (1 - post) * 0.2
     got = update_mastery(0.15, False)
     assert abs(got - expected) < 1e-9
 
@@ -94,7 +94,7 @@ def test_param_file_matches_defaults_for_every_kc():
 
 
 def test_first_fail_keeps_novice_below_faded_band():
-    # learn=0.25: a first failed submit leaves a novice in Complete (< 0.3).
+    # learn=0.2: a first failed submit leaves a novice in Complete (< 0.3).
     assert update_mastery(initial_mastery("loops"), False, "loops") < 0.3
 
 
@@ -105,7 +105,14 @@ def test_mastery_threshold():
 
 
 def test_four_straight_passes_reach_mastery():
-    # guess=0.4: a pass is weaker evidence, so 3 passes (0.90) fall short.
+    # guess=0.4: a pass is weaker evidence, so 3 passes (0.87) fall short.
     p0 = initial_mastery("loops")
     assert not is_mastered(update_mastery_sequence(p0, [True] * 3, "loops"))
     assert is_mastered(update_mastery_sequence(p0, [True] * 4, "loops"))
+
+
+def test_repeated_fails_return_struggling_student_to_complete():
+    # learn=0.2: repeated fails settle near 0.24, below the Complete/Faded
+    # boundary (0.3), so a struggling Faded student can return to Complete.
+    p = update_mastery_sequence(0.7, [False] * 50, "loops")
+    assert 0.23 < p < 0.25

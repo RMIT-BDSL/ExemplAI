@@ -29,7 +29,7 @@ log = logging.getLogger("rich")
 # classic Corbett & Anderson BKT (and pyBKT's default non-forgets model).
 DEFAULT_PARAMS = {
     "prior": 0.15,
-    "learn": 0.25,
+    "learn": 0.2,
     "guess": 0.4,
     "slip": 0.1,
     "forget": 0.0,
