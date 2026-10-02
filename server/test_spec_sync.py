@@ -83,10 +83,13 @@ def test_context_carries_allowed_features_and_asks_for_a_reply_to_the_latest_mes
     assert "<allowed_python>" not in student_context({"current_knowledge_component": "unknown"})
 
 
-def test_every_agent_prompt_has_the_allowed_features_rule():
+def test_example_agents_have_the_allowed_features_rule_and_control_does_not():
     from ai.nodes import complete_ebl_node, erroneous_ebl_node, faded_ebl_node
-    for mod in (complete_ebl_node, faded_ebl_node, erroneous_ebl_node, control_agent):
+    for mod in (complete_ebl_node, faded_ebl_node, erroneous_ebl_node):
         assert "<allowed_python>" in mod._SYSTEM_PROMPT, mod.__name__
+    assert "<allowed_python>" not in control_agent._SYSTEM_PROMPT  # truly generic tutor
+    control_context = student_context({"current_knowledge_component": "loops", "experiment_condition": "control"})
+    assert "<allowed_python>" not in control_context
 
 
 def test_dean_exempts_deliberate_faded_blanks():
@@ -99,8 +102,10 @@ def test_button_presses_are_spelled_out_for_the_model():
     assert "<student_action>\nThe student pressed Get help" in help_text
     assert "targets the failure in <error_trace>" in help_text
     assert "different scenario" in student_context({**base, "trigger": "new_example"})
-    control = student_context({**base, "experiment_condition": "control", "trigger": "new_example"})
-    assert "fresh explanation" in control and "present a new example" not in control
+    # Control is a plain chat: no button context and no example allowance.
+    control = student_context({**base, "experiment_condition": "control", "trigger": "get_help",
+                               "examples_remaining": 0})
+    assert "<student_action>" not in control and "<examples_remaining>" not in control
     assert "<student_action>" not in student_context({**base, "trigger": "message"})
     assert help_text.endswith("reply to their latest message.")
 

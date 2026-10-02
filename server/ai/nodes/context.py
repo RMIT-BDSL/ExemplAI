@@ -40,17 +40,14 @@ asks for one: help them with the examples already given instead.
 # Chat-button triggers: always a new example (they spend the example allowance).
 _BUTTON_TRIGGERS = ("get_help", "new_example")
 
-# Tells the model which button was pressed, so its reply matches the
-# new_example label the server gives every button reply (see split_response_type).
+# Experimental group only: tells the model which button was pressed, so its
+# reply matches the new_example label the server gives every button reply (see
+# split_response_type). The control group has a plain chat with no buttons.
 _STUDENT_ACTION = {
-    ("get_help", "experimental"): "The student pressed Get help after a failed Submit: "
-    "present a new example that targets the failure in <error_trace>.",
-    ("new_example", "experimental"): "The student pressed New example: present a new "
-    "example in a different scenario from the examples earlier in this conversation.",
-    ("get_help", "control"): "The student pressed Get help after a failed Submit: "
-    "help them with the failure in <error_trace>.",
-    ("new_example", "control"): "The student pressed New example: give a fresh "
-    "explanation from a different angle than earlier in this conversation.",
+    "get_help": "The student pressed Get help after a failed Submit: present a new "
+    "example that targets the failure in <error_trace>.",
+    "new_example": "The student pressed New example: present a new example in a "
+    "different scenario from the examples earlier in this conversation.",
 }
 
 _TAG_RE = re.compile(r"^\s*\**\[(NEW_EXAMPLE|FOLLOW_UP)\]\**[ \t]*\n?", re.IGNORECASE)
@@ -69,20 +66,18 @@ def student_context(state: TutorGraphState) -> str:
     Goes BEFORE the conversation (see conversation()), so the model replies to
     the student's latest message rather than to an instruction placed last.
     """
-    allowed = allowed_python(state.get("current_knowledge_component"))
-    condition = "control" if state.get("experiment_condition") == "control" else "experimental"
-    action = _STUDENT_ACTION.get((state.get("trigger", ""), condition))
+    # Control is a plain, generic chat: no syllabus limit, buttons or example allowance.
+    is_control = state.get("experiment_condition") == "control"
+    allowed = "" if is_control else allowed_python(state.get("current_knowledge_component"))
+    action = None if is_control else _STUDENT_ACTION.get(state.get("trigger", ""))
+    remaining = None if is_control else state.get("examples_remaining")
     return (
         f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
         + (f"<allowed_python>\n{allowed}\n</allowed_python>\n" if allowed else "")
         + f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
         f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
-        + (
-            f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
-            if state.get("examples_remaining") is not None
-            else ""
-        )
+        + (f"<examples_remaining>{remaining}</examples_remaining>\n" if remaining is not None else "")
         + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
         + "The conversation with the student follows; reply to their latest message."
     )
@@ -130,10 +125,9 @@ def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
 
 
 def response_type_from_history(state: TutorGraphState) -> str:
-    """Control agent: no tag, label from history only (first reply vs later)."""
-    if state.get("trigger") in _BUTTON_TRIGGERS:
-        return NEW_EXAMPLE
-    return FOLLOW_UP if has_prior_tutor_reply(state) else NEW_EXAMPLE
+    """Control agent: a plain tutor that never gives examples, so every reply is
+    a follow_up and none counts against the example allowance."""
+    return FOLLOW_UP
 
 
 def recent_history(state: TutorGraphState) -> str:

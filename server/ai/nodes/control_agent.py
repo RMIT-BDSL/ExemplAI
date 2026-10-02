@@ -1,11 +1,14 @@
 """
 control_agent_node — RCT control group (standard LLM tutor, no EBL scaffolding).
 
-This is the baseline a generic LLM tutor would give, with the same guardrail as
-the experimental group (ResearchMethodology.md §4.4: never hand over a complete
-solution). It routes through the Dean for DIRECT_ANSWER_LEAK,
-INAPPROPRIATE_CONTENT and HALLUCINATED_CODE; the EBL modality checks do not
-apply to the control condition. Writes draft_response only — the Dean vets it.
+The control group gets a plain chat with the same model: the student can ask
+anything, with no Get help / New example buttons, no chat lock and no example
+allowance. The Dean checks control replies for DIRECT_ANSWER_LEAK (the
+methodology's guardrail, ResearchMethodology.md §4.4: never hand over the
+answer), INAPPROPRIATE_CONTENT and HALLUCINATED_CODE, but none of the example
+checks. It is a truly generic tutor: unlike the example
+agents it gets no <allowed_python> syllabus limit. Writes draft_response only —
+the Dean vets it.
 """
 
 from __future__ import annotations
@@ -27,10 +30,7 @@ concise.
 
 Do not write out a complete solution to the student's problem, or a fully \
 corrected version of their code. Explaining an error, pointing to where it is, \
-giving a hint, or showing a short snippet of syntax is fine.
-
-Use only the Python features listed in <allowed_python>; never use a feature \
-from a later topic."""
+giving a hint, or showing a short snippet of syntax is fine."""
 
 
 def control_agent_node(state: TutorGraphState) -> dict:

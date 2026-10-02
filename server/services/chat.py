@@ -104,14 +104,15 @@ class ChatLocked(Exception):
 
 
 def check_chat_lock(chat: Chat, allowance: Optional[dict]) -> None:
-    """Server-side copy of the Convex addMessage lock (web/convex/examples.ts).
+    """Server-side copy of the Convex addMessage lock (web/convex/examples.ts),
+    for the experimental group. The control group's plain chat isn't locked.
 
     Get help gives a round's first example and needs a failed Submit; New
     example needs Get help first and an example earned but not yet used; typed
     messages need the tutor to have replied once. Skipped when Convex predates
     the allowance.
     """
-    if allowance is None:
+    if allowance is None or chat.experiment_condition == "control":
         return
     used, remaining = allowance.get("used", 0), allowance.get("remaining", 0)
     if chat.trigger == "get_help":
@@ -252,10 +253,11 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
+        await _evaluate_posthog_condition(auth_user_id, chat)  # before the lock: control isn't locked
         check_chat_lock(chat, context.allowance)
-        await _evaluate_posthog_condition(auth_user_id, chat)
 
-        state = with_allowance(build_initial_state(chat, context.history), context.allowance)
+        allowance = None if chat.experiment_condition == "control" else context.allowance
+        state = with_allowance(build_initial_state(chat, context.history), allowance)
         result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
 
         text = _extract_final_message_text(result)
@@ -288,10 +290,11 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
+        await _evaluate_posthog_condition(auth_user_id, chat)  # before the lock: control isn't locked
         check_chat_lock(chat, context.allowance)
-        await _evaluate_posthog_condition(auth_user_id, chat)
 
-        state = with_allowance(build_initial_state(chat, context.history), context.allowance)
+        allowance = None if chat.experiment_condition == "control" else context.allowance
+        state = with_allowance(build_initial_state(chat, context.history), allowance)
         result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
     except ChatLocked as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
