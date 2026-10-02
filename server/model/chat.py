@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -27,4 +29,9 @@ class Chat(BaseModel):
     unit_test_assertions: str = ""
     current_knowledge_component: str = ""
     student_code: str = ""
+    # Overwritten from Convex (last failed Submit); the browser value is ignored.
     error_trace: str = ""
+
+    # "get_help": the Get help button (always a new example; needs a failed
+    # Submit). "message": a typed chat message (needs Get help first).
+    trigger: Literal["message", "get_help"] = "message"

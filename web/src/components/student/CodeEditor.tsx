@@ -17,7 +17,6 @@ interface CodeEditorProps {
 	setIsConsoleOpen: (open: boolean) => void;
 	onRun: () => void;
 	onSubmit: () => void;
-	onSendErrorToChat?: (error: string) => void;
 	isSaved: boolean;
 	onSave: () => void;
 	testCases: any[];
@@ -38,7 +37,6 @@ export default function CodeEditor({
 	setIsConsoleOpen,
 	onRun,
 	onSubmit,
-	onSendErrorToChat,
 	isSaved,
 	onSave,
 	testCases,
@@ -146,7 +144,6 @@ export default function CodeEditor({
 							activeTab={activeTab}
 							setIsConsoleOpen={setIsConsoleOpen}
 							renderStatusBadge={renderStatusBadge}
-							onSendErrorToChat={onSendErrorToChat}
 							testCases={testCases}
 						/>
 					)}

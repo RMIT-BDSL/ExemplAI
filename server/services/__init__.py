@@ -34,13 +34,51 @@ def _convex_client(auth_token: str) -> ConvexClient:
     return client
 
 
+_ERROR_TRACE_CHARS = 2000
+
+
+def summarize_failures(results: list[dict]) -> str:
+    """Tutor-facing summary of a failed Submit, stored in Convex for the chat.
+
+    Visible tests give input, expected, actual output and any error. Hidden
+    tests are only counted, so the tutor can never reveal them.
+    """
+    entries: list[str] = []
+    hidden_failed = 0
+    for r in results:
+        if r.get("passed"):
+            continue
+        if r.get("hidden"):
+            hidden_failed += 1
+            continue
+        if r.get("status_id") == 6:
+            entry = f"Compilation error:\n{(r.get('stderr') or '').strip()}"
+        else:
+            entry = (
+                f"Input: {r.get('input')}\n"
+                f"Expected: {r.get('expected')}\n"
+                f"Got: {(r.get('stdout') or '').strip()}"
+            )
+            if r.get("stderr"):
+                entry += f"\nError: {r['stderr'].strip()}"
+        if entry not in entries:  # a compile error repeats for every test
+            entries.append(entry)
+    if hidden_failed:
+        entries.append(f"{hidden_failed} hidden test(s) failed (details withheld).")
+    return "\n\n".join(entries)[:_ERROR_TRACE_CHARS]
+
+
 async def _record_code_execution(
     auth_token: Optional[str],
     lesson_id: Optional[str],
     action_type: str,
     passed: bool,
+    error_trace: Optional[str] = None,
 ) -> None:
-    """After Judge0: set has_run; on first Submit compute BKT in Python and store."""
+    """After Judge0: set has_run; on first Submit compute BKT in Python and store.
+
+    A failed Submit also sends ``error_trace`` (see summarize_failures); Convex
+    counts it and unlocks Get help."""
     if not auth_token or not lesson_id or not settings.CONVEX_URL:
         return
 
@@ -50,6 +88,8 @@ async def _record_code_execution(
         "passed": passed,
         "actionType": action,
     }
+    if action == "submit" and not passed and error_trace:
+        mutation_args["errorTrace"] = error_trace
 
     try:
         client = _convex_client(auth_token)
@@ -491,7 +531,8 @@ async def execute_code(
             auth_token,
             lesson_id,
             action_type,
-            not result["error"]
+            not result["error"],
+            summarize_failures(results) if result["error"] else None,
         )
         return result
 
@@ -499,12 +540,16 @@ async def execute_code(
     output = await _judge0_submit(student_code.code, language_id)
     # Judge0 status id 3 = Accepted
     passed = (output.get("status") or {}).get("id") == 3
+    error_trace = None
+    if not passed:
+        error_trace = (output.get("stderr") or output.get("compile_output") or "").strip()[:_ERROR_TRACE_CHARS]
     background_tasks.add_task(
         _record_code_execution,
         auth_token,
         lesson_id,
         action_type,
-        passed
+        passed,
+        error_trace,
     )
     return output
 

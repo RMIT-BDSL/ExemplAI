@@ -137,6 +137,7 @@ export const getLessonProgress = authenticatedQuery({
       status: row.status,
       has_run: row.has_run ?? false,
       bkt_recorded: row.bkt_recorded ?? false,
+      failed_submits: row.failed_submits ?? 0,
     }));
   },
 });
@@ -255,6 +256,8 @@ export const recordCodeExecution = authenticatedMutation({
     knowledgeComponent: v.optional(v.string()),
     // Server-computed: probMastery reached the BKT mastery threshold.
     mastered: v.optional(v.boolean()),
+    // Server-built summary of a failed Submit (hidden tests counted only).
+    errorTrace: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await getUserByToken(ctx, ctx.user._id);
@@ -330,11 +333,20 @@ export const recordCodeExecution = authenticatedMutation({
       bktRecorded = true;
     }
 
+    // A failed Submit (not Run) unlocks "Get help" and is what the tutor
+    // sees as the error.
+    const failedSubmit = args.actionType === "submit" && !args.passed;
+    const failedSubmits = (existing?.failed_submits ?? 0) + (failedSubmit ? 1 : 0);
+    const failureFields = failedSubmit
+      ? { failed_submits: failedSubmits, last_error_trace: args.errorTrace ?? "" }
+      : {};
+
     if (existing) {
       await ctx.db.patch(existing._id, {
         status: nextStatus,
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
+        ...failureFields,
       });
     } else {
       await ctx.db.insert("lessonProgress", {
@@ -343,6 +355,7 @@ export const recordCodeExecution = authenticatedMutation({
         status: nextStatus,
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
+        ...failureFields,
       });
     }
 
@@ -353,6 +366,7 @@ export const recordCodeExecution = authenticatedMutation({
       prob_mastery: probMastery,
       knowledge_component: knowledgeComponent,
       mastered,
+      failed_submits: failedSubmits,
     };
   },
 });

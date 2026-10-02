@@ -2,7 +2,7 @@ import asyncio
 import concurrent.futures
 import json
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, NamedTuple, Optional
 from fastapi import HTTPException, status
 from convex import ConvexClient
 from langchain_core.messages import RemoveMessage
@@ -71,7 +71,31 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
         "current_knowledge_component": chat.current_knowledge_component,
         "student_code": chat.student_code,
         "error_trace": chat.error_trace,
+        "trigger": chat.trigger,
     }
+
+
+class ChatLocked(Exception):
+    """The lesson's chat isn't unlocked for this request (see check_chat_lock)."""
+
+
+def check_chat_lock(chat: Chat, history: Optional[list[dict]], failed_submits: Optional[int]) -> None:
+    """Server-side copy of the Convex addMessage lock.
+
+    Get help needs a failed Submit and works once per lesson (before the
+    tutor's first reply); typed messages need that first reply. Skipped when
+    Convex predates the lock (no failed_submits / history in the context).
+    """
+    if failed_submits is None or history is None:
+        return
+    help_started = any(m.get("sender") == "assistant" for m in history)
+    if chat.trigger == "get_help":
+        if failed_submits < 1:
+            raise ChatLocked("Get help unlocks after a failed Submit")
+        if help_started:
+            raise ChatLocked("Help has already started for this lesson")
+    elif not help_started:
+        raise ChatLocked("Chat unlocks after Get help")
 
 
 _posthog_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -100,10 +124,14 @@ async def _evaluate_posthog_condition(auth_user_id: str, chat: Chat) -> None:
             log.warning("PostHog flag evaluation failed: %s", e)
 
 
-async def _load_convex_context(client: ConvexClient, chat: Chat) -> Optional[list[dict]]:
-    """Fill ``chat`` with lesson/BKT context from Convex; return the conversation.
+class ConvexChatContext(NamedTuple):
+    history: Optional[list[dict]]   # None: Convex predates history in getChatContext
+    failed_submits: Optional[int]   # None: Convex predates the Get help lock
 
-    Returns None when Convex sent no ``messages`` (older deployment)."""
+
+async def _load_convex_context(client: ConvexClient, chat: Chat) -> ConvexChatContext:
+    """Fill ``chat`` with lesson/BKT/error context from Convex; return the
+    conversation and failed-Submit count."""
     if chat.chat_id:
         try:
             context = await asyncio.wait_for(
@@ -124,11 +152,13 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> Optional[lis
                 chat.bkt_prob_mastery = mastery
                 if context.get("experiment_condition"):
                     chat.experiment_condition = context.get("experiment_condition")
-                return context.get("messages")
+                if "error_trace" in context:
+                    chat.error_trace = context["error_trace"] or ""
+                return ConvexChatContext(context.get("messages"), context.get("failed_submits"))
         except Exception as cvx_err:
             log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
             raise RuntimeError("Unable to load authenticated chat context") from cvx_err
-    return None
+    return ConvexChatContext(None, None)
 
 
 def _determine_chosen_model(result: dict) -> str:
@@ -186,10 +216,11 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     """Run the tutor graph to completion and return the final state."""
     try:
         client = _convex_client(auth_token)
-        history = await _load_convex_context(client, chat)
+        context = await _load_convex_context(client, chat)
+        check_chat_lock(chat, context.history, context.failed_submits)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat, history), config=_thread_config(chat, auth_user_id))
+        result = await graph.ainvoke(build_initial_state(chat, context.history), config=_thread_config(chat, auth_user_id))
 
         text = _extract_final_message_text(result)
         chosen_model = _determine_chosen_model(result)
@@ -203,6 +234,8 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
             "messages": [{"type": "ai", "content": text}],
             "chosen_model": chosen_model,
         }
+    except ChatLocked as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
         log.error(f"AI service error: {e}")
         raise HTTPException(
@@ -218,10 +251,14 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
         client = _convex_client(auth_token)
-        history = await _load_convex_context(client, chat)
+        context = await _load_convex_context(client, chat)
+        check_chat_lock(chat, context.history, context.failed_submits)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat, history), config=_thread_config(chat, auth_user_id))
+        result = await graph.ainvoke(build_initial_state(chat, context.history), config=_thread_config(chat, auth_user_id))
+    except ChatLocked as e:
+        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        return
     except Exception as e:
         log.error(f"AI service error: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': 'AI service temporarily unavailable'})}\n\n"

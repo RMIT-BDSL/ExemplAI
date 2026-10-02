@@ -1,4 +1,4 @@
-import { Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import TestCasesView from "./TestCasesView";
 
 interface ExecutionResult {
@@ -151,7 +151,6 @@ interface TerminalProps {
     activeTab: "result" | "stdout" | "testcases";
     setIsConsoleOpen: (open: boolean) => void;
     renderStatusBadge: () => React.ReactNode;
-    onSendErrorToChat?: (error: string) => void;
     testCases: any[];
 }
 
@@ -163,11 +162,8 @@ export default function Terminal({
     activeTab,
     setIsConsoleOpen,
     renderStatusBadge,
-    onSendErrorToChat,
     testCases,
 }: TerminalProps) {
-    const errorText =
-        executionResult?.compile_output || executionResult?.stderr || "";
     return (
         <div className="flex h-full flex-col overflow-hidden text-xs text-zinc-350">
             {/* Drawer Header */}
@@ -258,16 +254,6 @@ export default function Terminal({
                                         />
                                     )}
 
-                                {errorText && onSendErrorToChat && (
-                                    <button
-                                        type="button"
-                                        onClick={() => onSendErrorToChat(errorText)}
-                                        className="inline-flex items-center gap-1.2 rounded-md border border-lagoon/20 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 hover:text-lagoon transition-colors cursor-pointer active:scale-95"
-                                    >
-                                        <Sparkles className="size-3.5" />
-                                        <span>Ask AI about this error</span>
-                                    </button>
-                                )}
                             </div>
                         ) : (
                             <FullStdout stdout={executionResult.stdout} />

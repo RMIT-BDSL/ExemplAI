@@ -1,5 +1,24 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
+
+// The tutor's first reply in a lesson comes from "Get help", which unlocks
+// after a failed Submit; typed messages unlock once that first reply exists.
+async function lessonProgressFor(ctx: QueryCtx, userId: Id<"users">, lessonId: Id<"questions">) {
+  return await ctx.db
+    .query("lessonProgress")
+    .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", lessonId))
+    .unique();
+}
+
+async function hasTutorReply(ctx: QueryCtx, chatId: Id<"chats">) {
+  const messages = await ctx.db
+    .query("chatMessages")
+    .withIndex("by_chat", (q) => q.eq("chatId", chatId))
+    .collect();
+  return messages.some((m) => m.sender === "assistant");
+}
 
 // Get messages for a given lesson chat
 export const getMessages = authenticatedQuery({
@@ -47,12 +66,14 @@ export const getOrCreateChat = authenticatedMutation({
   },
 });
 
-// Add a message to the chat (user path)
+// Add a message to the chat (user path). `trigger: "get_help"` marks the turn
+// created by the Get help button.
 export const addMessage = authenticatedMutation({
   args: {
     chatId: v.id("chats"),
     sender: v.literal("user"),
     content: v.string(),
+    trigger: v.optional(v.literal("get_help")),
   },
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
@@ -60,10 +81,22 @@ export const addMessage = authenticatedMutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId !== ctx.customUser._id) throw new Error("Unauthorized");
 
+    const helpStarted = await hasTutorReply(ctx, args.chatId);
+    if (args.trigger === "get_help") {
+      const progress = await lessonProgressFor(ctx, chat.userId, chat.lessonId);
+      if ((progress?.failed_submits ?? 0) < 1) {
+        throw new Error("Get help unlocks after a failed Submit");
+      }
+      if (helpStarted) throw new Error("Help has already started for this lesson");
+    } else if (!helpStarted) {
+      throw new Error("Chat unlocks after Get help");
+    }
+
     await ctx.db.insert("chatMessages", {
       chatId: args.chatId,
       sender: args.sender,
       content: args.content,
+      ...(args.trigger ? { trigger: args.trigger } : {}),
     });
     return { success: true };
   },
@@ -138,6 +171,8 @@ export const getChatContext = authenticatedQuery({
     //     .join("\n");
     // }
 
+    const progress = await lessonProgressFor(ctx, chat.userId, chat.lessonId);
+
     const recent = await ctx.db
       .query("chatMessages")
       .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
@@ -151,6 +186,8 @@ export const getChatContext = authenticatedQuery({
       bkt_prob_mastery: probMastery,
       // Oldest first, ending with the student's latest message.
       messages: recent.reverse().map((m) => ({ sender: m.sender, content: m.content })),
+      failed_submits: progress?.failed_submits ?? 0,
+      error_trace: progress?.last_error_trace ?? "",
     };
   },
 });
