@@ -393,27 +393,31 @@ export function ChatInput({ onSendMessage, disabled, placeholder }: ChatInputPro
 
 // The student turn the Get help button adds to the conversation.
 export const GET_HELP_MESSAGE = "Please provide me an example to help me with this";
+// The student turn the New example button adds.
+export const NEW_EXAMPLE_MESSAGE = "Please show me a different example";
+
+type ExampleTrigger = "get_help" | "new_example";
 
 // 5. Chat Box default exported container
 // The chat is locked until the student has a failed Submit on the lesson; then
 // "Get help" asks the tutor for a first example, after which the student can
-// type. Convex (addMessage) and the server enforce the same lock.
+// type. Further examples come from "New example", each earned by another failed
+// Submit, up to the lesson cap (convex/examples.ts). Convex (addMessage) and
+// the server enforce the same rules.
 export default function ChatBox({
   editorRef,
   currentCode,
   lessonId,
-  failedSubmits = 0,
   onCollapse,
   onOpenScratchpad,
-  onGetHelp,
+  onExampleRequested,
 }: {
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
-  failedSubmits?: number;
   onCollapse?: () => void;
   onOpenScratchpad?: (code: string, language?: string) => void;
-  onGetHelp?: () => void;
+  onExampleRequested?: (trigger: ExampleTrigger, examplesUsed: number) => void;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -444,6 +448,16 @@ export default function ChatBox({
     api.chats.getMessages,
     convexLessonId ? { lessonId: convexLessonId } : "skip"
   );
+  // Example allowance for this lesson's current round (reactive).
+  const allowance = useQuery(
+    api.examples.getExampleAllowance,
+    convexLessonId ? { lessonId: convexLessonId } : "skip"
+  );
+  const cap = allowance?.cap ?? 3;
+  const used = allowance?.used ?? 0;
+  const remaining = allowance?.remaining ?? 0;
+  const exhausted = allowance?.exhausted ?? false;
+  const earned = allowance?.earned ?? 0;
 
   // Map Convex messages to the local Message format
   const messages: Message[] = React.useMemo(() => {
@@ -454,7 +468,7 @@ export default function ChatBox({
           id: "welcome",
           sender: "assistant",
           content:
-            failedSubmits > 0
+            earned > 0
               ? "Your solution didn't pass yet. Press **Get help** and I'll show you an example to help you with this problem."
               : "Hi, I'm your AI learning assistant. Submit your solution first. If it doesn't pass, you can get help from me here.",
           timestamp: new Date(),
@@ -478,7 +492,7 @@ export default function ChatBox({
       });
     }
     return result;
-  }, [dbMessages, localError, failedSubmits]);
+  }, [dbMessages, localError, earned]);
 
   // Track how many assistant messages Convex currently holds so a failed POST
   // /chat can tell whether the reply landed anyway.
@@ -492,7 +506,14 @@ export default function ChatBox({
 
   // Help starts with the tutor's first reply (to Get help); typing unlocks then.
   const helpStarted = assistantCount > 0;
-  const canGetHelp = !helpStarted && failedSubmits > 0;
+  // Get help gives a round's first example; New example the rest.
+  const canGetHelp = used === 0 && remaining > 0;
+  const canNewExample = used > 0 && remaining > 0;
+  const exampleStatus = exhausted
+    ? `You've used all ${cap} examples for this lesson. Try a lesson on another topic, then come back for new examples.`
+    : remaining > 0
+      ? `${remaining} example${remaining === 1 ? "" : "s"} available`
+      : `Submit another attempt to unlock your next example (${cap - used} left).`;
 
   // A reply landed in Convex for a send whose HTTP call failed — clear the
   // waiting state (and any timeout error we may have already shown). Runs
@@ -548,7 +569,7 @@ export default function ChatBox({
     };
   }, [convexLessonId, getOrCreateChat]);
 
-  const handleSendMessage = async (text: string, trigger?: "get_help") => {
+  const handleSendMessage = async (text: string, trigger?: ExampleTrigger) => {
     if (!chatId || !convexLessonId) return;
     
     // Optmistically show typing state
@@ -625,10 +646,11 @@ export default function ChatBox({
     }
   };
 
-  const handleGetHelp = () => {
-    if (!canGetHelp || isTyping) return;
-    onGetHelp?.();
-    handleSendMessage(GET_HELP_MESSAGE, "get_help");
+  const requestExample = (trigger: ExampleTrigger) => {
+    const allowed = trigger === "get_help" ? canGetHelp : canNewExample;
+    if (!allowed || isTyping) return;
+    onExampleRequested?.(trigger, used);
+    handleSendMessage(trigger === "get_help" ? GET_HELP_MESSAGE : NEW_EXAMPLE_MESSAGE, trigger);
   };
 
   return (
@@ -639,12 +661,12 @@ export default function ChatBox({
         <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} />
       </div>
 
-      {/* Get help: enabled by a failed Submit, used once to start the conversation */}
-      {!helpStarted && !isTyping && (
+      {/* Get help starts a round (enabled by a failed Submit); New example continues it */}
+      {!isTyping && used === 0 && (
         <div className="flex px-4 pb-2">
           <button
             type="button"
-            onClick={handleGetHelp}
+            onClick={() => requestExample("get_help")}
             disabled={!canGetHelp || !chatId || !convexLessonId}
             title={canGetHelp ? "Get an example to help with this problem" : "Available after a failed Submit"}
             className="inline-flex items-center gap-1.5 rounded-full border border-lagoon/30 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 transition-all select-none disabled:border-zinc-800 disabled:bg-zinc-950 disabled:text-zinc-600 disabled:cursor-not-allowed cursor-pointer"
@@ -652,6 +674,20 @@ export default function ChatBox({
             <Sparkles className="size-3.5" />
             Get help
           </button>
+        </div>
+      )}
+      {!isTyping && used > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
+          <button
+            type="button"
+            onClick={() => requestExample("new_example")}
+            disabled={!canNewExample || !chatId || !convexLessonId}
+            className="inline-flex items-center gap-1.5 rounded-full border border-lagoon/30 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 transition-all select-none disabled:border-zinc-800 disabled:bg-zinc-950 disabled:text-zinc-600 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Sparkles className="size-3.5" />
+            New example
+          </button>
+          <span className="text-[10px] text-zinc-500 leading-snug">{exampleStatus}</span>
         </div>
       )}
 

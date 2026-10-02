@@ -46,6 +46,9 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     tokenIdentifier: v.optional(v.string()),
     role: v.optional(v.string()),
+    // Last lesson the student opened; returning to a lesson from a different
+    // one resets that lesson's used-up example allowance (convex/examples.ts).
+    last_opened_lesson: v.optional(v.id("questions")),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
@@ -73,6 +76,10 @@ export default defineSchema({
     // Server-built summary of the last failed Submit, passed to the tutor
     // (hidden tests are counted, never detailed).
     last_error_trace: v.optional(v.string()),
+    // Example round (convex/examples.ts): examples given after round_started_at
+    // count against the cap; round_failed_submits earns them. Reset together.
+    round_started_at: v.optional(v.number()),
+    round_failed_submits: v.optional(v.number()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])
@@ -124,7 +131,12 @@ export default defineSchema({
     content: v.string(),
     sentBySystem: v.optional(v.boolean()),
     model: v.optional(v.string()),
-    // Student turns created by the "Get help" button rather than typed.
-    trigger: v.optional(v.literal("get_help")),
+    // Student turns created by the Get help / New example buttons rather than typed.
+    trigger: v.optional(v.union(v.literal("get_help"), v.literal("new_example"))),
+    // Tutor turns: what the reply delivered. Only "new_example" counts against
+    // the example allowance; a Dean-rejected draft is saved as "fallback".
+    response_type: v.optional(
+      v.union(v.literal("new_example"), v.literal("follow_up"), v.literal("fallback"))
+    ),
   }).index("by_chat", ["chatId"]),
 });
