@@ -8,8 +8,9 @@ output for a deterministic approve/reject decision.
 
 Checks depend on the condition and the draft's ``response_type``:
 - always (both conditions): DIRECT_ANSWER_LEAK, INAPPROPRIATE_CONTENT,
-  HALLUCINATED_CODE — judged against the recent conversation, so an answer
-  pieced together over several turns is caught;
+  HALLUCINATED_CODE — the leak judged against the recent conversation, so an
+  answer pieced together over several turns is caught;
+- control (plain chat): those three only — no example-type or limit checks;
 - experimental + new_example: MODALITY_VIOLATION (the example matches its type);
 - experimental + follow_up: MODALITY_DRIFT (the reply keeps to its type's
   follow-up rules) instead, so follow-ups aren't rejected for lacking blanks
@@ -114,7 +115,8 @@ re-explaining or hinting about examples already given is allowed.
 </example_limit>
 
 <control>
-In the control condition, apply only checks 1-3. There are no modality checks.
+The control condition is a plain chat tutor that gives no examples: apply \
+only checks 1-3. Never apply the example checks (4-6).
 </control>
 
 Otherwise approve (status="approved"). On rejection, set reason to the check \
@@ -141,9 +143,10 @@ def _examples_remaining_text(state: TutorGraphState) -> str:
 
 
 def _over_example_limit(state: TutorGraphState) -> bool:
-    """A typed request answered with a new example when none remain."""
+    """Experimental: a typed request answered with a new example when none remain."""
     return (
-        state.get("trigger", "message") == "message"
+        state.get("experiment_condition") != "control"
+        and state.get("trigger", "message") == "message"
         and state.get("response_type") == NEW_EXAMPLE
         and state.get("examples_remaining") == 0
     )

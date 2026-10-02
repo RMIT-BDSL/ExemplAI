@@ -98,7 +98,6 @@ def test_locked_request_is_a_403_not_a_502(monkeypatch):
 def test_get_help_is_always_a_new_example():
     state = {"trigger": "get_help", "messages": [HumanMessage(content="hi"), AIMessage(content="earlier")]}
     assert split_response_type("[FOLLOW_UP]\nHere is one", state) == ("Here is one", NEW_EXAMPLE)
-    assert response_type_from_history(state) == NEW_EXAMPLE
 
 
 def test_get_help_carries_trigger_and_error_to_the_agent(monkeypatch):

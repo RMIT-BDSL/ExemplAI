@@ -43,11 +43,10 @@ def test_missing_tag_falls_back_to_history():
     assert split_response_type("An example", FIRST_TURN) == ("An example", NEW_EXAMPLE)
 
 
-def test_control_label_comes_from_history():
-    assert response_type_from_history(FIRST_TURN) == NEW_EXAMPLE
+def test_control_replies_are_never_examples():
+    # Control is a plain chat: no reply counts against an example allowance.
+    assert response_type_from_history(FIRST_TURN) == FOLLOW_UP
     assert response_type_from_history(LATER_TURN) == FOLLOW_UP
-    # dict messages (as sent by the web client) count too
-    assert response_type_from_history({"messages": [{"role": "assistant", "content": "hi"}]}) == FOLLOW_UP
 
 
 def test_dean_input_carries_label_history_and_code():

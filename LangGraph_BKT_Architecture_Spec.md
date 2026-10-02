@@ -156,7 +156,7 @@ def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
     """
 ```
 
-**Shared context (all agents).** Each agent sends `[system prompt, student_context(state), *conversation(state)]`: the problem context comes first and the conversation last, so the model replies to the student's latest message (an instruction placed after the history would make every turn a new example). `<allowed_python>` lists the Python features the lesson's topic and earlier topics have taught (`server/ai/syllabus.py`), so examples never use features from later weeks. When the student pressed **Get help** or **New example**, `<student_action>` says so (for the experimental agents: present a new example; for Control: help with the failure / give a fresh explanation), so the reply matches the `new_example` label the server gives every button reply.
+**Shared context (all agents; control gets the plain version).** Each agent sends `[system prompt, student_context(state), *conversation(state)]`: the problem context comes first and the conversation last, so the model replies to the student's latest message (an instruction placed after the history would make every turn a new example). `<allowed_python>` lists the Python features the lesson's topic and earlier topics have taught (`server/ai/syllabus.py`), so examples never use features from later weeks. When the student pressed **Get help** or **New example**, `<student_action>` says so (present a new example), so the reply matches the `new_example` label the server gives every button reply. The control group has a plain chat with no buttons and no example allowance, so its context has no `<student_action>`, `<examples_remaining>` or `<allowed_python>` (it is a truly generic tutor; the lessons it helps with are the same as the experimental group's).
 
 ```python
 def student_context(state: TutorGraphState) -> str:
@@ -165,20 +165,18 @@ def student_context(state: TutorGraphState) -> str:
     Goes BEFORE the conversation (see conversation()), so the model replies to
     the student's latest message rather than to an instruction placed last.
     """
-    allowed = allowed_python(state.get("current_knowledge_component"))
-    condition = "control" if state.get("experiment_condition") == "control" else "experimental"
-    action = _STUDENT_ACTION.get((state.get("trigger", ""), condition))
+    # Control is a plain, generic chat: no syllabus limit, buttons or example allowance.
+    is_control = state.get("experiment_condition") == "control"
+    allowed = "" if is_control else allowed_python(state.get("current_knowledge_component"))
+    action = None if is_control else _STUDENT_ACTION.get(state.get("trigger", ""))
+    remaining = None if is_control else state.get("examples_remaining")
     return (
         f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
         + (f"<allowed_python>\n{allowed}\n</allowed_python>\n" if allowed else "")
         + f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
         f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
-        + (
-            f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
-            if state.get("examples_remaining") is not None
-            else ""
-        )
+        + (f"<examples_remaining>{remaining}</examples_remaining>\n" if remaining is not None else "")
         + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
         + "The conversation with the student follows; reply to their latest message."
     )
@@ -193,7 +191,7 @@ def conversation(state: TutorGraphState) -> list:
     return list(state.get("messages", []))[-_AGENT_HISTORY_TURNS:]
 ```
 
-The Control agent is not asked for a tag: its `response_type` comes from the history alone (first reply = `new_example`, later = `follow_up`). The Dean applies no modality checks to the control condition, so the label is only for logging.
+The Control agent is not asked for a tag: it never gives examples, so every control reply is labelled `follow_up` and none counts against an example allowance. The label is only for logging.
 
 ---
 
@@ -371,7 +369,9 @@ def erroneous_example_node(state: TutorGraphState):
 ---
 
 #### 4.2.4 Control Agent (`control_agent_node`)
-**Target Audience:** Control group (Option 1 in ResearchMethodology.md §4.2: a standard, non-adaptive AI tutor). It gets the same guardrail as the experimental group (§4.4: never provide a complete solution) and goes through the same Dean, but without modality checks.
+**Target Audience:** Control group (Option 1 in ResearchMethodology.md §4.2: a standard, non-adaptive AI tutor). The control group gets a **plain chat interface with the same LLM**: students can ask anything, with no Get help / New example buttons, no chat lock, no example allowance and no Complete / Faded / Erroneous examples. Replies still go through the Dean, which checks that **the answer isn't given away** (§4.4: never provide a complete solution), that nothing unsafe or offensive is said, and that code isn't accidentally broken — but none of the example checks.
+
+*Implementation note:* the server and Dean treat control this way; the chat UI and Convex's message lock still need the student's stored group (the A/B assignment work) before control students see the plain chat.
 
 *If the team chooses Option 2 (random router) instead, control students are routed randomly to the three EBL agents and this agent is unused; the Dean would then apply the experimental checks.*
 
@@ -384,10 +384,7 @@ concise.
 
 Do not write out a complete solution to the student's problem, or a fully \
 corrected version of their code. Explaining an error, pointing to where it is, \
-giving a hint, or showing a short snippet of syntax is fine.
-
-Use only the Python features listed in <allowed_python>; never use a feature \
-from a later topic."""
+giving a hint, or showing a short snippet of syntax is fine."""
 
 
 def control_agent_node(state: TutorGraphState):
@@ -398,7 +395,7 @@ def control_agent_node(state: TutorGraphState):
     return {
         "draft_response": str(response.content),
         "pedagogical_modality": "Control",
-        "response_type": response_type_from_history(state),  # no tag; first reply vs later
+        "response_type": response_type_from_history(state),  # always follow_up: no examples
     }
 ```
 
@@ -412,11 +409,11 @@ Its checks depend on the condition and the draft's `response_type`:
 | | `new_example` | `follow_up` |
 |---|---|---|
 | **Experimental** | Always-checks + MODALITY_VIOLATION (+ EXAMPLE_LIMIT at 0 remaining) | Always-checks + MODALITY_DRIFT (+ EXAMPLE_LIMIT at 0 remaining) |
-| **Control** | Always-checks only | Always-checks only |
+| **Control** (plain chat) | Always-checks only | Always-checks only |
 
-**Example allowance** (`web/convex/examples.ts`): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. A typed request whose draft is labelled `new_example` with none remaining is answered with a limit message without calling the Dean's LLM; a mislabelled one is caught by EXAMPLE_LIMIT. The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
+**Example allowance** (`web/convex/examples.ts`, experimental group only): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. A typed request whose draft is labelled `new_example` with none remaining is answered with a limit message without calling the Dean's LLM; a mislabelled one is caught by EXAMPLE_LIMIT. The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
 
-*Always-checks:* DIRECT_ANSWER_LEAK (judged against the recent conversation, so an answer pieced together over several turns is caught), INAPPROPRIATE_CONTENT, HALLUCINATED_CODE. For control, a "leak" is a complete working solution or a fully corrected version of the student's code; explanations, hints and short syntax snippets are allowed.
+*Always-checks (both conditions):* DIRECT_ANSWER_LEAK (judged against the recent conversation, so an answer pieced together over several turns is caught), INAPPROPRIATE_CONTENT, HALLUCINATED_CODE. For control, a "leak" is a complete working solution or a fully corrected version of the student's code; explanations, hints and short syntax snippets are allowed. The example checks (MODALITY_VIOLATION, MODALITY_DRIFT, EXAMPLE_LIMIT) are experimental only, since control gives no examples.
 
 **Structured Output Schema:**
 ```python
@@ -493,7 +490,8 @@ re-explaining or hinting about examples already given is allowed.
 </example_limit>
 
 <control>
-In the control condition, apply only checks 1-3. There are no modality checks.
+The control condition is a plain chat tutor that gives no examples: apply \
+only checks 1-3. Never apply the example checks (4-6).
 </control>
 
 Otherwise approve (status="approved"). On rejection, set reason to the check \

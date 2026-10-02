@@ -121,3 +121,57 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
     chat = Chat(user_id=1, chat_id="c", conversation=[], trigger="new_example")
     asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
     assert saved == {"text": "example 2", "response_type": NEW_EXAMPLE}
+
+
+# ── control group: plain chat, Dean checks the answer leak only ───────
+
+def test_control_is_never_locked_or_limited():
+    control = Chat(user_id=1, chat_id="c", conversation=[], experiment_condition="control")
+    check_chat_lock(control, _allowance(used=0, earned=0))  # typed before any failed Submit: fine
+
+
+def test_control_first_reply_is_not_blocked_by_the_example_limit(monkeypatch):
+    dean = _Dean(DeanValidationResult(status="approved"))
+    monkeypatch.setattr(dean_mod, "llm", dean)
+    state = _typed_state(experiment_condition="control", pedagogical_modality="Control",
+                         response_type=NEW_EXAMPLE, draft_response="Here's how loops work...")
+    out = dean_mod.dean_validation_node(state)
+    assert out["messages"][0]["content"] == "Here's how loops work..."
+    assert len(dean.calls) == 1  # went to the Dean, not short-circuited
+
+
+def test_dean_checks_control_for_leak_safety_and_broken_code_but_not_examples():
+    prompt = dean_mod._SYSTEM_PROMPT
+    control_rules = prompt[prompt.index("<control>"):prompt.index("</control>")]
+    assert "only checks 1-3" in control_rules and "Never apply the example checks (4-6)" in control_rules
+    always = prompt[prompt.index("<always_check>"):prompt.index("</always_check>")]
+    for check in ("1. DIRECT_ANSWER_LEAK", "2. INAPPROPRIATE_CONTENT", "3. HALLUCINATED_CODE"):
+        assert check in always, check
+
+
+def test_control_chat_gets_no_allowance(monkeypatch):
+    seen = {}
+
+    class FakeGraph:
+        async def ainvoke(self, state, config):
+            seen.update(state)
+            return {"messages": [AIMessage(content="ok")], "delivered_response_type": "follow_up",
+                    "guardrail_passed": True, "experiment_condition": "control"}
+
+    async def fake_context(client, chat):
+        return ConvexChatContext([{"sender": "user", "content": "how do loops work?"}], _allowance(used=0, earned=0))
+
+    async def fake_save(*args, **kwargs):
+        return None
+
+    async def fake_condition(user_id, chat):
+        return None
+
+    monkeypatch.setattr(chat_service, "_convex_client", lambda token: object())
+    monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
+    monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
+    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
+    chat = Chat(user_id=1, chat_id="c", conversation=[], experiment_condition="control")
+    asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
+    assert "examples_remaining" not in seen  # not locked (no 403) and no allowance in the graph
+
