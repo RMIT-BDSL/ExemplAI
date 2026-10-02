@@ -93,7 +93,11 @@ class TutorGraphState(TypedDict):
     student_code: str                     # The raw buggy code submitted
     error_trace: str                      # Unit test failure output (deterministic)
     experiment_condition: str             # "experimental" or "control"
+    draft_response: str                   # Agent's unvetted draft; only the Dean writes to `messages`
+    response_type: str                    # "new_example" | "follow_up" (set by the agent node)
 ```
+
+`response_type` tells the Dean what kind of reply it is checking. A **new example** must match its modality (Complete / Faded / Erroneous). A **follow-up** (answering a question, feedback on the student's attempt, a narrower hint) is checked against the modality's follow-up rules instead, so it is not rejected for lacking blanks or a bug.
 
 ---
 
@@ -123,6 +127,34 @@ These will be tested and iterated upon. The agents are responsible for generatin
 - **Message Separation:** Static instructions live in `SystemMessage`. Dynamic, per-invocation context is injected via `HumanMessage` using XML-delimited blocks for reliable extraction.
 - **Structured Output:** The Dean Agent uses a Pydantic schema to enforce a deterministic pass/reject response.
 - **Node Functions:** Each agent is a standard LangGraph node function that reads from and writes to `TutorGraphState`.
+- **Drafts, not messages:** Agents write `draft_response`, `pedagogical_modality` and `response_type`. They never append to `messages`; the Dean is the only node that does, so no unvetted text reaches the student.
+- **Response type:** Each EBL agent starts its reply with a `[NEW_EXAMPLE]` or `[FOLLOW_UP]` tag, which the node strips (see 4.2.0). The first tutor reply in a conversation is always `new_example`, whatever the tag says.
+
+#### 4.2.0 Shared: response type
+Implemented in `server/ai/nodes/context.py`.
+
+```python
+RESPONSE_TYPE_INSTRUCTION = """
+
+<response_type>
+Start your reply with exactly one tag on its own first line:
+[NEW_EXAMPLE] if this reply presents a new example: your first reply in the \
+conversation, or the student asked for a different example.
+[FOLLOW_UP] if this reply responds to the student about an example you already \
+gave: answering a question, giving feedback on their attempt, or a narrower hint.
+The tag is removed before the student sees your reply.
+</response_type>"""
+
+
+def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
+    """Strip the tag; return (draft, response_type).
+
+    - No earlier tutor reply in the conversation -> always "new_example".
+    - Otherwise use the tag; if it is missing, default to "follow_up".
+    """
+```
+
+The Control agent is not asked for a tag: its `response_type` comes from the history alone (first reply = `new_example`, later = `follow_up`). The Dean applies no modality checks to the control condition, so the label is only for logging.
 
 ---
 
@@ -188,11 +220,12 @@ def complete_example_node(state: TutorGraphState):
 Generate a complete worked example for an analogous problem that targets the concept above."""
 
     response = llm.invoke([
-        SystemMessage(content=COMPLETE_EXAMPLE_SYSTEM),
+        SystemMessage(content=COMPLETE_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
         *state["messages"],  # conversation history
         HumanMessage(content=human_msg),
     ])
-    return {"messages": [response]}
+    draft, response_type = split_response_type(str(response.content), state)
+    return {"draft_response": draft, "pedagogical_modality": "Complete", "response_type": response_type}
 ```
 
 ---
@@ -263,11 +296,12 @@ def faded_example_node(state: TutorGraphState):
 Generate a faded example for an analogous problem. Omit 2-3 lines targeting the concept above."""
 
     response = llm.invoke([
-        SystemMessage(content=FADED_EXAMPLE_SYSTEM),
+        SystemMessage(content=FADED_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
         *state["messages"],
         HumanMessage(content=human_msg),
     ])
-    return {"messages": [response]}
+    draft, response_type = split_response_type(str(response.content), state)
+    return {"draft_response": draft, "pedagogical_modality": "Faded", "response_type": response_type}
 ```
 
 ---
@@ -342,113 +376,151 @@ Here is their current situation:
 Generate a subtly buggy code example for an analogous problem targeting the concept above."""
 
     response = llm.invoke([
-        SystemMessage(content=ERRONEOUS_EXAMPLE_SYSTEM),
+        SystemMessage(content=ERRONEOUS_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
         *state["messages"],
         HumanMessage(content=human_msg),
     ])
-    return {"messages": [response]}
+    draft, response_type = split_response_type(str(response.content), state)
+    return {"draft_response": draft, "pedagogical_modality": "Erroneous", "response_type": response_type}
 ```
 
 ---
 
-#### 4.2.4 Dean Agent (`dean_validation_node`)
-**Purpose:** Institutional safety gate. Every response drafted by an EBL Agent or the Control Agent must pass through the Dean Agent before being streamed to the student UI.
+#### 4.2.4 Control Agent (`control_agent_node`)
+**Target Audience:** Control group (Option 1 in ResearchMethodology.md §4.2: a standard, non-adaptive AI tutor). It gets the same guardrail as the experimental group (§4.4: never provide a complete solution) and goes through the same Dean, but without modality checks.
+
+*If the team chooses Option 2 (random router) instead, control students are routed randomly to the three EBL agents and this agent is unused; the Dean would then apply the experimental checks.*
+
+**Node Function:**
+```python
+CONTROL_SYSTEM = """You are a helpful programming tutor. Help the student with \
+their problem the way a standard AI assistant would: explain concepts, point out \
+issues in their code, and guide them toward a working solution. Be clear and \
+concise.
+
+Do not write out a complete solution to the student's problem, or a fully \
+corrected version of their code. Explaining an error, pointing to where it is, \
+giving a hint, or showing a short snippet of syntax is fine."""
+
+
+def control_agent_node(state: TutorGraphState):
+    response = llm.invoke([
+        SystemMessage(content=CONTROL_SYSTEM),
+        HumanMessage(content=student_context(state)),
+    ])
+    return {
+        "draft_response": str(response.content),
+        "pedagogical_modality": "Control",
+        "response_type": response_type_from_history(state),  # no tag; first reply vs later
+    }
+```
+
+---
+
+#### 4.2.5 Dean Agent (`dean_validation_node`)
+**Purpose:** Institutional safety gate. Every response drafted by an EBL Agent or the Control Agent must pass through the Dean Agent before it reaches the student UI. The Dean is the only node that appends to `messages`.
+
+Its checks depend on the condition and the draft's `response_type`:
+
+| | `new_example` | `follow_up` |
+|---|---|---|
+| **Experimental** | Always-checks + MODALITY_VIOLATION | Always-checks + MODALITY_DRIFT |
+| **Control** | Always-checks only | Always-checks only |
+
+*Always-checks:* DIRECT_ANSWER_LEAK (judged against the recent conversation, so an answer pieced together over several turns is caught), INAPPROPRIATE_CONTENT, HALLUCINATED_CODE. For control, a "leak" is a complete working solution or a fully corrected version of the student's code; explanations, hints and short syntax snippets are allowed.
 
 **Structured Output Schema:**
 ```python
-from pydantic import BaseModel, Field
-from typing import Literal, Optional
-
 class DeanValidationResult(BaseModel):
-    """Structured output from the Dean Agent validation check."""
-    status: Literal["approved", "rejected"] = Field(
-        description="Whether the draft response passed all validation checks."
-    )
-    reason: Optional[str] = Field(
-        default=None,
-        description="If rejected, which validation check failed."
-    )
-    violation_excerpt: Optional[str] = Field(
-        default=None,
-        description="If rejected, the specific excerpt from the draft that caused the failure."
-    )
+    status: Literal["approved", "rejected"]
+    reason: Optional[str] = None
+    violation_excerpt: Optional[str] = None
 ```
 
 **Node Function:**
 ```python
-DEAN_SYSTEM = """You are an academic integrity validator for a university programming tutor. \
-Your sole job is to review a draft response from an AI tutoring agent BEFORE it reaches the student.
+DEAN_SYSTEM = """You are the Dean, an academic integrity validator for a \
+university programming tutor. Decide whether the drafted reply may reach the \
+student. You do not write tutoring content.
 
-<role>
-You are a safety gate. You do NOT generate pedagogical content. You ONLY validate or reject \
-draft responses from upstream agents.
-</role>
+<inputs>
+- experiment_condition: "experimental" (example-based tutor) or "control" \
+(standard tutor).
+- pedagogical_modality: Complete | Faded | Erroneous | Control.
+- response_type: "new_example" (a fresh example) or "follow_up" (a reply about \
+an example or answer already given).
+- conversation_history: recent turns in this lesson, oldest first.
+- original_problem, student_code, draft_response.
+</inputs>
 
-<validation_checks>
-REJECT the draft if ANY of the following are true:
+<always_check>
+Apply to every draft, in both conditions:
+1. DIRECT_ANSWER_LEAK: the draft hands the student a solution to \
+<original_problem>. Judge it against the whole conversation: reject a draft that \
+supplies the last missing piece of a solution assembled over earlier turns.
+   - experimental: reject code that solves <original_problem>, or an example \
+that could be trivially adapted (renaming, minor restructuring) into a solution.
+   - control: reject a complete working solution to <original_problem> or a \
+fully corrected version of <student_code>. Explaining an error, pointing to \
+where it is, a hint, or a short syntax snippet is allowed.
+2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
+3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
+Exceptions: the intentional bug in an Erroneous example (including when the \
+reply discusses it), and the student's own code quoted back to them.
+</always_check>
 
-1. DIRECT_ANSWER_LEAK: The draft contains code that directly solves the student's Target \
-Problem, or could be trivially adapted (variable renaming, minor restructuring) to solve it.
+<experimental_new_example>
+Only when experiment_condition is "experimental" and response_type is \
+"new_example":
+4. MODALITY_VIOLATION: the example does not match <pedagogical_modality>: \
+Complete = a full worked parallel example; Faded = a parallel example with \
+deliberate blanks for the student to fill; Erroneous = a parallel example with \
+one intentional, non-trivial logic bug for the student to find.
+</experimental_new_example>
 
-2. MODALITY_VIOLATION: The draft does not match its assigned pedagogical mode:
-   - Complete Example: must provide a FULL worked analog (no blanks).
-   - Faded Example: must have deliberate blanks (no complete code).
-   - Erroneous Example: must contain an intentional bug (no correct code).
-   - Control: standard tutoring response (no special modality rules).
+<experimental_follow_up>
+Only when experiment_condition is "experimental" and response_type is \
+"follow_up". Do NOT require blanks or a bug here. Check instead:
+5. MODALITY_DRIFT: the reply breaks the follow-up rules of its modality:
+   - Faded: fills in a blank, or reveals the completed code, before the \
+student has correctly completed it themselves.
+   - Erroneous: reveals where the bug is or how to fix it before the student \
+has correctly diagnosed it.
+   - Complete: leaves the parallel example and starts working on \
+<original_problem> itself.
+Answering the student's question, re-explaining, giving feedback on their \
+attempt, or giving a narrower hint is allowed.
+</experimental_follow_up>
 
-3. INAPPROPRIATE_CONTENT: The draft contains offensive language, unrelated content, or \
-anything violating institutional academic integrity policies.
+<control>
+In the control condition, apply only checks 1-3. There are no modality checks.
+</control>
 
-4. HALLUCINATED_CODE: The draft contains code with obvious unintentional syntax errors or \
-logical impossibilities that would confuse the student. Exception: intentional bugs in \
-Erroneous Examples are expected and should NOT be flagged.
-</validation_checks>
+Otherwise approve (status="approved"). On rejection, set reason to the check \
+name and violation_excerpt to the offending snippet."""
 
-<output_instructions>
-You MUST respond using the DeanValidationResult schema. Always set status to "approved" \
-or "rejected". If rejected, provide the specific reason and excerpt.
-</output_instructions>"""
+
+def dean_input(state: TutorGraphState) -> str:
+    return (
+        f"<experiment_condition>{state['experiment_condition']}</experiment_condition>\n"
+        f"<pedagogical_modality>{state['pedagogical_modality']}</pedagogical_modality>\n"
+        f"<response_type>{state['response_type']}</response_type>\n"
+        f"<conversation_history>\n{recent_history(state)}\n</conversation_history>\n"  # last 10 turns
+        f"<original_problem>\n{state['original_problem']}\n</original_problem>\n"
+        f"<student_code>\n{state['student_code']}\n</student_code>\n"
+        f"<draft_response>\n{state['draft_response']}\n</draft_response>"
+    )
 
 
 def dean_validation_node(state: TutorGraphState):
-    # The last message in state is the draft from the upstream agent
-    draft_response = state["messages"][-1].content
-
-    human_msg = f"""Validate the following draft response before it is sent to the student.
-
-<pedagogical_mode>
-{state["pedagogical_modality"]}
-</pedagogical_mode>
-
-<target_problem>
-{state["original_problem"]}
-</target_problem>
-
-<student_code>
-{state["student_code"]}
-</student_code>
-
-<draft_response>
-{draft_response}
-</draft_response>
-
-Does this draft pass all validation checks?"""
-
     result = llm.with_structured_output(DeanValidationResult).invoke([
         SystemMessage(content=DEAN_SYSTEM),
-        HumanMessage(content=human_msg),
+        HumanMessage(content=dean_input(state)),
     ])
-
-    if result.status == "rejected":
-        # Remove the failed draft and route back to the upstream agent
-        return {
-            "messages": [AIMessage(content=(
-                f"[DEAN REJECTED: {result.reason}] {result.violation_excerpt}"
-            ))],
-        }
-    else:
-        # Draft approved — pass through unchanged
-        return state
+    if result.status == "approved":
+        return {"messages": [{"role": "ai", "content": state["draft_response"]}]}
+    # Rejected: the draft never reaches the student; send a safe fallback instead.
+    return {"messages": [{"role": "ai", "content": FALLBACK}]}
 ```
 
 ---
@@ -461,5 +533,5 @@ To make this graph function align with the Split-Pane UX and RCT methodology, de
    * **Right Pane (Chat Reply):** Bypasses unit testing and BKT updates. Routes directly to the active LLM agent for **Conversational Evaluation** (checking if they understood the pedagogical hint).
 2. **A/B Experiment Routing:** After handling the input, the router checks the student's RCT cohort. Control Group students bypass the BKT engine entirely and are routed to a generic `Control Agent` (Standard LLM). Experimental Group students proceed to the Orchestrator.
 3. **State Injection (Experimental Group):** Fetch the newly updated `probMastery` float and inject it into the `TutorGraphState` before invoking the Orchestrator conditional edge.
-4. **Post-Graph Logging (Phase 2):** After the selected agent (Control or EBL) drafts a response, it passes through the Dean Agent for safety validation. Once passed to the UI, trigger an async job to log the intervention type (Control, Complete, Faded, Erroneous) to Supabase.
+4. **Post-Graph Logging (Phase 2):** After the selected agent (Control or EBL) drafts a response, it passes through the Dean Agent for safety validation. Once passed to the UI, trigger an async job to log the intervention type (Control, Complete, Faded, Erroneous), the `response_type` (new example or follow-up), and the Dean's decision and reason to Supabase.
 5. **UI Streaming Constraints (Dean Validation):** Because the Dean Agent must approve the full draft *before* the student sees it, the backend CANNOT stream raw tokens from the EBL agents directly to the UI. The frontend must display a loading state (e.g., "Tutor is thinking...") while the graph executes. Once the Dean approves, the backend returns the full string. The frontend may then use a Javascript typewriter effect to simulate streaming for a better UX.
