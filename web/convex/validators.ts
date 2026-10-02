@@ -36,7 +36,7 @@ export const lessonFields = {
   week: z.number().int().min(1).max(12),
   problem_name: z.string().min(1, "Problem name is required"),
   problem_description: z.string(),
-  // Skill key for BKT (e.g. "loops", "io_basics").
+  // Skill key for BKT, one per syllabus topic (e.g. "loops", "branching").
   knowledge_component: z.string().min(1, "Knowledge component is required"),
   // Human-readable KC label (e.g. "Loops").
   topic: z.string().optional(),

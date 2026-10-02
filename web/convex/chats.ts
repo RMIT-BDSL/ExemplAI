@@ -141,7 +141,9 @@ export const getChatContext = authenticatedQuery({
     const lesson = await ctx.db.get(chat.lessonId);
     if (!lesson) throw new Error("Lesson not found");
 
-    let probMastery = 0.0;
+    // null = no graded Submit on this KC yet; the Python server substitutes
+    // the BKT cold-start prior (P-Init) so routing starts from 0.15, not 0.
+    let probMastery: number | null = null;
     if (lesson.knowledge_component) {
       const bkt = await ctx.db
         .query("bktMastery")

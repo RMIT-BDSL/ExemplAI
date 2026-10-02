@@ -253,6 +253,8 @@ export const recordCodeExecution = authenticatedMutation({
     // Server-computed mastery after first Submit; omit on run / re-submit.
     probMastery: v.optional(v.number()),
     knowledgeComponent: v.optional(v.string()),
+    // Server-computed: probMastery reached the BKT mastery threshold.
+    mastered: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await getUserByToken(ctx, ctx.user._id);
@@ -289,6 +291,7 @@ export const recordCodeExecution = authenticatedMutation({
     let bktRecorded = existing?.bkt_recorded ?? false;
     let probMastery: number | undefined;
     let knowledgeComponent: string | undefined;
+    let mastered: boolean | undefined;
 
     if (shouldRecordBkt) {
       knowledgeComponent = args.knowledgeComponent!;
@@ -304,10 +307,15 @@ export const recordCodeExecution = authenticatedMutation({
         )
         .unique();
 
+      // Sticky: once mastered, a later fail doesn't revoke it.
+      const newlyMastered = !masteryRow?.mastered && args.mastered === true;
+      mastered = masteryRow?.mastered === true || newlyMastered;
+
       if (masteryRow) {
         await ctx.db.patch(masteryRow._id, {
           prob_mastery: probMastery,
           updatedAt: now,
+          ...(newlyMastered ? { mastered: true, masteredAt: now } : {}),
         });
       } else {
         await ctx.db.insert("bktMastery", {
@@ -315,6 +323,8 @@ export const recordCodeExecution = authenticatedMutation({
           knowledge_component: knowledgeComponent,
           prob_mastery: probMastery,
           updatedAt: now,
+          mastered,
+          ...(newlyMastered ? { masteredAt: now } : {}),
         });
       }
       bktRecorded = true;
@@ -342,6 +352,7 @@ export const recordCodeExecution = authenticatedMutation({
       status: nextStatus,
       prob_mastery: probMastery,
       knowledge_component: knowledgeComponent,
+      mastered,
     };
   },
 });

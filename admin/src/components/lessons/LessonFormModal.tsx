@@ -36,7 +36,7 @@ const LessonFormModal: Component<Props> = (props) => {
   const [problemName, setProblemName] = createSignal(props.editingLesson?.problem_name ?? '');
   const [problemDescription, setProblemDescription] = createSignal(props.editingLesson?.problem_description ?? '');
   const [knowledgeComponent, setKnowledgeComponent] = createSignal(
-    props.editingLesson?.knowledge_component ?? 'io_basics'
+    props.editingLesson?.knowledge_component ?? 'intro_setup'
   );
   const [topic, setTopic] = createSignal(props.editingLesson?.topic ?? '');
   const [tag, setTag] = createSignal(props.editingLesson?.tag ?? '');
@@ -47,14 +47,19 @@ const LessonFormModal: Component<Props> = (props) => {
   const [starterCode, setStarterCode] = createSignal(props.editingLesson?.starter_code ?? '');
   const [solutionCode, setSolutionCode] = createSignal(props.editingLesson?.solution_code ?? '');
 
+  // One BKT knowledge component per syllabus topic; keep in sync with data/bktParams.json.
   const knowledgeComponents = [
-    'io_basics',
-    'arithmetic',
-    'modular_arith',
-    'conditionals',
-    'functions_params',
-    'string_manip',
+    'intro_setup',
+    'variables_expressions',
+    'strings_formatting',
+    'branching',
     'loops',
+    'advanced_loops',
+    'functions',
+    'collections',
+    'files',
+    'basic_libraries',
+    'advanced_topics',
   ];
 
   // Loading & Error States
