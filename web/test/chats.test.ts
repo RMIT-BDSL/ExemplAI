@@ -154,7 +154,7 @@ describe("chats API", () => {
     expect(messages[1].content).toBe("Hello Student");
   });
 
-  it("clearChat deletes messages and the chat itself", async () => {
+  it("getChatContext returns the conversation oldest-first and only to its owner", async () => {
     const t = setup();
     const admin = await createMockAdmin(t);
     const course = await admin.mutation(api.courses.createCourse, {
@@ -163,29 +163,30 @@ describe("chats API", () => {
     });
     const lessonId = await admin.mutation(api.lessons.createLesson, {
       course,
-      week: 1,
+      week: 5,
       problem_name: "Test Lesson",
-      problem_description: "x",
+      problem_description: "Sum a list",
       knowledge_component: "loops",
     });
 
     const student = await createMockStudent(t);
     const chatId = await student.mutation(api.chats.getOrCreateChat, { lessonId });
-
-    await student.mutation(api.chats.addMessage, {
-      chatId,
-      sender: "user",
-      content: "Message to be deleted",
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "first" });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("chatMessages", { chatId, sender: "assistant", content: "an example", sentBySystem: true });
     });
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "follow-up" });
 
-    // Clear chat
-    await student.mutation(api.chats.clearChat, { lessonId });
+    const context = await student.query(api.chats.getChatContext, { chatId });
+    expect(context.original_problem).toBe("Sum a list");
+    expect(context.bkt_prob_mastery).toBeNull();
+    expect(context.messages).toEqual([
+      { sender: "user", content: "first" },
+      { sender: "assistant", content: "an example" },
+      { sender: "user", content: "follow-up" },
+    ]);
 
-    const messagesAfter = await student.query(api.chats.getMessages, { lessonId });
-    expect(messagesAfter).toEqual([]);
-
-    // Getting the chat again should generate a NEW chatId
-    const newChatId = await student.mutation(api.chats.getOrCreateChat, { lessonId });
-    expect(newChatId).not.toBe(chatId);
+    // Another user can't read this student's conversation.
+    await expect(admin.query(api.chats.getChatContext, { chatId })).rejects.toThrow("Unauthorized");
   });
 });

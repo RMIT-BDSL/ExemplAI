@@ -1,4 +1,4 @@
-import { Bot, RefreshCw, Send, Sparkles, User, ChevronRight, MessageSquare, Play, Square, Loader2 } from "lucide-react";
+import { Bot, Send, Sparkles, User, ChevronRight, MessageSquare, Play, Square, Loader2 } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "#/lib/utils.ts";
@@ -16,12 +16,11 @@ export interface Message {
 
 // 1. Chat Header Component
 export interface ChatHeaderProps {
-  onClearChat?: () => void;
   isTyping?: boolean;
   onCollapse?: () => void;
 }
 
-export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProps) {
+export function ChatHeader({ isTyping, onCollapse }: ChatHeaderProps) {
   return (
     <div className="flex h-11 items-center justify-between border-b border-zinc-850 bg-zinc-950/80 px-4 flex-shrink-0">
       <div className="flex items-center gap-2 text-xs font-medium text-zinc-250">
@@ -35,15 +34,6 @@ export function ChatHeader({ onClearChat, isTyping, onCollapse }: ChatHeaderProp
         )}
       </div>
       <div className="flex items-center gap-1.5">
-        {onClearChat && (
-          <button
-            onClick={onClearChat}
-            className="rounded-md p-1 hover:bg-zinc-850 hover:text-zinc-100 transition-colors cursor-pointer"
-            title="Reset chat"
-          >
-            <RefreshCw className="size-3.5 text-zinc-400" />
-          </button>
-        )}
         {onCollapse && (
           <button
             type="button"
@@ -470,7 +460,6 @@ export default function ChatBox({
   const [chatId, setChatId] = React.useState<string | null>(null);
   const getOrCreateChat = useMutation(api.chats.getOrCreateChat);
   const addMessageMutation = useMutation(api.chats.addMessage);
-  const clearChatMutation = useMutation(api.chats.clearChat);
 
   // Fetch messages from Convex
   const dbMessages = useQuery(
@@ -667,16 +656,6 @@ export default function ChatBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingMessage, chatId, convexLessonId]);
 
-  const handleClearChat = async () => {
-    if (convexLessonId) {
-      await clearChatMutation({ lessonId: convexLessonId });
-      // Start a fresh checkpoint thread so the server doesn't resume the old
-      // conversation's memory after the student clears the chat.
-      const newChatId = await getOrCreateChat({ lessonId: convexLessonId });
-      setChatId(newChatId);
-    }
-  };
-
   // Quick prompt triggers
   const quickPrompts = [
     { label: "Give a hint", query: "Can you give me a hint on Two Sum?" },
@@ -689,7 +668,7 @@ export default function ChatBox({
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      <ChatHeader onClearChat={handleClearChat} isTyping={isTyping} onCollapse={onCollapse} />
+      <ChatHeader isTyping={isTyping} onCollapse={onCollapse} />
 
       <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} onAskAboutOutput={onAskAboutOutput} />
 

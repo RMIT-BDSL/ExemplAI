@@ -15,7 +15,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai.llm import llm
-from ai.nodes.context import response_type_from_history, student_context
+from ai.nodes.context import conversation, response_type_from_history, student_context
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
@@ -35,6 +35,7 @@ def control_agent_node(state: TutorGraphState) -> dict:
     messages = [
         SystemMessage(content=_SYSTEM_PROMPT),
         HumanMessage(content=student_context(state)),
+        *conversation(state),
     ]
     response = llm.invoke(messages)
     return {
