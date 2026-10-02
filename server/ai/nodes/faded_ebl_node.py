@@ -13,7 +13,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai.llm import llm
-from ai.nodes.context import RESPONSE_TYPE_INSTRUCTION, split_response_type, student_context
+from ai.nodes.context import RESPONSE_TYPE_INSTRUCTION, conversation, split_response_type, student_context
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
@@ -39,6 +39,7 @@ def faded_example_node(state: TutorGraphState) -> dict:
     messages = [
         SystemMessage(content=_SYSTEM_PROMPT + RESPONSE_TYPE_INSTRUCTION),
         HumanMessage(content=student_context(state)),
+        *conversation(state),
     ]
     response = llm.invoke(messages)
     draft, response_type = split_response_type(str(response.content), state)

@@ -36,6 +36,9 @@ The tag is removed before the student sees your reply.
 
 _TAG_RE = re.compile(r"^\s*\**\[(NEW_EXAMPLE|FOLLOW_UP)\]\**[ \t]*\n?", re.IGNORECASE)
 
+# Recent turns sent to the agents (Convex already caps what it returns).
+_AGENT_HISTORY_TURNS = 20
+
 # Recent turns shown to the Dean; each turn is truncated to keep the check cheap.
 _HISTORY_TURNS = 10
 _HISTORY_CHARS = 1500
@@ -47,8 +50,18 @@ def student_context(state: TutorGraphState) -> str:
         f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
         f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
-        f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>"
+        f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
+        "The conversation with the student follows; reply to their latest message."
     )
+
+
+def conversation(state: TutorGraphState) -> list:
+    """The lesson conversation for an agent's LLM call.
+
+    Oldest first, ending with the student's latest message, so it goes AFTER
+    the context message and the model replies to what the student just said.
+    """
+    return list(state.get("messages", []))[-_AGENT_HISTORY_TURNS:]
 
 
 def _role(msg) -> str:

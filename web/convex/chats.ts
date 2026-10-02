@@ -99,37 +99,12 @@ export const addSystemMessage = authenticatedMutation({
   },
 });
 
-// Clear a chat by deleting the chat document and all its messages
-export const clearChat = authenticatedMutation({
-  args: { lessonId: v.id("questions") },
-  handler: async (ctx, args) => {
-    if (!ctx.customUser) throw new Error("User not found");
-    const chat = await ctx.db
-      .query("chats")
-      .withIndex("by_user_lesson", (q) =>
-        q.eq("userId", ctx.customUser._id).eq("lessonId", args.lessonId)
-      )
-      .unique();
+// Most recent turns the tutor sees; older ones stay stored but aren't sent to the LLM.
+const CHAT_HISTORY_LIMIT = 20;
 
-    if (!chat) return { success: true }; // Nothing to clear
-
-    // Delete all messages
-    const messages = await ctx.db
-      .query("chatMessages")
-      .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
-      .collect();
-    for (const msg of messages) {
-      await ctx.db.delete(msg._id);
-    }
-    
-    // Delete the chat itself
-    await ctx.db.delete(chat._id);
-
-    return { success: true };
-  },
-});
-
-// Fetch full problem context and BKT mastery for a given chat, meant to be called by the backend
+// Fetch full problem context, BKT mastery and recent conversation for a given
+// chat, meant to be called by the backend. The conversation comes from here
+// (not the browser) so it can't be duplicated or forged.
 export const getChatContext = authenticatedQuery({
   args: { chatId: v.id("chats") },
   handler: async (ctx, args) => {
@@ -163,11 +138,19 @@ export const getChatContext = authenticatedQuery({
     //     .join("\n");
     // }
 
+    const recent = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+      .order("desc")
+      .take(CHAT_HISTORY_LIMIT);
+
     return {
       original_problem: lesson.problem_description || "",
       // unit_test_assertions: unitTestAssertions,
       current_knowledge_component: lesson.knowledge_component || "",
       bkt_prob_mastery: probMastery,
+      // Oldest first, ending with the student's latest message.
+      messages: recent.reverse().map((m) => ({ sender: m.sender, content: m.content })),
     };
   },
 });

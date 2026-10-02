@@ -5,6 +5,8 @@ import logging
 from typing import AsyncGenerator, Optional
 from fastapi import HTTPException, status
 from convex import ConvexClient
+from langchain_core.messages import RemoveMessage
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from posthog import Posthog
 
 from bkt import initial_mastery
@@ -36,10 +38,24 @@ def _thread_config(chat: Chat, auth_user_id: str) -> dict:
     return {"configurable": {"thread_id": f"exemplai:{auth_user_id}:{chat.chat_id}"}}
 
 
-def build_initial_state(chat: Chat) -> dict:
-    """Map a /chat request into the TutorGraphState input dict."""
+def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dict:
+    """Map a /chat request into the TutorGraphState input dict.
+
+    ``history`` is the lesson conversation from Convex (chats:getChatContext),
+    oldest first and ending with the student's latest message. It is the
+    source of truth: the browser-sent ``chat.conversation`` is only used if
+    the Convex deployment predates history in getChatContext.
+
+    The leading RemoveMessage(REMOVE_ALL_MESSAGES) replaces the checkpointed
+    messages instead of appending to them; appending re-added the whole
+    conversation every turn (2, 6, 12, ... messages).
+    """
+    if history is None:
+        log.warning("chat history missing from Convex context; using browser conversation")
+        history = chat.conversation
+
     langgraph_messages = []
-    for msg in chat.conversation:
+    for msg in history:
         role = "user" if msg.get("sender") == "user" else "assistant"
         langgraph_messages.append({"role": role, "content": msg.get("content", "")})
 
@@ -47,7 +63,7 @@ def build_initial_state(chat: Chat) -> dict:
         langgraph_messages = [{"role": "user", "content": "hi!"}]
 
     return {
-        "messages": langgraph_messages,
+        "messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *langgraph_messages],
         "experiment_condition": chat.experiment_condition,
         "bkt_prob_mastery": chat.bkt_prob_mastery,
         "original_problem": chat.original_problem,
@@ -84,7 +100,10 @@ async def _evaluate_posthog_condition(auth_user_id: str, chat: Chat) -> None:
             log.warning("PostHog flag evaluation failed: %s", e)
 
 
-async def _load_convex_context(client: ConvexClient, chat: Chat) -> None:
+async def _load_convex_context(client: ConvexClient, chat: Chat) -> Optional[list[dict]]:
+    """Fill ``chat`` with lesson/BKT context from Convex; return the conversation.
+
+    Returns None when Convex sent no ``messages`` (older deployment)."""
     if chat.chat_id:
         try:
             context = await asyncio.wait_for(
@@ -105,9 +124,11 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> None:
                 chat.bkt_prob_mastery = mastery
                 if context.get("experiment_condition"):
                     chat.experiment_condition = context.get("experiment_condition")
+                return context.get("messages")
         except Exception as cvx_err:
             log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
             raise RuntimeError("Unable to load authenticated chat context") from cvx_err
+    return None
 
 
 def _determine_chosen_model(result: dict) -> str:
@@ -165,10 +186,10 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     """Run the tutor graph to completion and return the final state."""
     try:
         client = _convex_client(auth_token)
-        await _load_convex_context(client, chat)
+        history = await _load_convex_context(client, chat)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        result = await graph.ainvoke(build_initial_state(chat, history), config=_thread_config(chat, auth_user_id))
 
         text = _extract_final_message_text(result)
         chosen_model = _determine_chosen_model(result)
@@ -197,10 +218,10 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     (no unvetted text reaches the student) at the cost of no latency gain."""
     try:
         client = _convex_client(auth_token)
-        await _load_convex_context(client, chat)
+        history = await _load_convex_context(client, chat)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat), config=_thread_config(chat, auth_user_id))
+        result = await graph.ainvoke(build_initial_state(chat, history), config=_thread_config(chat, auth_user_id))
     except Exception as e:
         log.error(f"AI service error: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': 'AI service temporarily unavailable'})}\n\n"
