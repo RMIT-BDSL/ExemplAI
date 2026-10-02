@@ -32,6 +32,7 @@ class Chat(BaseModel):
     # Overwritten from Convex (last failed Submit); the browser value is ignored.
     error_trace: str = ""
 
-    # "get_help": the Get help button (always a new example; needs a failed
-    # Submit). "message": a typed chat message (needs Get help first).
-    trigger: Literal["message", "get_help"] = "message"
+    # "get_help" / "new_example": the chat buttons (always a new example,
+    # spending the example allowance). "message": a typed chat message (needs
+    # the tutor to have replied once). See web/convex/examples.ts.
+    trigger: Literal["message", "get_help", "new_example"] = "message"

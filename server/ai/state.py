@@ -39,7 +39,12 @@ class TutorGraphState(TypedDict):
     # ── Internal: unvetted agent draft (Dean reads this) ──────────────
     draft_response: str
     response_type: str                # "new_example" | "follow_up" (Dean checks differ)
-    trigger: str                      # "get_help" (button: always a new example) | "message"
+    trigger: str                      # "get_help" | "new_example" (buttons: always a new example) | "message"
+
+    # ── Internal: example allowance (web/convex/examples.ts) ──────────
+    examples_remaining: int           # examples earned but not yet given this round
+    example_limit_message: str        # shown when a typed request would exceed it
+    delivered_response_type: str      # set by the Dean: what reached the student
 
     # ── Internal: input-safety gate (input_guardrail writes these) ────
     guardrail_passed: bool

@@ -13,7 +13,12 @@ Checks depend on the condition and the draft's ``response_type``:
 - experimental + new_example: MODALITY_VIOLATION (the example matches its type);
 - experimental + follow_up: MODALITY_DRIFT (the reply keeps to its type's
   follow-up rules) instead, so follow-ups aren't rejected for lacking blanks
-  or a bug.
+  or a bug;
+- experimental, no examples remaining: EXAMPLE_LIMIT (a typed request can't
+  get a new example past the allowance, even if the draft is mislabelled).
+A typed request whose draft is labelled new_example with none remaining is
+answered with the limit message without calling the LLM. Sets
+``delivered_response_type`` (what reached the student) for Convex.
 """
 
 from __future__ import annotations
@@ -26,6 +31,8 @@ from pydantic import BaseModel
 
 from ai.llm import llm
 from ai.nodes.context import NEW_EXAMPLE, recent_history
+
+FALLBACK = "fallback"  # delivered_response_type when the draft is replaced
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
@@ -52,6 +59,8 @@ student. You do not write tutoring content.
 - pedagogical_modality: Complete | Faded | Erroneous | Control.
 - response_type: "new_example" (a fresh example) or "follow_up" (a reply about \
 an example or answer already given).
+- examples_remaining: new examples the student may still receive in this \
+lesson ("not limited" if unknown).
 - conversation_history: recent turns in this lesson, oldest first.
 - original_problem, student_code, draft_response.
 </inputs>
@@ -95,6 +104,13 @@ Answering the student's question, re-explaining, giving feedback on their \
 attempt, or giving a narrower hint is allowed.
 </experimental_follow_up>
 
+<example_limit>
+Only when experiment_condition is "experimental" and examples_remaining is 0:
+6. EXAMPLE_LIMIT: the draft presents a new worked example (a new parallel \
+problem with its own code), whatever its response_type says. Discussing, \
+re-explaining or hinting about examples already given is allowed.
+</example_limit>
+
 <control>
 In the control condition, apply only checks 1-3. There are no modality checks.
 </control>
@@ -109,6 +125,7 @@ def _dean_input(state: TutorGraphState) -> str:
         f"<experiment_condition>{state.get('experiment_condition', '')}</experiment_condition>\n"
         f"<pedagogical_modality>{state.get('pedagogical_modality', '')}</pedagogical_modality>\n"
         f"<response_type>{state.get('response_type') or NEW_EXAMPLE}</response_type>\n"
+        f"<examples_remaining>{_examples_remaining_text(state)}</examples_remaining>\n"
         f"<conversation_history>\n{recent_history(state)}\n</conversation_history>\n"
         f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
@@ -116,9 +133,31 @@ def _dean_input(state: TutorGraphState) -> str:
     )
 
 
+def _examples_remaining_text(state: TutorGraphState) -> str:
+    remaining = state.get("examples_remaining")
+    return "not limited" if remaining is None else str(remaining)
+
+
+def _over_example_limit(state: TutorGraphState) -> bool:
+    """A typed request answered with a new example when none remain."""
+    return (
+        state.get("trigger", "message") == "message"
+        and state.get("response_type") == NEW_EXAMPLE
+        and state.get("examples_remaining") == 0
+    )
+
+
 def dean_validation_node(state: TutorGraphState) -> dict:
     log.info("dean_validation_node")
     draft = state.get("draft_response", "")
+    limit_message = state.get("example_limit_message") or _FALLBACK
+
+    if _over_example_limit(state):
+        log.info("dean_validation_node → example limit reached")
+        return {
+            "messages": [{"role": "ai", "content": limit_message}],
+            "delivered_response_type": FALLBACK,
+        }
 
     dean = llm.with_structured_output(DeanValidationResult)
     result: DeanValidationResult = dean.invoke(
@@ -127,7 +166,14 @@ def dean_validation_node(state: TutorGraphState) -> dict:
 
     if result.status == "approved":
         log.info("dean_validation_node → approved")
-        return {"messages": [{"role": "ai", "content": draft}]}
+        return {
+            "messages": [{"role": "ai", "content": draft}],
+            "delivered_response_type": state.get("response_type") or NEW_EXAMPLE,
+        }
 
     log.warning(f"dean_validation_node → rejected ({result.reason})")
-    return {"messages": [{"role": "ai", "content": _FALLBACK}]}
+    fallback = limit_message if result.reason == "EXAMPLE_LIMIT" else _FALLBACK
+    return {
+        "messages": [{"role": "ai", "content": fallback}],
+        "delivered_response_type": FALLBACK,
+    }

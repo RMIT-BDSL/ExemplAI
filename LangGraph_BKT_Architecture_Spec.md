@@ -143,6 +143,8 @@ conversation, or the student asked for a different example.
 [FOLLOW_UP] if this reply responds to the student about an example you already \
 gave: answering a question, giving feedback on their attempt, or a narrower hint.
 The tag is removed before the student sees your reply.
+If <examples_remaining> is 0, do not present a new example, even if the student \
+asks for one: help them with the examples already given instead.
 </response_type>"""
 
 
@@ -424,8 +426,10 @@ Its checks depend on the condition and the draft's `response_type`:
 
 | | `new_example` | `follow_up` |
 |---|---|---|
-| **Experimental** | Always-checks + MODALITY_VIOLATION | Always-checks + MODALITY_DRIFT |
+| **Experimental** | Always-checks + MODALITY_VIOLATION (+ EXAMPLE_LIMIT at 0 remaining) | Always-checks + MODALITY_DRIFT (+ EXAMPLE_LIMIT at 0 remaining) |
 | **Control** | Always-checks only | Always-checks only |
+
+**Example allowance** (`web/convex/examples.ts`): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. A typed request whose draft is labelled `new_example` with none remaining is answered with a limit message without calling the Dean's LLM; a mislabelled one is caught by EXAMPLE_LIMIT. The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
 
 *Always-checks:* DIRECT_ANSWER_LEAK (judged against the recent conversation, so an answer pieced together over several turns is caught), INAPPROPRIATE_CONTENT, HALLUCINATED_CODE. For control, a "leak" is a complete working solution or a fully corrected version of the student's code; explanations, hints and short syntax snippets are allowed.
 
@@ -449,6 +453,8 @@ student. You do not write tutoring content.
 - pedagogical_modality: Complete | Faded | Erroneous | Control.
 - response_type: "new_example" (a fresh example) or "follow_up" (a reply about \
 an example or answer already given).
+- examples_remaining: new examples the student may still receive in this \
+lesson ("not limited" if unknown).
 - conversation_history: recent turns in this lesson, oldest first.
 - original_problem, student_code, draft_response.
 </inputs>
@@ -492,6 +498,13 @@ Answering the student's question, re-explaining, giving feedback on their \
 attempt, or giving a narrower hint is allowed.
 </experimental_follow_up>
 
+<example_limit>
+Only when experiment_condition is "experimental" and examples_remaining is 0:
+6. EXAMPLE_LIMIT: the draft presents a new worked example (a new parallel \
+problem with its own code), whatever its response_type says. Discussing, \
+re-explaining or hinting about examples already given is allowed.
+</example_limit>
+
 <control>
 In the control condition, apply only checks 1-3. There are no modality checks.
 </control>
@@ -505,6 +518,7 @@ def dean_input(state: TutorGraphState) -> str:
         f"<experiment_condition>{state['experiment_condition']}</experiment_condition>\n"
         f"<pedagogical_modality>{state['pedagogical_modality']}</pedagogical_modality>\n"
         f"<response_type>{state['response_type']}</response_type>\n"
+        f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
         f"<conversation_history>\n{recent_history(state)}\n</conversation_history>\n"  # last 10 turns
         f"<original_problem>\n{state['original_problem']}\n</original_problem>\n"
         f"<student_code>\n{state['student_code']}\n</student_code>\n"
@@ -518,9 +532,11 @@ def dean_validation_node(state: TutorGraphState):
         HumanMessage(content=dean_input(state)),
     ])
     if result.status == "approved":
-        return {"messages": [{"role": "ai", "content": state["draft_response"]}]}
-    # Rejected: the draft never reaches the student; send a safe fallback instead.
-    return {"messages": [{"role": "ai", "content": FALLBACK}]}
+        return {"messages": [{"role": "ai", "content": state["draft_response"]}],
+                "delivered_response_type": state["response_type"]}
+    # Rejected: the draft never reaches the student; send a safe fallback instead
+    # (the limit message for EXAMPLE_LIMIT).
+    return {"messages": [{"role": "ai", "content": FALLBACK}], "delivered_response_type": "fallback"}
 ```
 
 ---

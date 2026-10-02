@@ -337,8 +337,13 @@ export const recordCodeExecution = authenticatedMutation({
     // sees as the error.
     const failedSubmit = args.actionType === "submit" && !args.passed;
     const failedSubmits = (existing?.failed_submits ?? 0) + (failedSubmit ? 1 : 0);
+    // round_failed_submits earns examples in the current round (convex/examples.ts).
     const failureFields = failedSubmit
-      ? { failed_submits: failedSubmits, last_error_trace: args.errorTrace ?? "" }
+      ? {
+          failed_submits: failedSubmits,
+          round_failed_submits: (existing?.round_failed_submits ?? existing?.failed_submits ?? 0) + 1,
+          last_error_trace: args.errorTrace ?? "",
+        }
       : {};
 
     if (existing) {

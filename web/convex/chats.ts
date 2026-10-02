@@ -1,24 +1,6 @@
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import type { QueryCtx } from "./_generated/server";
+import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
-
-// The tutor's first reply in a lesson comes from "Get help", which unlocks
-// after a failed Submit; typed messages unlock once that first reply exists.
-async function lessonProgressFor(ctx: QueryCtx, userId: Id<"users">, lessonId: Id<"questions">) {
-  return await ctx.db
-    .query("lessonProgress")
-    .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", lessonId))
-    .unique();
-}
-
-async function hasTutorReply(ctx: QueryCtx, chatId: Id<"chats">) {
-  const messages = await ctx.db
-    .query("chatMessages")
-    .withIndex("by_chat", (q) => q.eq("chatId", chatId))
-    .collect();
-  return messages.some((m) => m.sender === "assistant");
-}
 
 // Get messages for a given lesson chat
 export const getMessages = authenticatedQuery({
@@ -66,14 +48,15 @@ export const getOrCreateChat = authenticatedMutation({
   },
 });
 
-// Add a message to the chat (user path). `trigger: "get_help"` marks the turn
-// created by the Get help button.
+// Add a message to the chat (user path). `trigger` marks turns created by the
+// Get help / New example buttons, which spend the example allowance
+// (convex/examples.ts); typed messages need the tutor to have replied once.
 export const addMessage = authenticatedMutation({
   args: {
     chatId: v.id("chats"),
     sender: v.literal("user"),
     content: v.string(),
-    trigger: v.optional(v.literal("get_help")),
+    trigger: v.optional(v.union(v.literal("get_help"), v.literal("new_example"))),
   },
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
@@ -81,14 +64,11 @@ export const addMessage = authenticatedMutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId !== ctx.customUser._id) throw new Error("Unauthorized");
 
-    const helpStarted = await hasTutorReply(ctx, args.chatId);
-    if (args.trigger === "get_help") {
-      const progress = await lessonProgressFor(ctx, chat.userId, chat.lessonId);
-      if ((progress?.failed_submits ?? 0) < 1) {
-        throw new Error("Get help unlocks after a failed Submit");
-      }
-      if (helpStarted) throw new Error("Help has already started for this lesson");
-    } else if (!helpStarted) {
+    const allowance = await allowanceForChat(ctx, chat);
+    if (args.trigger) {
+      const blocked = buttonBlockedReason(args.trigger, allowance);
+      if (blocked) throw new Error(blocked);
+    } else if (!allowance.helpStarted) {
       throw new Error("Chat unlocks after Get help");
     }
 
@@ -110,6 +90,10 @@ export const addSystemMessage = authenticatedMutation({
     content: v.string(),
     sentBySystem: v.optional(v.boolean()),
     model: v.optional(v.string()),
+    // What a tutor reply delivered; "new_example" counts against the allowance.
+    responseType: v.optional(
+      v.union(v.literal("new_example"), v.literal("follow_up"), v.literal("fallback"))
+    ),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -127,6 +111,7 @@ export const addSystemMessage = authenticatedMutation({
       content: args.content,
       sentBySystem: args.sentBySystem,
       model: args.model,
+      ...(args.responseType ? { response_type: args.responseType } : {}),
     });
     return { success: true };
   },
@@ -188,6 +173,7 @@ export const getChatContext = authenticatedQuery({
       messages: recent.reverse().map((m) => ({ sender: m.sender, content: m.content })),
       failed_submits: progress?.failed_submits ?? 0,
       error_trace: progress?.last_error_trace ?? "",
+      example_allowance: await allowanceForChat(ctx, chat),
     };
   },
 });

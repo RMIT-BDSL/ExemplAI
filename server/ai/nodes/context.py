@@ -32,7 +32,12 @@ conversation, or the student asked for a different example.
 [FOLLOW_UP] if this reply responds to the student about an example you already \
 gave: answering a question, giving feedback on their attempt, or a narrower hint.
 The tag is removed before the student sees your reply.
+If <examples_remaining> is 0, do not present a new example, even if the student \
+asks for one: help them with the examples already given instead.
 </response_type>"""
+
+# Chat-button triggers: always a new example (they spend the example allowance).
+_BUTTON_TRIGGERS = ("get_help", "new_example")
 
 _TAG_RE = re.compile(r"^\s*\**\[(NEW_EXAMPLE|FOLLOW_UP)\]\**[ \t]*\n?", re.IGNORECASE)
 
@@ -51,7 +56,12 @@ def student_context(state: TutorGraphState) -> str:
         f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
         f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
         f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
-        "The conversation with the student follows; reply to their latest message."
+        + (
+            f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
+            if state.get("examples_remaining") is not None
+            else ""
+        )
+        + "The conversation with the student follows; reply to their latest message."
     )
 
 
@@ -82,13 +92,13 @@ def has_prior_tutor_reply(state: TutorGraphState) -> bool:
 def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
     """Strip the agent's [NEW_EXAMPLE]/[FOLLOW_UP] tag; return (draft, response_type).
 
-    The first tutor reply in a conversation, and any reply to the Get help
-    button, is always a new example, whatever the tag says. A missing tag
-    falls back to the same history rule.
+    The first tutor reply in a conversation, and any reply to the Get help or
+    New example buttons, is always a new example, whatever the tag says. A
+    missing tag falls back to the same history rule.
     """
     match = _TAG_RE.match(raw)
     draft = raw[match.end():] if match else raw
-    if state.get("trigger") == "get_help" or not has_prior_tutor_reply(state):
+    if state.get("trigger") in _BUTTON_TRIGGERS or not has_prior_tutor_reply(state):
         return draft, NEW_EXAMPLE
     if match:
         return draft, NEW_EXAMPLE if match.group(1).upper() == "NEW_EXAMPLE" else FOLLOW_UP
@@ -98,7 +108,7 @@ def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
 
 def response_type_from_history(state: TutorGraphState) -> str:
     """Control agent: no tag, label from history only (first reply vs later)."""
-    if state.get("trigger") == "get_help":
+    if state.get("trigger") in _BUTTON_TRIGGERS:
         return NEW_EXAMPLE
     return FOLLOW_UP if has_prior_tutor_reply(state) else NEW_EXAMPLE
 

@@ -175,7 +175,7 @@ describe("chats API", () => {
     await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "why?" });
     await expect(
       student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "again", trigger: "get_help" })
-    ).rejects.toThrow("Help has already started");
+    ).rejects.toThrow("Get help has already been used");
 
     const messages = await student.query(api.chats.getMessages, { lessonId });
     expect(messages.map((m) => [m.sender, m.content, m.trigger])).toEqual([

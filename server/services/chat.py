@@ -75,26 +75,58 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
     }
 
 
+def example_limit_message(allowance: dict) -> str:
+    """What the student is told when a typed request would exceed the allowance."""
+    if allowance.get("exhausted"):
+        return (
+            f"You've used all {allowance.get('cap', 3)} examples for this lesson. Try a lesson "
+            "on another topic, then come back here and you can get new examples again."
+        )
+    return (
+        "You've used the examples you've earned so far. Submit another attempt "
+        "to unlock your next example."
+    )
+
+
+def with_allowance(state: dict, allowance: Optional[dict]) -> dict:
+    """Add the example allowance to the graph input (None: Convex predates it)."""
+    if allowance is None:
+        return state
+    return {
+        **state,
+        "examples_remaining": allowance.get("remaining", 0),
+        "example_limit_message": example_limit_message(allowance),
+    }
+
+
 class ChatLocked(Exception):
     """The lesson's chat isn't unlocked for this request (see check_chat_lock)."""
 
 
-def check_chat_lock(chat: Chat, history: Optional[list[dict]], failed_submits: Optional[int]) -> None:
-    """Server-side copy of the Convex addMessage lock.
+def check_chat_lock(chat: Chat, allowance: Optional[dict]) -> None:
+    """Server-side copy of the Convex addMessage lock (web/convex/examples.ts).
 
-    Get help needs a failed Submit and works once per lesson (before the
-    tutor's first reply); typed messages need that first reply. Skipped when
-    Convex predates the lock (no failed_submits / history in the context).
+    Get help gives a round's first example and needs a failed Submit; New
+    example needs Get help first and an example earned but not yet used; typed
+    messages need the tutor to have replied once. Skipped when Convex predates
+    the allowance.
     """
-    if failed_submits is None or history is None:
+    if allowance is None:
         return
-    help_started = any(m.get("sender") == "assistant" for m in history)
+    used, remaining = allowance.get("used", 0), allowance.get("remaining", 0)
     if chat.trigger == "get_help":
-        if failed_submits < 1:
+        if used > 0:
+            raise ChatLocked("Get help has already been used; ask for a new example instead")
+        if remaining < 1:
             raise ChatLocked("Get help unlocks after a failed Submit")
-        if help_started:
-            raise ChatLocked("Help has already started for this lesson")
-    elif not help_started:
+    elif chat.trigger == "new_example":
+        if used < 1:
+            raise ChatLocked("Use Get help first")
+        if allowance.get("exhausted"):
+            raise ChatLocked("All examples for this lesson are used; try another topic and come back")
+        if remaining < 1:
+            raise ChatLocked("Submit another attempt to unlock your next example")
+    elif not allowance.get("helpStarted"):
         raise ChatLocked("Chat unlocks after Get help")
 
 
@@ -126,7 +158,7 @@ async def _evaluate_posthog_condition(auth_user_id: str, chat: Chat) -> None:
 
 class ConvexChatContext(NamedTuple):
     history: Optional[list[dict]]   # None: Convex predates history in getChatContext
-    failed_submits: Optional[int]   # None: Convex predates the Get help lock
+    allowance: Optional[dict]       # None: Convex predates the example allowance
 
 
 async def _load_convex_context(client: ConvexClient, chat: Chat) -> ConvexChatContext:
@@ -154,7 +186,7 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> ConvexChatCo
                     chat.experiment_condition = context.get("experiment_condition")
                 if "error_trace" in context:
                     chat.error_trace = context["error_trace"] or ""
-                return ConvexChatContext(context.get("messages"), context.get("failed_submits"))
+                return ConvexChatContext(context.get("messages"), context.get("example_allowance"))
         except Exception as cvx_err:
             log.error(f"Failed to fetch chat context from Convex: {cvx_err}")
             raise RuntimeError("Unable to load authenticated chat context") from cvx_err
@@ -188,7 +220,8 @@ async def _save_assistant_message(
     client: ConvexClient,
     chat_id: Optional[str],
     text: str,
-    chosen_model: str
+    chosen_model: str,
+    response_type: Optional[str] = None,
 ) -> None:
     if text and chat_id:
         try:
@@ -202,6 +235,8 @@ async def _save_assistant_message(
                         "content": text,
                         "sentBySystem": True,
                         "model": chosen_model,
+                        # What the reply delivered; Convex counts new examples.
+                        **({"responseType": response_type} if response_type else {}),
                         "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
@@ -217,14 +252,15 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
-        check_chat_lock(chat, context.history, context.failed_submits)
+        check_chat_lock(chat, context.allowance)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat, context.history), config=_thread_config(chat, auth_user_id))
+        state = with_allowance(build_initial_state(chat, context.history), context.allowance)
+        result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
 
         text = _extract_final_message_text(result)
         chosen_model = _determine_chosen_model(result)
-        await _save_assistant_message(client, chat.chat_id, text, chosen_model)
+        await _save_assistant_message(client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"))
 
         # Return a small, guaranteed-serializable payload rather than the raw
         # graph state (which carries LangChain message objects and can be large
@@ -252,10 +288,11 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
-        check_chat_lock(chat, context.history, context.failed_submits)
+        check_chat_lock(chat, context.allowance)
         await _evaluate_posthog_condition(auth_user_id, chat)
 
-        result = await graph.ainvoke(build_initial_state(chat, context.history), config=_thread_config(chat, auth_user_id))
+        state = with_allowance(build_initial_state(chat, context.history), context.allowance)
+        result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
     except ChatLocked as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         return
@@ -267,7 +304,7 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     text = _extract_final_message_text(result)
     chosen_model = _determine_chosen_model(result)
     try:
-        await _save_assistant_message(client, chat.chat_id, text, chosen_model)
+        await _save_assistant_message(client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"))
     except Exception as e:
         log.error(f"Message persistence error: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to save assistant message'})}\n\n"

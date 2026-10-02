@@ -66,6 +66,7 @@ function Course() {
   const { data: session } = authClient.useSession();
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
+  const openLesson = useMutation(api.examples.openLesson);
   const { data: lessonProgress } = useQuery(
     convexQuery(
       api.courses.getLessonProgress,
@@ -135,8 +136,10 @@ function Course() {
         lessonId: activeQuestionId,
         status: "in-progress",
       }).catch(() => {});
+      // Coming back from another lesson resets a used-up example allowance.
+      openLesson({ lessonId: activeQuestionId }).catch(() => {});
     }
-  }, [tokenIdentifier, activeQuestionId, setLessonStatus]);
+  }, [tokenIdentifier, activeQuestionId, setLessonStatus, openLesson]);
 
   useEffect(() => {
     if (activeQuestion && problemId) {
@@ -359,10 +362,11 @@ function Course() {
     }, 0);
   }
 
-  function handleGetHelp() {
-    posthog.capture("get_help_clicked", {
+  function handleExampleRequested(trigger: "get_help" | "new_example", examplesUsed: number) {
+    posthog.capture(trigger === "get_help" ? "get_help_clicked" : "new_example_clicked", {
       problem_id: problemId,
       failed_submits: failedSubmits,
+      examples_used: examplesUsed,
     });
   }
 
@@ -529,9 +533,8 @@ function Course() {
                     editorRef={editorRef}
                     currentCode={currentCode}
                     lessonId={activeQuestionId}
-                    failedSubmits={failedSubmits}
                     onOpenScratchpad={handleOpenScratchpad}
-                    onGetHelp={handleGetHelp}
+                    onExampleRequested={handleExampleRequested}
                   />
                 </Suspense>
               </div>
