@@ -8,7 +8,7 @@
     "intro_setup": {
       "description": "Running Python, print output, first programs",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -16,7 +16,7 @@
     "variables_expressions": {
       "description": "Variables, types and conversion, arithmetic, modulo and integer division",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -24,7 +24,7 @@
     "strings_formatting": {
       "description": "String indexing, slicing, concatenation, methods and formatting",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -32,7 +32,7 @@
     "branching": {
       "description": "If/elif/else, comparisons and boolean logic",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -40,7 +40,7 @@
     "loops": {
       "description": "For/while iteration and range",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -48,7 +48,7 @@
     "advanced_loops": {
       "description": "Nested loops, break/continue, loop patterns and accumulators",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -56,7 +56,7 @@
     "functions": {
       "description": "Defining functions, parameters, return values, calling library functions",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -64,7 +64,7 @@
     "collections": {
       "description": "Lists, tuples, dictionaries and sets",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -72,7 +72,7 @@
     "files": {
       "description": "Reading and writing files",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -80,7 +80,7 @@
     "basic_libraries": {
       "description": "Using standard-library modules for practical tasks",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
@@ -88,7 +88,7 @@
     "advanced_topics": {
       "description": "Advanced course topics",
       "prior": 0.15,
-      "learn": 0.25,
+      "learn": 0.2,
       "guess": 0.4,
       "slip": 0.1,
       "forget": 0.0
