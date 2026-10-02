@@ -23,7 +23,9 @@ export async function sendChatMessage(
   conversation: ChatMessagePayload[],
   chatId: string,
   userId = 1,
-  studentCode = ""
+  studentCode = "",
+  // "get_help": the Get help button (server forces a new example).
+  trigger: "message" | "get_help" = "message"
 ): Promise<LangGraphResponse> {
   const tokenRes = await authClient.convex.token();
   const token = tokenRes.data?.token;
@@ -35,6 +37,7 @@ export async function sendChatMessage(
       chat_id: chatId,
       conversation,
       student_code: studentCode,
+      trigger,
     },
     {
       timeout: 60000,

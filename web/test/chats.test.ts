@@ -2,6 +2,7 @@ import { convexTest } from "convex-test";
 import { describe, it, expect, beforeEach } from "vitest";
 import { api, components } from "../convex/_generated/api";
 import schema from "../convex/schema";
+import type { Id } from "../convex/_generated/dataModel";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 const setup = () => convexTest(schema, modules);
@@ -84,6 +85,31 @@ async function createMockStudent(t: ReturnType<typeof setup>) {
   });
 }
 
+async function setupLessonChat(t: ReturnType<typeof setup>) {
+  const admin = await createMockAdmin(t);
+  const course = await admin.mutation(api.courses.createCourse, {
+    course_name: "Test Course",
+    course_language: "python",
+  });
+  const lessonId = await admin.mutation(api.lessons.createLesson, {
+    course,
+    week: 5,
+    problem_name: "Test Lesson",
+    problem_description: "Sum a list",
+    knowledge_component: "loops",
+  });
+  const student = await createMockStudent(t);
+  const chatId = await student.mutation(api.chats.getOrCreateChat, { lessonId });
+  return { admin, student, lessonId, chatId };
+}
+
+// Tutor replies are written by the Python server (addSystemMessage + backend secret).
+async function insertTutorReply(t: ReturnType<typeof setup>, chatId: Id<"chats">, content: string) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("chatMessages", { chatId, sender: "assistant", content, sentBySystem: true });
+  });
+}
+
 describe("chats API", () => {
   it("getOrCreateChat creates a new chat if none exists", async () => {
     const t = setup();
@@ -115,71 +141,70 @@ describe("chats API", () => {
     expect(sameChatId).toBe(chatId);
   });
 
-  it("addMessage correctly inserts a message and getMessages retrieves it", async () => {
+  it("addMessage enforces the Get help lock", async () => {
     const t = setup();
-    const admin = await createMockAdmin(t);
-    const course = await admin.mutation(api.courses.createCourse, {
-      course_name: "Test Course",
-      course_language: "python",
-    });
-    const lessonId = await admin.mutation(api.lessons.createLesson, {
-      course,
-      week: 1,
-      problem_name: "Test Lesson",
-      problem_description: "x",
-      knowledge_component: "loops",
-    });
+    const { student, lessonId, chatId } = await setupLessonChat(t);
 
-    const student = await createMockStudent(t);
-    const chatId = await student.mutation(api.chats.getOrCreateChat, { lessonId });
+    // Before any failed Submit: neither Get help nor typed messages.
+    await expect(
+      student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "help", trigger: "get_help" })
+    ).rejects.toThrow("Get help unlocks after a failed Submit");
+    await expect(
+      student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "hi" })
+    ).rejects.toThrow("Chat unlocks after Get help");
 
-    // Add a message
+    // A failed Submit unlocks Get help, but typing still waits for the tutor's reply.
+    await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: false,
+      actionType: "submit",
+      errorTrace: "Input: 3 | Expected: 6 | Got: 5",
+    });
     await student.mutation(api.chats.addMessage, {
       chatId,
       sender: "user",
-      content: "Hello AI",
+      content: "Please provide me an example to help me with this",
+      trigger: "get_help",
     });
+    await expect(
+      student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "hi" })
+    ).rejects.toThrow("Chat unlocks after Get help");
 
-    await student.mutation(api.chats.addMessage, {
-      chatId,
-      sender: "assistant",
-      content: "Hello Student",
-    });
+    // Once the tutor has replied, typing works and Get help can't be repeated.
+    await insertTutorReply(t, chatId, "an example");
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "why?" });
+    await expect(
+      student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "again", trigger: "get_help" })
+    ).rejects.toThrow("Help has already started");
 
     const messages = await student.query(api.chats.getMessages, { lessonId });
-    expect(messages).toHaveLength(2);
-    expect(messages[0].sender).toBe("user");
-    expect(messages[0].content).toBe("Hello AI");
-    expect(messages[1].sender).toBe("assistant");
-    expect(messages[1].content).toBe("Hello Student");
+    expect(messages.map((m) => [m.sender, m.content, m.trigger])).toEqual([
+      ["user", "Please provide me an example to help me with this", "get_help"],
+      ["assistant", "an example", undefined],
+      ["user", "why?", undefined],
+    ]);
   });
 
-  it("getChatContext returns the conversation oldest-first and only to its owner", async () => {
+  it("getChatContext returns the conversation, failure info, and only to its owner", async () => {
     const t = setup();
-    const admin = await createMockAdmin(t);
-    const course = await admin.mutation(api.courses.createCourse, {
-      course_name: "Test Course",
-      course_language: "python",
+    const { admin, student, lessonId, chatId } = await setupLessonChat(t);
+    await student.mutation(api.courses.recordCodeExecution, {
+      lessonId,
+      passed: false,
+      actionType: "submit",
+      errorTrace: "Input: 3 | Expected: 6 | Got: 5",
     });
-    const lessonId = await admin.mutation(api.lessons.createLesson, {
-      course,
-      week: 5,
-      problem_name: "Test Lesson",
-      problem_description: "Sum a list",
-      knowledge_component: "loops",
-    });
-
-    const student = await createMockStudent(t);
-    const chatId = await student.mutation(api.chats.getOrCreateChat, { lessonId });
-    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "first" });
-    await t.run(async (ctx) => {
-      await ctx.db.insert("chatMessages", { chatId, sender: "assistant", content: "an example", sentBySystem: true });
-    });
+    // A failed Run does not count.
+    await student.mutation(api.courses.recordCodeExecution, { lessonId, passed: false, actionType: "run" });
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "first", trigger: "get_help" });
+    await insertTutorReply(t, chatId, "an example");
     await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "follow-up" });
 
     const context = await student.query(api.chats.getChatContext, { chatId });
     expect(context.original_problem).toBe("Sum a list");
     expect(context.bkt_prob_mastery).toBeNull();
+    expect(context.failed_submits).toBe(1);
+    expect(context.error_trace).toBe("Input: 3 | Expected: 6 | Got: 5");
     expect(context.messages).toEqual([
       { sender: "user", content: "first" },
       { sender: "assistant", content: "an example" },

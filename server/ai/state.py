@@ -39,6 +39,7 @@ class TutorGraphState(TypedDict):
     # ── Internal: unvetted agent draft (Dean reads this) ──────────────
     draft_response: str
     response_type: str                # "new_example" | "follow_up" (Dean checks differ)
+    trigger: str                      # "get_help" (button: always a new example) | "message"
 
     # ── Internal: input-safety gate (input_guardrail writes these) ────
     guardrail_passed: bool

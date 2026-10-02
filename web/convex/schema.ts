@@ -68,6 +68,11 @@ export default defineSchema({
     status: v.union(v.literal("in-progress"), v.literal("completed")),
     has_run: v.optional(v.boolean()),
     bkt_recorded: v.optional(v.boolean()),
+    // Failed Submits on this lesson; the first unlocks "Get help" in the chat.
+    failed_submits: v.optional(v.number()),
+    // Server-built summary of the last failed Submit, passed to the tutor
+    // (hidden tests are counted, never detailed).
+    last_error_trace: v.optional(v.string()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])
@@ -119,5 +124,7 @@ export default defineSchema({
     content: v.string(),
     sentBySystem: v.optional(v.boolean()),
     model: v.optional(v.string()),
+    // Student turns created by the "Get help" button rather than typed.
+    trigger: v.optional(v.literal("get_help")),
   }).index("by_chat", ["chatId"]),
 });

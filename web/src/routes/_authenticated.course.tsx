@@ -85,11 +85,6 @@ function Course() {
   const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true);
   const [isIndexOpen, setIsIndexOpen] = useState<boolean>(false);
 
-  const [chatPrompt, setChatPrompt] = useState<{
-    key: number;
-    content: string;
-  } | null>(null);
-
   const [isScratchpadVisible, setIsScratchpadVisible] = useState<boolean>(false);
   const scratchpadRef = useRef<ScratchpadHandle | null>(null);
 
@@ -111,7 +106,10 @@ function Course() {
   }, []);
 
   const activeQuestionId = activeQuestion?._id;
-  const isCompleted = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId)?.status === "completed";
+  const activeProgress = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId);
+  const isCompleted = activeProgress?.status === "completed";
+  // Failed Submits on this lesson; the first unlocks Get help in the chat.
+  const failedSubmits: number = activeProgress?.failed_submits ?? 0;
 
   const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
   const nextQuestion =
@@ -328,6 +326,10 @@ function Course() {
       );
       setExecutionResult(response.data);
       const succeeded = !response.data?.error;
+      // A failed Submit unlocks Get help, so bring the chat into view.
+      if (actionType === "submit" && !succeeded) {
+        setIsChatCollapsed(false);
+      }
       posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {
         problem_id: problemId,
         language,
@@ -347,33 +349,6 @@ function Course() {
     }
   }
 
-  function handleSendErrorToChat(error: string) {
-    const code = editorRef.current?.getValue() ?? currentCode;
-    const content = [
-      `I ran into an error on problem \`${activeQuestionId}\` (${activeQuestion?.problem_name ?? "this problem"}).`,
-      "",
-      "Here is my code:",
-      "```python",
-      code,
-      "```",
-      "",
-      "And here is the error I got:",
-      "```",
-      error,
-      "```",
-      "",
-      "Can you help me understand what went wrong and how to fix it?",
-    ].join("\n");
-
-    posthog.capture("error_sent_to_chat", {
-      problem_id: problemId,
-      language,
-    });
-
-    setIsChatCollapsed(false);
-    setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
-  }
-
   const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
 
   function handleOpenScratchpad(code: string, snippetLanguage?: string) {
@@ -384,25 +359,11 @@ function Course() {
     }, 0);
   }
 
-  function handleAskAboutOutput(code: string, output: string, snippetLanguage?: string) {
-    const content = [
-      `I ran this snippet in the scratchpad:`,
-      "```" + (snippetLanguage || "python"),
-      code,
-      "```",
-      "",
-      "And got this output:",
-      "```",
-      output || "(empty output)",
-      "```",
-      "",
-      "Can you help me understand what happened?",
-    ].join("\n");
-
-    posthog.capture("scratchpad_output_asked", { problem_id: problemId });
-
-    setIsChatCollapsed(false);
-    setChatPrompt((prev) => ({ key: (prev?.key ?? 0) + 1, content }));
+  function handleGetHelp() {
+    posthog.capture("get_help_clicked", {
+      problem_id: problemId,
+      failed_submits: failedSubmits,
+    });
   }
 
   // Navigation is handled by the <Link> in LessonIndex; this just resets
@@ -528,7 +489,6 @@ function Course() {
                   setIsConsoleOpen={setIsConsoleOpen}
                   onRun={() => handleExecute("run")}
                   onSubmit={() => handleExecute("submit")}
-                  onSendErrorToChat={handleSendErrorToChat}
                   isSaved={isSaved}
                   onSave={handleSave}
                   testCases={activeQuestion?.testCases || []}
@@ -566,12 +526,12 @@ function Course() {
                 >
                   <SidePanel
                     onCollapse={() => setIsChatCollapsed(true)}
-                    pendingMessage={chatPrompt}
                     editorRef={editorRef}
                     currentCode={currentCode}
                     lessonId={activeQuestionId}
+                    failedSubmits={failedSubmits}
                     onOpenScratchpad={handleOpenScratchpad}
-                    onAskAboutOutput={handleAskAboutOutput}
+                    onGetHelp={handleGetHelp}
                   />
                 </Suspense>
               </div>

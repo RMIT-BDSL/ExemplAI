@@ -53,7 +53,6 @@ export function ChatHeader({ isTyping, onCollapse }: ChatHeaderProps) {
 export interface MessageBubbleProps {
   message: Message;
   onOpenScratchpad?: (code: string, language?: string) => void;
-  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }
 
 // Normalise a markdown fence language tag to a monaco/language key.
@@ -72,12 +71,10 @@ function CodeBlock({
   language,
   code,
   onOpenScratchpad,
-  onAskAboutOutput,
 }: {
   language?: string;
   code: string;
   onOpenScratchpad?: (code: string, language?: string) => void;
-  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }) {
   const [isRunning, setIsRunning] = React.useState(false);
   const [result, setResult] = React.useState<any>(null);
@@ -113,7 +110,6 @@ function CodeBlock({
 
   const statusId = result?.status?.id ?? result?.status_id;
   const isAccepted = statusId === 3;
-  const outputText = result?.stdout?.trim() || "(empty output)";
   const hasError = Boolean(result?.stderr || result?.compile_output || result?.error);
 
   return (
@@ -179,27 +175,13 @@ function CodeBlock({
           <pre className="chat-code chat-code-wrap editorial-scroll max-h-32">
             {result.stdout ? result.stdout : hasError ? result.stderr || result.compile_output : "(empty output)"}
           </pre>
-          {onAskAboutOutput && (
-            <div className="px-3 pb-2">
-              <button
-                type="button"
-                onClick={() =>
-                  onAskAboutOutput(code, hasError ? result.stderr || result.compile_output || "" : outputText, language)
-                }
-                className="inline-flex items-center gap-1 rounded-md border border-lagoon/20 bg-lagoon/10 px-2 py-0.5 text-[10px] font-semibold text-lagoon hover:bg-lagoon/20 transition-colors cursor-pointer"
-              >
-                <Sparkles className="size-3" />
-                <span>Ask AI about this result</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-export function MessageBubble({ message, onOpenScratchpad, onAskAboutOutput }: MessageBubbleProps) {
+export function MessageBubble({ message, onOpenScratchpad }: MessageBubbleProps) {
   const isUser = message.sender === "user";
 
   return (
@@ -249,7 +231,6 @@ export function MessageBubble({ message, onOpenScratchpad, onAskAboutOutput }: M
                         language={match?.[1]}
                         code={raw.replace(/\n$/, "")}
                         onOpenScratchpad={onOpenScratchpad}
-                        onAskAboutOutput={onAskAboutOutput}
                       />
                     );
                   }
@@ -293,10 +274,9 @@ export interface MessageFeedProps {
   messages: Message[];
   isTyping?: boolean;
   onOpenScratchpad?: (code: string, language?: string) => void;
-  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
 }
 
-export function MessageFeed({ messages, isTyping, onOpenScratchpad, onAskAboutOutput }: MessageFeedProps) {
+export function MessageFeed({ messages, isTyping, onOpenScratchpad }: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -325,7 +305,6 @@ export function MessageFeed({ messages, isTyping, onOpenScratchpad, onAskAboutOu
             key={message.id}
             message={message}
             onOpenScratchpad={onOpenScratchpad}
-            onAskAboutOutput={onAskAboutOutput}
           />
         ))
       )}
@@ -363,9 +342,10 @@ export function MessageFeed({ messages, isTyping, onOpenScratchpad, onAskAboutOu
 export interface ChatInputProps {
   onSendMessage: (text: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
-export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
+export function ChatInput({ onSendMessage, disabled, placeholder }: ChatInputProps) {
   const [text, setText] = React.useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -389,7 +369,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question or request a hint..."
+          placeholder={placeholder ?? "Ask a question or request a hint..."}
           disabled={disabled}
           rows={1}
           className="flex-1 max-h-24 resize-none bg-transparent py-1 text-xs text-zinc-100 placeholder-zinc-650 outline-none select-text leading-relaxed"
@@ -411,31 +391,29 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   );
 }
 
-// A message pushed into the chat from outside (e.g. the "Ask AI about this
-// error" button in the terminal). The `key` changes each time so the same
-// content can be re-sent, and we only auto-send keys we haven't seen yet.
-export interface PendingMessage {
-  key: number;
-  content: string;
-}
+// The student turn the Get help button adds to the conversation.
+export const GET_HELP_MESSAGE = "Please provide me an example to help me with this";
 
 // 5. Chat Box default exported container
+// The chat is locked until the student has a failed Submit on the lesson; then
+// "Get help" asks the tutor for a first example, after which the student can
+// type. Convex (addMessage) and the server enforce the same lock.
 export default function ChatBox({
-  pendingMessage,
   editorRef,
   currentCode,
   lessonId,
+  failedSubmits = 0,
   onCollapse,
   onOpenScratchpad,
-  onAskAboutOutput,
+  onGetHelp,
 }: {
-  pendingMessage?: PendingMessage | null;
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
+  failedSubmits?: number;
   onCollapse?: () => void;
   onOpenScratchpad?: (code: string, language?: string) => void;
-  onAskAboutOutput?: (code: string, output: string, language?: string) => void;
+  onGetHelp?: () => void;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -475,7 +453,10 @@ export default function ChatBox({
         {
           id: "welcome",
           sender: "assistant",
-          content: "Hi there I am your AI learning assistant. I can help you understand this problem, offer hints, or explain algorithms without giving away the direct solution. What would you like to discuss?",
+          content:
+            failedSubmits > 0
+              ? "Your solution didn't pass yet. Press **Get help** and I'll show you an example to help you with this problem."
+              : "Hi, I'm your AI learning assistant. Submit your solution first. If it doesn't pass, you can get help from me here.",
           timestamp: new Date(),
         },
       ];
@@ -497,7 +478,7 @@ export default function ChatBox({
       });
     }
     return result;
-  }, [dbMessages, localError]);
+  }, [dbMessages, localError, failedSubmits]);
 
   // Track how many assistant messages Convex currently holds so a failed POST
   // /chat can tell whether the reply landed anyway.
@@ -508,6 +489,10 @@ export default function ChatBox({
   React.useEffect(() => {
     assistantCountRef.current = assistantCount;
   }, [assistantCount]);
+
+  // Help starts with the tutor's first reply (to Get help); typing unlocks then.
+  const helpStarted = assistantCount > 0;
+  const canGetHelp = !helpStarted && failedSubmits > 0;
 
   // A reply landed in Convex for a send whose HTTP call failed — clear the
   // waiting state (and any timeout error we may have already shown). Runs
@@ -563,7 +548,7 @@ export default function ChatBox({
     };
   }, [convexLessonId, getOrCreateChat]);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, trigger?: "get_help") => {
     if (!chatId || !convexLessonId) return;
     
     // Optmistically show typing state
@@ -577,6 +562,7 @@ export default function ChatBox({
         chatId: chatId as Id<"chats">,
         sender: "user",
         content: text,
+        ...(trigger ? { trigger } : {}),
       });
 
       // Prepare conversation payload for backend
@@ -626,7 +612,7 @@ export default function ChatBox({
       // The response body is intentionally unused: the backend persists the
       // assistant reply to Convex and it renders from the reactive `dbMessages`
       // query. This POST just triggers the run.
-      await sendChatMessage(conversationPayload, chatId, 1, editorContext);
+      await sendChatMessage(conversationPayload, chatId, 1, editorContext, trigger ?? "message");
       setIsTyping(false);
     } catch (error) {
       console.error("Error communicating with chat server:", error);
@@ -639,57 +625,41 @@ export default function ChatBox({
     }
   };
 
-  // Auto-send a message that was pushed in from outside (terminal error,
-  // etc.). Guard on the key so re-renders don't re-send the same content.
-  const lastPendingKey = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (
-      pendingMessage &&
-      pendingMessage.content.trim() &&
-      pendingMessage.key !== lastPendingKey.current &&
-      chatId &&
-      convexLessonId
-    ) {
-      lastPendingKey.current = pendingMessage.key;
-      handleSendMessage(pendingMessage.content);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingMessage, chatId, convexLessonId]);
-
-  // Quick prompt triggers
-  const quickPrompts = [
-    { label: "Give a hint", query: "Can you give me a hint on Two Sum?" },
-    {
-      label: "Explain complexity",
-      query: "What is the optimal time complexity?",
-    },
-    { label: "Stuck on approach", query: "I'm stuck, how should I start?" },
-  ];
+  const handleGetHelp = () => {
+    if (!canGetHelp || isTyping) return;
+    onGetHelp?.();
+    handleSendMessage(GET_HELP_MESSAGE, "get_help");
+  };
 
   return (
     <div className="flex h-full flex-col bg-transparent">
       <ChatHeader isTyping={isTyping} onCollapse={onCollapse} />
 
-      <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} onAskAboutOutput={onAskAboutOutput} />
+      <div className={cn("flex flex-1 min-h-0 flex-col", !helpStarted && !isTyping && "opacity-60")}>
+        <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} />
+      </div>
 
-      {/* Quick Actions (only visible when not typing) */}
-      {!isTyping && (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-2">
-          {quickPrompts.map((p, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSendMessage(p.query)}
-              disabled={!chatId || !convexLessonId}
-              className="inline-flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-[10px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <Sparkles className="size-3 text-lagoon" />
-              {p.label}
-            </button>
-          ))}
+      {/* Get help: enabled by a failed Submit, used once to start the conversation */}
+      {!helpStarted && !isTyping && (
+        <div className="flex px-4 pb-2">
+          <button
+            type="button"
+            onClick={handleGetHelp}
+            disabled={!canGetHelp || !chatId || !convexLessonId}
+            title={canGetHelp ? "Get an example to help with this problem" : "Available after a failed Submit"}
+            className="inline-flex items-center gap-1.5 rounded-full border border-lagoon/30 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 transition-all select-none disabled:border-zinc-800 disabled:bg-zinc-950 disabled:text-zinc-600 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Sparkles className="size-3.5" />
+            Get help
+          </button>
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !chatId || !convexLessonId} />
+      <ChatInput
+        onSendMessage={(text) => handleSendMessage(text)}
+        disabled={!helpStarted || isTyping || !chatId || !convexLessonId}
+        placeholder={helpStarted ? undefined : "The chat opens after you press Get help"}
+      />
     </div>
   );
 }

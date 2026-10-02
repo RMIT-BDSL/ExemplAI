@@ -82,12 +82,13 @@ def has_prior_tutor_reply(state: TutorGraphState) -> bool:
 def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
     """Strip the agent's [NEW_EXAMPLE]/[FOLLOW_UP] tag; return (draft, response_type).
 
-    The first tutor reply in a conversation is always a new example, whatever
-    the tag says. A missing tag falls back to the same history rule.
+    The first tutor reply in a conversation, and any reply to the Get help
+    button, is always a new example, whatever the tag says. A missing tag
+    falls back to the same history rule.
     """
     match = _TAG_RE.match(raw)
     draft = raw[match.end():] if match else raw
-    if not has_prior_tutor_reply(state):
+    if state.get("trigger") == "get_help" or not has_prior_tutor_reply(state):
         return draft, NEW_EXAMPLE
     if match:
         return draft, NEW_EXAMPLE if match.group(1).upper() == "NEW_EXAMPLE" else FOLLOW_UP
@@ -97,6 +98,8 @@ def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
 
 def response_type_from_history(state: TutorGraphState) -> str:
     """Control agent: no tag, label from history only (first reply vs later)."""
+    if state.get("trigger") == "get_help":
+        return NEW_EXAMPLE
     return FOLLOW_UP if has_prior_tutor_reply(state) else NEW_EXAMPLE
 
 
