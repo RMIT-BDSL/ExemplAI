@@ -78,7 +78,9 @@ where it is, a hint, or a short syntax snippet is allowed.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \
-reply discusses it), and the student's own code quoted back to them.
+reply discusses it), the deliberate blanks in a Faded example (placeholder \
+lines such as `____` or `# ???: ...` make that code incomplete on purpose), \
+and the student's own code quoted back to them.
 </always_check>
 
 <experimental_new_example>

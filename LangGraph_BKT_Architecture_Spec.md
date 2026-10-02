@@ -156,6 +156,43 @@ def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
     """
 ```
 
+**Shared context (all agents).** Each agent sends `[system prompt, student_context(state), *conversation(state)]`: the problem context comes first and the conversation last, so the model replies to the student's latest message (an instruction placed after the history would make every turn a new example). `<allowed_python>` lists the Python features the lesson's topic and earlier topics have taught (`server/ai/syllabus.py`), so examples never use features from later weeks. When the student pressed **Get help** or **New example**, `<student_action>` says so (for the experimental agents: present a new example; for Control: help with the failure / give a fresh explanation), so the reply matches the `new_example` label the server gives every button reply.
+
+```python
+def student_context(state: TutorGraphState) -> str:
+    """XML-delimited snapshot of the student's current turn for a HumanMessage.
+
+    Goes BEFORE the conversation (see conversation()), so the model replies to
+    the student's latest message rather than to an instruction placed last.
+    """
+    allowed = allowed_python(state.get("current_knowledge_component"))
+    condition = "control" if state.get("experiment_condition") == "control" else "experimental"
+    action = _STUDENT_ACTION.get((state.get("trigger", ""), condition))
+    return (
+        f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
+        f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
+        + (f"<allowed_python>\n{allowed}\n</allowed_python>\n" if allowed else "")
+        + f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
+        f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
+        + (
+            f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
+            if state.get("examples_remaining") is not None
+            else ""
+        )
+        + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
+        + "The conversation with the student follows; reply to their latest message."
+    )
+
+
+def conversation(state: TutorGraphState) -> list:
+    """The lesson conversation for an agent's LLM call.
+
+    Oldest first, ending with the student's latest message, so it goes AFTER
+    the context message and the model replies to what the student just said.
+    """
+    return list(state.get("messages", []))[-_AGENT_HISTORY_TURNS:]
+```
+
 The Control agent is not asked for a tag: its `response_type` comes from the history alone (first reply = `new_example`, later = `follow_up`). The Dean applies no modality checks to the control condition, so the label is only for logging.
 
 ---
@@ -180,7 +217,9 @@ ask the student to guess or fill in blanks — novices need a full model to stud
 concept the student is failing on (e.g., loop iteration, conditional logic, accumulation).
 - Use a DIFFERENT domain or scenario so the student CANNOT copy-paste your code as a solution.
 - NEVER directly reference, debug, or fix the student's actual code.
-- NEVER provide code that solves the student's Target Problem.
+- NEVER provide code that solves the student's <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter.
 - Add inline comments on every meaningful line explaining WHY that line exists.
 - End with a bridge statement guiding the student back to their own code.
 </rules>
@@ -201,30 +240,10 @@ complete example using a completely DIFFERENT scenario to prevent pattern-matchi
 
 
 def complete_example_node(state: TutorGraphState):
-    human_msg = f"""The student needs help. Here is their current situation:
-
-<target_problem>
-{state["original_problem"]}
-</target_problem>
-
-<student_code>
-{state["student_code"]}
-</student_code>
-
-<test_result>
-{state["error_trace"]}
-</test_result>
-
-<knowledge_component>
-{state["current_knowledge_component"]}
-</knowledge_component>
-
-Generate a complete worked example for an analogous problem that targets the concept above."""
-
     response = llm.invoke([
         SystemMessage(content=COMPLETE_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
-        *state["messages"],  # conversation history
-        HumanMessage(content=human_msg),
+        HumanMessage(content=student_context(state)),  # problem, topic, allowed Python, code, failure
+        *conversation(state),                           # ends with the student's latest message
     ])
     draft, response_type = split_response_type(str(response.content), state)
     return {"draft_response": draft, "pedagogical_modality": "Complete", "response_type": response_type}
@@ -249,10 +268,12 @@ You deliberately omit critical lines so the student must fill in the gaps themse
 - Generate a DIFFERENT but conceptually analogous problem that targets the same concept \
 the student is struggling with. Use a DIFFERENT scenario.
 - NEVER directly reference, debug, or fix the student's actual code.
-- NEVER provide code that solves the student's Target Problem.
+- NEVER provide code that solves the student's <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter.
 - Deliberately omit 2-3 critical lines, replacing them with clearly marked blanks:
   # ???: What goes here to [description of what the line should do]?
-- The blanks MUST target the exact conceptual gap revealed by the student's test failure.
+- The blanks MUST target the exact conceptual gap revealed by the student's <error_trace>.
 - After the code block, ask exactly ONE targeted question guiding the student toward the \
 most important blank.
 </rules>
@@ -277,30 +298,10 @@ faded example using a completely DIFFERENT scenario to prevent pattern-matching.
 
 
 def faded_example_node(state: TutorGraphState):
-    human_msg = f"""The student needs scaffolded help. Here is their current situation:
-
-<target_problem>
-{state["original_problem"]}
-</target_problem>
-
-<student_code>
-{state["student_code"]}
-</student_code>
-
-<test_result>
-{state["error_trace"]}
-</test_result>
-
-<knowledge_component>
-{state["current_knowledge_component"]}
-</knowledge_component>
-
-Generate a faded example for an analogous problem. Omit 2-3 lines targeting the concept above."""
-
     response = llm.invoke([
         SystemMessage(content=FADED_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
-        *state["messages"],
-        HumanMessage(content=human_msg),
+        HumanMessage(content=student_context(state)),  # problem, topic, allowed Python, code, failure
+        *conversation(state),                           # ends with the student's latest message
     ])
     draft, response_type = split_response_type(str(response.content), state)
     return {"draft_response": draft, "pedagogical_modality": "Faded", "response_type": response_type}
@@ -324,13 +325,15 @@ spoon-feeding the answer.
 
 <rules>
 - Generate a DIFFERENT but conceptually analogous problem. NEVER generate buggy code \
-for the student's actual Target Problem — always use a different scenario.
+for the student's actual <original_problem> — always use a different scenario.
 - NEVER directly reference, debug, or fix the student's actual code.
 - The bug MUST be non-trivial: off-by-one errors, incorrect boundary conditions, wrong \
 operator precedence, missing edge cases, or flawed accumulator logic. NOT syntax errors.
 - Present the code as if YOU wrote it and ask the student to find the flaw.
 - Provide a specific failing test case as a concrete starting point.
-- Do NOT provide structural templates, hints, or direct answers to the Target Problem.
+- Do NOT provide structural templates, hints, or direct answers to the <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter.
 </rules>
 
 <multi_turn>
@@ -356,31 +359,10 @@ with [input]. Can you figure out what's wrong?"
 
 
 def erroneous_example_node(state: TutorGraphState):
-    human_msg = f"""The student is advanced and needs a debugging challenge. \
-Here is their current situation:
-
-<target_problem>
-{state["original_problem"]}
-</target_problem>
-
-<student_code>
-{state["student_code"]}
-</student_code>
-
-<test_result>
-{state["error_trace"]}
-</test_result>
-
-<knowledge_component>
-{state["current_knowledge_component"]}
-</knowledge_component>
-
-Generate a subtly buggy code example for an analogous problem targeting the concept above."""
-
     response = llm.invoke([
         SystemMessage(content=ERRONEOUS_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
-        *state["messages"],
-        HumanMessage(content=human_msg),
+        HumanMessage(content=student_context(state)),  # problem, topic, allowed Python, code, failure
+        *conversation(state),                           # ends with the student's latest message
     ])
     draft, response_type = split_response_type(str(response.content), state)
     return {"draft_response": draft, "pedagogical_modality": "Erroneous", "response_type": response_type}
@@ -402,7 +384,10 @@ concise.
 
 Do not write out a complete solution to the student's problem, or a fully \
 corrected version of their code. Explaining an error, pointing to where it is, \
-giving a hint, or showing a short snippet of syntax is fine."""
+giving a hint, or showing a short snippet of syntax is fine.
+
+Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic."""
 
 
 def control_agent_node(state: TutorGraphState):
@@ -472,7 +457,9 @@ where it is, a hint, or a short syntax snippet is allowed.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \
-reply discusses it), and the student's own code quoted back to them.
+reply discusses it), the deliberate blanks in a Faded example (placeholder \
+lines such as `____` or `# ???: ...` make that code incomplete on purpose), \
+and the student's own code quoted back to them.
 </always_check>
 
 <experimental_new_example>

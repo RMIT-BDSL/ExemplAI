@@ -16,6 +16,7 @@ import logging
 import re
 
 from ai.state import TutorGraphState
+from ai.syllabus import allowed_python
 
 log = logging.getLogger("rich")
 
@@ -39,6 +40,19 @@ asks for one: help them with the examples already given instead.
 # Chat-button triggers: always a new example (they spend the example allowance).
 _BUTTON_TRIGGERS = ("get_help", "new_example")
 
+# Tells the model which button was pressed, so its reply matches the
+# new_example label the server gives every button reply (see split_response_type).
+_STUDENT_ACTION = {
+    ("get_help", "experimental"): "The student pressed Get help after a failed Submit: "
+    "present a new example that targets the failure in <error_trace>.",
+    ("new_example", "experimental"): "The student pressed New example: present a new "
+    "example in a different scenario from the examples earlier in this conversation.",
+    ("get_help", "control"): "The student pressed Get help after a failed Submit: "
+    "help them with the failure in <error_trace>.",
+    ("new_example", "control"): "The student pressed New example: give a fresh "
+    "explanation from a different angle than earlier in this conversation.",
+}
+
 _TAG_RE = re.compile(r"^\s*\**\[(NEW_EXAMPLE|FOLLOW_UP)\]\**[ \t]*\n?", re.IGNORECASE)
 
 # Recent turns sent to the agents (Convex already caps what it returns).
@@ -50,17 +64,26 @@ _HISTORY_CHARS = 1500
 
 
 def student_context(state: TutorGraphState) -> str:
-    """XML-delimited snapshot of the student's current turn for a HumanMessage."""
+    """XML-delimited snapshot of the student's current turn for a HumanMessage.
+
+    Goes BEFORE the conversation (see conversation()), so the model replies to
+    the student's latest message rather than to an instruction placed last.
+    """
+    allowed = allowed_python(state.get("current_knowledge_component"))
+    condition = "control" if state.get("experiment_condition") == "control" else "experimental"
+    action = _STUDENT_ACTION.get((state.get("trigger", ""), condition))
     return (
         f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<knowledge_component>\n{state.get('current_knowledge_component', '')}\n</knowledge_component>\n"
-        f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
+        + (f"<allowed_python>\n{allowed}\n</allowed_python>\n" if allowed else "")
+        + f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
         f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
         + (
             f"<examples_remaining>{state['examples_remaining']}</examples_remaining>\n"
             if state.get("examples_remaining") is not None
             else ""
         )
+        + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
         + "The conversation with the student follows; reply to their latest message."
     )
 
