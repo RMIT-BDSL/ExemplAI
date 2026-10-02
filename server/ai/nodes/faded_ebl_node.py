@@ -31,7 +31,9 @@ Hard rules (research integrity):
 - The blanks must target the <knowledge_component>; the student transfers the idea.
 - The completed example must NOT be trivially adaptable into a solution to \
 <original_problem>.
-- NEVER output code that directly solves <original_problem>."""
+- NEVER output code that directly solves <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter."""
 
 
 def faded_example_node(state: TutorGraphState) -> dict:

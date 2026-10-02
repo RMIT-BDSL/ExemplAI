@@ -32,7 +32,9 @@ Hard rules (research integrity):
 - The bug must be conceptual (relating to the <knowledge_component>), not a typo.
 - The corrected example must NOT be trivially adaptable into a solution to \
 <original_problem>.
-- NEVER output code that directly solves <original_problem>."""
+- NEVER output code that directly solves <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter."""
 
 
 def erroneous_example_node(state: TutorGraphState) -> dict:

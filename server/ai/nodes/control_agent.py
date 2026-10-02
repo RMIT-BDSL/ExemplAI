@@ -27,7 +27,10 @@ concise.
 
 Do not write out a complete solution to the student's problem, or a fully \
 corrected version of their code. Explaining an error, pointing to where it is, \
-giving a hint, or showing a short snippet of syntax is fine."""
+giving a hint, or showing a short snippet of syntax is fine.
+
+Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic."""
 
 
 def control_agent_node(state: TutorGraphState) -> dict:

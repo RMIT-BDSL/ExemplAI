@@ -31,6 +31,8 @@ Pick a different domain, different variable names, different data.
 trivially adaptable (rename a variable, minor restructure) into a solution to \
 <original_problem>.
 - NEVER output code that directly solves <original_problem>.
+- Use only the Python features listed in <allowed_python>; never use a feature \
+from a later topic, even if it would be shorter.
 - Teach the <knowledge_component>. Keep it concise and correct."""
 
 
