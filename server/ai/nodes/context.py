@@ -16,7 +16,7 @@ import logging
 import re
 
 from ai.state import TutorGraphState
-from ai.syllabus import allowed_python
+from ai.syllabus import allowed_python, topic_bugs
 
 log = logging.getLogger("rich")
 
@@ -60,11 +60,12 @@ _HISTORY_TURNS = 10
 _HISTORY_CHARS = 1500
 
 
-def student_context(state: TutorGraphState) -> str:
+def student_context(state: TutorGraphState, extra: str = "") -> str:
     """XML-delimited snapshot of the student's current turn for a HumanMessage.
 
     Goes BEFORE the conversation (see conversation()), so the model replies to
     the student's latest message rather than to an instruction placed last.
+    ``extra`` adds an agent-specific block (e.g. topic_bug_context()).
     """
     # Control is a plain, generic chat: no syllabus limit, buttons or example allowance.
     is_control = state.get("experiment_condition") == "control"
@@ -79,8 +80,15 @@ def student_context(state: TutorGraphState) -> str:
         f"<error_trace>\n{state.get('error_trace', '')}\n</error_trace>\n"
         + (f"<examples_remaining>{remaining}</examples_remaining>\n" if remaining is not None else "")
         + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
+        + extra
         + "The conversation with the student follows; reply to their latest message."
     )
+
+
+def topic_bug_context(state: TutorGraphState) -> str:
+    """Erroneous agent: the bug types its example may use for this topic."""
+    bugs = topic_bugs(state.get("current_knowledge_component"))
+    return f"<topic_bugs>\n{bugs}\n</topic_bugs>\n" if bugs else ""
 
 
 def conversation(state: TutorGraphState) -> list:
