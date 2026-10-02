@@ -155,8 +155,8 @@ except ImportError:
 # KCs are the COSC3104/5 syllabus topics (one per teaching week; no class in
 # week 7) and must match the keys in bktParams.json and the lesson tags in
 # web/convex/seed.ts. Each problem is placed in the same topic as its seed
-# lesson. Topics with no CSEDM problem (advanced_loops, collections, files,
-# basic_libraries, advanced_topics) are not fitted.
+# lesson. Topics with no CSEDM problem (advanced_loops, functions, collections,
+# files, advanced_topics) are not fitted.
 
 PROBLEM_TO_KC = {
     # --- intro_setup (week 1): first programs ---
@@ -187,8 +187,8 @@ PROBLEM_TO_KC = {
     # --- loops (week 5): iteration ---
     "oneToN":            "loops",                  # 1..n
 
-    # --- functions (week 8): seeded here, though it is really a math-library call ---
-    "findRoot":          "functions",              # math.sqrt, return value
+    # --- basic_libraries (week 11): a math-library call (math.sqrt) ---
+    "findRoot":          "basic_libraries",        # math.sqrt, return value
 }
 
 # Friendly descriptions for the output JSON (same wording as bktParams.json)
