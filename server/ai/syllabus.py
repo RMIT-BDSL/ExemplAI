@@ -57,3 +57,35 @@ def allowed_python(knowledge_component: Optional[str]) -> str:
     lines = [f"- {LESSON_FUNCTION_SHAPE}"]
     lines += [f"- {features} (week {week})" for _, week, features in SYLLABUS[:upto]]
     return "\n".join(lines)
+
+
+# Logic bugs an Erroneous example may plant, per topic: the bug must exercise the
+# lesson's own topic (not just loops), and stay within the allowed features.
+TOPIC_BUGS: dict[str, str] = {
+    "intro_setup": "printing a value instead of returning it; a wrong or misspelled string literal",
+    "variables_expressions": "/ instead of // (or the reverse); % where // is needed (or the reverse); "
+    "operator precedence (missing brackets); converting to int too early so the value is truncated; "
+    "an off-by-one in a formula (e.g. rounding up when dividing)",
+    "strings_formatting": "an off-by-one index or slice (e.g. s[1:] vs s[:-1]); concatenating in the "
+    "wrong order; comparing without matching case (missing lower()); using the wrong string method",
+    "branching": "> instead of >= (or < vs <=) at a boundary; and instead of or (or the reverse); "
+    "conditions in the wrong order so a later branch never runs; a missing case",
+    "loops": "an off-by-one range (e.g. range(n) vs range(1, n + 1)); the accumulator starting at the "
+    "wrong value or not being updated; returning inside the loop too early; a while condition that "
+    "stops one step early",
+    "advanced_loops": "the inner loop using the outer loop's variable; break or continue in the wrong "
+    "place; a counter or flag not reset for each outer iteration",
+    "functions": "printing instead of returning; a missing return on one path; arguments passed in "
+    "the wrong order; using a fixed value instead of the parameter",
+    "collections": "an off-by-one list index; changing a list while looping over it; mixing up an "
+    "index and a value; a wrong dictionary key or a missing key check",
+    "files": "not stripping newlines; opening in write mode instead of append; reading the file twice",
+    "basic_libraries": "calling a library function with arguments in the wrong order or units (e.g. "
+    "degrees vs radians); expecting an int where the function returns a float",
+    "advanced_topics": "a logic error in the topic's main idea",
+}
+
+
+def topic_bugs(knowledge_component: Optional[str]) -> str:
+    """Bug types an Erroneous example may use for this topic ('' if unknown)."""
+    return TOPIC_BUGS.get(knowledge_component or "", "")

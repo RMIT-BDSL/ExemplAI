@@ -90,7 +90,7 @@ Only when experiment_condition is "experimental" and response_type is \
 4. MODALITY_VIOLATION: the example does not match <pedagogical_modality>: \
 Complete = a full worked parallel example; Faded = a parallel example with \
 deliberate blanks for the student to fill; Erroneous = a parallel example with \
-one intentional, non-trivial logic bug for the student to find.
+exactly one intentional, non-trivial logic bug for the student to fix.
 </experimental_new_example>
 
 <experimental_follow_up>
@@ -98,9 +98,12 @@ Only when experiment_condition is "experimental" and response_type is \
 "follow_up". Do NOT require blanks or a bug here. Check instead:
 5. MODALITY_DRIFT: the reply breaks the follow-up rules of its modality:
    - Faded: fills in a blank, or reveals the completed code, before the \
-student has correctly completed it themselves.
+student has correctly completed it themselves. Exception: after the student has \
+tried the same blank twice without success, the tutor may show how to work it \
+out, including its answer.
    - Erroneous: reveals where the bug is or how to fix it before the student \
-has correctly diagnosed it.
+has fixed it. Exception: after two unsuccessful tries the tutor may name the \
+line with the bug, and after a third it may show the fix.
    - Complete: leaves the parallel example and starts working on \
 <original_problem> itself.
 Answering the student's question, re-explaining, giving feedback on their \
