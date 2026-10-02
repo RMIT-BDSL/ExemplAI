@@ -13,7 +13,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai.llm import llm
-from ai.nodes.context import student_context
+from ai.nodes.context import RESPONSE_TYPE_INSTRUCTION, split_response_type, student_context
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
@@ -37,11 +37,13 @@ trivially adaptable (rename a variable, minor restructure) into a solution to \
 def complete_example_node(state: TutorGraphState) -> dict:
     log.info("complete_example_node")
     messages = [
-        SystemMessage(content=_SYSTEM_PROMPT),
+        SystemMessage(content=_SYSTEM_PROMPT + RESPONSE_TYPE_INSTRUCTION),
         HumanMessage(content=student_context(state)),
     ]
     response = llm.invoke(messages)
+    draft, response_type = split_response_type(str(response.content), state)
     return {
-        "draft_response": str(response.content),
+        "draft_response": draft,
         "pedagogical_modality": "Complete",
+        "response_type": response_type,
     }
