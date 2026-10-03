@@ -63,7 +63,7 @@ export type PublicApiType = {
       "public",
       {
         lessonId: Id<"questions">;
-        status: "in-progress" | "completed" | "pending";
+        status: "in-progress";
         tokenIdentifier: string;
       },
       any
@@ -163,6 +163,32 @@ export type PublicApiType = {
       "query",
       "public",
       Record<string, never>,
+      any
+    >;
+  };
+  students: {
+    listStudents: FunctionReference<
+      "query",
+      "public",
+      {
+        paginationOpts: {
+          cursor: string | null;
+          numItems: number;
+          endCursor?: string | null;
+        };
+      },
+      any
+    >;
+    studentSummary: FunctionReference<
+      "query",
+      "public",
+      Record<string, never>,
+      any
+    >;
+    getStudent: FunctionReference<
+      "query",
+      "public",
+      { userId: Id<"users"> },
       any
     >;
   };

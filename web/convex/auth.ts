@@ -8,6 +8,7 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel.d.ts";
 import authConfig from "./auth.config";
+import { triggers } from "./triggers";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -16,8 +17,9 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
   triggers: {
     user: {
       onCreate: async (ctx, authUser) => {
-        // Sync user to your custom 'users' table
-        await ctx.db.insert("users", {
+        // Sync user to your custom 'users' table (through the triggers, so
+        // the new student gets a studentStats row).
+        await triggers.wrapDB(ctx).db.insert("users", {
           name: authUser.name || undefined,
           email: authUser.email,
           image: authUser.image || undefined,

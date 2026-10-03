@@ -5,6 +5,9 @@ import schema from "../convex/schema";
 import type { Id } from "../convex/_generated/dataModel";
 
 const modules = import.meta.glob("../convex/**/*.ts");
+// recordCodeExecution / addSystemMessage only accept the backend secret.
+process.env.CONVEX_BACKEND_SECRET = "secret";
+
 const setup = () => convexTest(schema, modules);
 
 async function createMockAdmin(t: ReturnType<typeof setup>) {
@@ -155,6 +158,7 @@ describe("chats API", () => {
 
     // A failed Submit unlocks Get help, but typing still waits for the tutor's reply.
     await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId,
       passed: false,
       actionType: "submit",
@@ -189,13 +193,14 @@ describe("chats API", () => {
     const t = setup();
     const { admin, student, lessonId, chatId } = await setupLessonChat(t);
     await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId,
       passed: false,
       actionType: "submit",
       errorTrace: "Input: 3 | Expected: 6 | Got: 5",
     });
     // A failed Run does not count.
-    await student.mutation(api.courses.recordCodeExecution, { lessonId, passed: false, actionType: "run" });
+    await student.mutation(api.courses.recordCodeExecution, { lessonId, passed: false, actionType: "run", backendSecret: "secret" });
     await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "first", trigger: "get_help" });
     await insertTutorReply(t, chatId, "an example");
     await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "follow-up" });

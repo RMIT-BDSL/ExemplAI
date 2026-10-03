@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { countFields as counts } from "./studentMetrics";
 
 export default defineSchema({
   course: defineTable({
@@ -80,6 +81,15 @@ export default defineSchema({
     // count against the cap; round_failed_submits earns them. Reset together.
     round_started_at: v.optional(v.number()),
     round_failed_submits: v.optional(v.number()),
+    // Activity timestamps for the admin student view (convex/students.ts).
+    // Rows from before these existed fall back to _creationTime.
+    updated_at: v.optional(v.number()),
+    last_submit_at: v.optional(v.number()),
+    completed_at: v.optional(v.number()),
+    // KC mastery just before this lesson's first graded Submit (BKT prior when
+    // the student had none), so admins can relate mastery to first-try passes
+    // without the circularity of the post-update value.
+    mastery_before: v.optional(v.number()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])
@@ -114,7 +124,45 @@ export default defineSchema({
   chats: defineTable({
     userId: v.id("users"),
     lessonId: v.id("questions"),
+    // Summary of chatMessages, kept up to date by convex/triggers.ts so the
+    // admin views never read a whole conversation. Missing on chats that
+    // predate it until students:backfillSummaries runs.
+    message_count: v.optional(v.number()),
+    last_message_at: v.optional(v.number()),
+    last_reply_at: v.optional(v.number()),
+    last_reply_model: v.optional(v.string()),
+    last_reply_response_type: v.optional(v.string()),
+    examples_given: v.optional(v.number()),
   }).index("by_user_lesson", ["userId", "lessonId"]),
+  // One row per student: their counters and last activity, maintained by
+  // convex/triggers.ts. The admin student list pages through this.
+  studentStats: defineTable({
+    userId: v.id("users"),
+    lastActivityAt: v.number(),
+    ...counts,
+  })
+    .index("by_user", ["userId"])
+    .index("by_last_activity", ["lastActivityAt"]),
+  // Single row: totals over every student, maintained alongside studentStats.
+  cohortStats: defineTable({
+    students: v.number(),
+    // Students with at least one lessonProgress row.
+    active: v.number(),
+    ...counts,
+  }),
+  // Help requests and examples given, copied from chatMessages without the
+  // content so a student's timeline is a small indexed read.
+  chatEvents: defineTable({
+    userId: v.id("users"),
+    chatId: v.id("chats"),
+    lessonId: v.id("questions"),
+    messageId: v.id("chatMessages"),
+    at: v.number(),
+    kind: v.union(v.literal("help"), v.literal("example")),
+    detail: v.optional(v.string()),
+  })
+    .index("by_user_at", ["userId", "at"])
+    .index("by_chat", ["chatId"]),
   releaseNotes: defineTable({
     type: v.union(
       v.literal("feature"),
@@ -138,5 +186,8 @@ export default defineSchema({
     response_type: v.optional(
       v.union(v.literal("new_example"), v.literal("follow_up"), v.literal("fallback"))
     ),
-  }).index("by_chat", ["chatId"]),
+  })
+    .index("by_chat", ["chatId"])
+    // Examples given this round: a bounded range read instead of the whole chat.
+    .index("by_chat_response", ["chatId", "response_type"]),
 });

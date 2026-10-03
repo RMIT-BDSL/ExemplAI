@@ -186,19 +186,16 @@ export const getExecutionBktContext = authenticatedQuery({
 });
 
 /**
- * Sets a student's status for a single lesson.
- * - "in-progress" / "completed": creates or updates the progress row.
- * - "pending": removes the row (the UI default for lessons with no record).
- * Looked up via the by_user_lesson index so it's a single-row upsert.
+ * Marks a lesson the student opened as "in-progress" (creating its progress
+ * row). That is the only status a student may set: completion and failed
+ * Submits are recorded by recordCodeExecution with the backend secret, and
+ * students can't clear a row, which would wipe its failed Submits and let a
+ * retry count as a first-try pass. A completed lesson stays completed.
  */
 export const setLessonStatus = authenticatedMutation({
   args: {
     lessonId: v.id("questions"),
-    status: v.union(
-      v.literal("in-progress"),
-      v.literal("completed"),
-      v.literal("pending"),
-    ),
+    status: v.literal("in-progress"),
   },
   handler: async (ctx, args) => {
     const user = await getUserByToken(ctx, ctx.user._id);
@@ -213,27 +210,20 @@ export const setLessonStatus = authenticatedMutation({
       )
       .unique();
 
-    if (args.status === "pending") {
-      if (existing) await ctx.db.delete(existing._id);
+    // Reopening a finished lesson for review leaves it completed.
+    if (existing?.status === "completed") {
       return { success: true };
     }
 
-    // Marking a lesson "in-progress" must never undo a "completed" lesson
-    // (e.g. when a finished problem is reopened for review).
-    if (
-      args.status === "in-progress" &&
-      existing?.status === "completed"
-    ) {
-      return { success: true };
-    }
-
+    const now = Date.now();
     if (existing) {
-      await ctx.db.patch(existing._id, { status: args.status });
+      await ctx.db.patch(existing._id, { updated_at: now });
     } else {
       await ctx.db.insert("lessonProgress", {
         userId: user._id,
         lessonId: args.lessonId,
         status: args.status,
+        updated_at: now,
       });
     }
 
@@ -245,6 +235,8 @@ export const setLessonStatus = authenticatedMutation({
  * Called by the FastAPI /execute path (with the student's JWT) after Judge0
  * finishes. Always sets has_run. On first Submit, persists server-computed
  * BKT mastery (Python) when probMastery + knowledgeComponent are provided.
+ * Requires the backend secret: the student holds the same JWT, and every
+ * argument here (pass/fail, mastery) must come from the server, not them.
  */
 export const recordCodeExecution = authenticatedMutation({
   args: {
@@ -253,13 +245,19 @@ export const recordCodeExecution = authenticatedMutation({
     actionType: v.union(v.literal("run"), v.literal("submit")),
     // Server-computed mastery after first Submit; omit on run / re-submit.
     probMastery: v.optional(v.number()),
+    // Mastery the server updated from (stored value or BKT prior).
+    priorMastery: v.optional(v.number()),
     knowledgeComponent: v.optional(v.string()),
     // Server-computed: probMastery reached the BKT mastery threshold.
     mastered: v.optional(v.boolean()),
     // Server-built summary of a failed Submit (hidden tests counted only).
     errorTrace: v.optional(v.string()),
+    backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
+    if (!process.env.CONVEX_BACKEND_SECRET || args.backendSecret !== process.env.CONVEX_BACKEND_SECRET) {
+      throw new Error("Unauthorized: Invalid backend secret");
+    }
     const user = await getUserByToken(ctx, ctx.user._id);
     if (!user) {
       throw new Error("Student not found.");
@@ -296,10 +294,10 @@ export const recordCodeExecution = authenticatedMutation({
     let knowledgeComponent: string | undefined;
     let mastered: boolean | undefined;
 
+    const now = Date.now();
     if (shouldRecordBkt) {
       knowledgeComponent = args.knowledgeComponent!;
       probMastery = Math.min(1, Math.max(0, args.probMastery!));
-      const now = Date.now();
 
       const masteryRow = await ctx.db
         .query("bktMastery")
@@ -346,12 +344,22 @@ export const recordCodeExecution = authenticatedMutation({
         }
       : {};
 
+    const activityFields = {
+      updated_at: now,
+      ...(args.actionType === "submit" ? { last_submit_at: now } : {}),
+      ...(nextStatus === "completed" && !alreadyCompleted ? { completed_at: now } : {}),
+      ...(shouldRecordBkt && args.priorMastery !== undefined
+        ? { mastery_before: Math.min(1, Math.max(0, args.priorMastery)) }
+        : {}),
+    };
+
     if (existing) {
       await ctx.db.patch(existing._id, {
         status: nextStatus,
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
         ...failureFields,
+        ...activityFields,
       });
     } else {
       await ctx.db.insert("lessonProgress", {
@@ -361,6 +369,7 @@ export const recordCodeExecution = authenticatedMutation({
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
         ...failureFields,
+        ...activityFields,
       });
     }
 
