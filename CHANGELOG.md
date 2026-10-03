@@ -1,3 +1,8 @@
+## [0.9.2] - 2026-10-03
+
+### 📚 Documentation
+
+- Restructure README and document Supabase keep-alive
 ## [0.9.1] - 2026-10-03
 
 ### ⚙️ Miscellaneous Tasks
