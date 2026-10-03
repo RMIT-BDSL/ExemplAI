@@ -1,9 +1,9 @@
-import { Bot, Send, Sparkles, User, ChevronRight, MessageSquare, Play, Square, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { Send, Sparkles } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
+import { sendChatMessage } from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
-import { sendChatMessage, scratchpadExecute } from "#/lib/api.ts";
-import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 // Types for Chat
@@ -12,324 +12,120 @@ export interface Message {
   sender: "user" | "assistant";
   content: string;
   timestamp: Date;
+  /** Tutor turns: "new_example" when the reply delivered an example. */
+  responseType?: string;
 }
 
-// 1. Chat Header Component
-export interface ChatHeaderProps {
-  isTyping?: boolean;
-  onCollapse?: () => void;
+function timeOf(d: Date) {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export function ChatHeader({ isTyping, onCollapse }: ChatHeaderProps) {
+// Code in tutor messages is read-only: the tutor is chat-only (no Run, no scratchpad).
+function CodeBlock({ code }: { code: string }) {
   return (
-    <div className="flex h-11 items-center justify-between border-b border-zinc-850 bg-zinc-950/80 px-4 flex-shrink-0">
-      <div className="flex items-center gap-2 text-xs font-medium text-zinc-250">
-        <div className="relative flex items-center justify-center">
-          <MessageSquare className="size-3.5 text-lagoon" />
-          <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-palm border border-zinc-950 animate-pulse" />
-        </div>
-        <span>AI Assistant</span>
-        {isTyping && (
-          <span className="ml-1 text-[10px] font-normal text-zinc-500 animate-pulse">typing...</span>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5">
-        {onCollapse && (
-          <button
-            type="button"
-            onClick={onCollapse}
-            className="rounded-md p-1 hover:bg-zinc-850 hover:text-zinc-100 transition-colors cursor-pointer"
-            title="Collapse panel"
-          >
-            <ChevronRight className="size-4 text-zinc-400" />
-          </button>
-        )}
-      </div>
-    </div>
+    <pre className="chat-code chat-code-wrap editorial-scroll my-2 max-h-80 rounded-[4px] border border-rule-strong !bg-surface-page">
+      {code}
+    </pre>
   );
 }
 
-// 2. Individual Message Bubble Component
-export interface MessageBubbleProps {
-  message: Message;
-  onOpenScratchpad?: (code: string, language?: string) => void;
-}
-
-// Normalise a markdown fence language tag to a monaco/language key.
-function normalizeCodeLanguage(lang?: string): string {
-  if (!lang) return "python";
-  const key = lang.toLowerCase();
-  if (key === "python3" || key === "py") return "python";
-  if (key === "js" || key === "node") return "javascript";
-  if (key === "ts") return "typescript";
-  if (key === "c++" || key === "cc" || key === "cpp") return "cpp";
-  if (key === "golang") return "go";
-  return key;
-}
-
-function CodeBlock({
-  language,
-  code,
-  onOpenScratchpad,
-}: {
-  language?: string;
-  code: string;
-  onOpenScratchpad?: (code: string, language?: string) => void;
-}) {
-  const [isRunning, setIsRunning] = React.useState(false);
-  const [result, setResult] = React.useState<any>(null);
-
-  const lang = normalizeCodeLanguage(language);
-
-  const LANGUAGE_IDS: Record<string, number> = {
-    python: 71,
-    javascript: 63,
-    typescript: 74,
-    java: 62,
-    cpp: 54,
-    go: 60,
-    rust: 73,
-  };
-
-  async function handleRun() {
-    if (isRunning) return;
-    setIsRunning(true);
-    setResult(null);
-    try {
-      const output = await scratchpadExecute(code, LANGUAGE_IDS[lang] ?? 71, "");
-      setResult(output);
-    } catch (err: any) {
-      setResult({
-        error: true,
-        stderr: err?.response?.data?.detail || err?.message || "Execution failed",
-      });
-    } finally {
-      setIsRunning(false);
-    }
+// 1. One turn. Tutor turns read as marginal prose (serif, no bubble), with a
+// generic "Example" label when the reply delivered an example; the kind of
+// example (Complete/Faded/Erroneous) is never shown. Student turns are plain
+// sans boxes on the right.
+export function MessageBubble({ message }: { message: Message }) {
+  if (message.sender === "user") {
+    return (
+      <div className="ml-12 flex flex-col items-end gap-1">
+        <div className="whitespace-pre-wrap rounded-[4px] border border-rule bg-surface-raised px-3 py-2.5 font-sans text-xs leading-relaxed text-ink">
+          {message.content}
+        </div>
+        <span className="select-none text-[9px] text-ink-label">
+          {timeOf(message.timestamp)}
+        </span>
+      </div>
+    );
   }
 
-  const statusId = result?.status?.id ?? result?.status_id;
-  const isAccepted = statusId === 3;
-  const hasError = Boolean(result?.stderr || result?.compile_output || result?.error);
-
+  const isExample = message.responseType === "new_example";
   return (
-    <div className="my-1.5 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-      {/* Code header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/70 px-3 py-1">
-        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">
-          {language || "code"}
+    <div>
+      <div className="mb-1.5 select-none font-sans text-[9px] font-semibold uppercase tracking-[0.15em]">
+        {isExample && <span className="text-brass">Example · </span>}
+        <span className="font-medium text-ink-label">
+          {timeOf(message.timestamp)}
         </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onOpenScratchpad?.(code, language)}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
-            title="Open in scratchpad"
-          >
-            <Square className="size-3" />
-            <span>Scratchpad</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleRun}
-            disabled={isRunning}
-            className="inline-flex items-center gap-1 rounded-md bg-lagoon px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-lagoon-deep disabled:opacity-50 transition-colors cursor-pointer"
-            title="Run this snippet"
-          >
-            {isRunning ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Play className="size-3 fill-current" />
-            )}
-            <span>Run</span>
-          </button>
-        </div>
       </div>
-
-      {/* Code body */}
-      <pre className="chat-code editorial-scroll max-h-80">{code}</pre>
-
-      {/* Output */}
-      {isRunning && (
-        <div className="flex items-center gap-2 border-t border-zinc-800 px-3 py-2 text-[10px] text-zinc-400 font-mono">
-          <Loader2 className="size-3 animate-spin text-lagoon" />
-          Executing...
-        </div>
-      )}
-      {!isRunning && result && (
-        <div className="border-t border-zinc-800 bg-zinc-900/40">
-          <div className="flex items-center justify-between px-3 pt-2 pb-1">
-            <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">
-              Output
-            </span>
-            <span
-              className={`rounded-full border px-1.5 py-px text-[9px] font-medium ${
-                isAccepted
-                  ? "text-palm border-palm/15 bg-palm/10"
-                  : "text-red-500 border-red-500/15 bg-red-500/10"
-              }`}
-            >
-              {isAccepted ? "Ran successfully" : result?.status?.description || "Error"}
-            </span>
-          </div>
-          <pre className="chat-code chat-code-wrap editorial-scroll max-h-32">
-            {result.stdout ? result.stdout : hasError ? result.stderr || result.compile_output : "(empty output)"}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function MessageBubble({ message, onOpenScratchpad }: MessageBubbleProps) {
-  const isUser = message.sender === "user";
-
-  return (
-    <div className={cn("flex w-full gap-2.5 text-xs", isUser ? "flex-row-reverse" : "flex-row")}>
-      {/* Avatar */}
-      <div
-        className={cn(
-          "flex size-6.5 shrink-0 select-none items-center justify-center rounded-full text-[10px] font-semibold border",
-          isUser
-            ? "bg-zinc-850 border-zinc-750 text-zinc-300"
-            : "bg-lagoon/15 border-lagoon/20 text-lagoon"
-        )}
-      >
-        {isUser ? <User className="size-3" /> : <Bot className="size-3" />}
-      </div>
-
-      {/* Content Bubble */}
-      <div className="flex flex-col max-w-[82%] gap-1">
-        <div
-          className={cn(
-            "rounded-2xl px-3.5 py-2 leading-relaxed shadow-sm text-xs",
-            isUser
-              ? "bg-lagoon text-white rounded-tr-none font-normal"
-              : "bg-zinc-800 border border-zinc-750 text-zinc-200 rounded-tl-none prose prose-invert prose-xs max-w-none prose-p:my-0.5 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-0.5 prose-ul:my-0.5 prose-li:my-0.5 prose-pre:my-1.5"
-          )}
+      <div className="prose max-w-none text-ink-chat prose-p:my-1.5 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2">
+        <ReactMarkdown
+          components={{
+            // Unwrap <pre> so the CodeBlock isn't nested in another <pre>.
+            pre(props) {
+              return <>{props.children}</>;
+            },
+            code(props) {
+              const { children, className, ...rest } = props;
+              const raw = String(children ?? "");
+              // react-markdown v10 dropped the `inline` prop: a fence with a
+              // language tag or any multi-line snippet is a block.
+              if (
+                /language-(\w+)/.test(className || "") ||
+                raw.includes("\n")
+              ) {
+                return <CodeBlock code={raw.replace(/\n$/, "")} />;
+              }
+              return (
+                <code className={className} {...rest}>
+                  {children}
+                </code>
+              );
+            },
+          }}
         >
-          {isUser ? (
-            message.content
-          ) : (
-            <ReactMarkdown
-              components={{
-                // Unwrap <pre> so our CodeBlock's <div> isn't nested in it.
-                pre(props) {
-                  return <>{props.children}</>;
-                },
-                code(props) {
-                  const { children, className, ...rest } = props;
-                  const match = /language-(\w+)/.exec(className || "");
-                  const raw = String(children ?? "");
-                  // react-markdown v10 dropped the `inline` prop, so treat a
-                  // fence with a language tag OR any multi-line snippet as a
-                  // block; everything else renders as inline code.
-                  const isBlock = Boolean(match) || raw.includes("\n");
-                  if (isBlock) {
-                    return (
-                      <CodeBlock
-                        language={match?.[1]}
-                        code={raw.replace(/\n$/, "")}
-                        onOpenScratchpad={onOpenScratchpad}
-                      />
-                    );
-                  }
-                  return (
-                    <code
-                      className={cn(
-                        "rounded border border-zinc-750 bg-zinc-950/60 px-1 py-px font-mono text-[0.85em] text-zinc-100",
-                        className
-                      )}
-                      {...rest}
-                    >
-                      {children}
-                    </code>
-                  );
-                },
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          )}
-        </div>
-        {/* Timestamp */}
-        <span
-          className={cn(
-            "text-[9px] text-zinc-550 px-1 select-none",
-            isUser ? "text-right" : "text-left"
-          )}
-        >
-          {message.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+          {message.content}
+        </ReactMarkdown>
       </div>
     </div>
   );
 }
 
-// 3. Message Feed Component
+// 2. Message feed
 export interface MessageFeedProps {
   messages: Message[];
   isTyping?: boolean;
-  onOpenScratchpad?: (code: string, language?: string) => void;
 }
 
-export function MessageFeed({ messages, isTyping, onOpenScratchpad }: MessageFeedProps) {
+export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when messages or typing change
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800">
-      {messages.length === 0 ? (
-        <div className="flex h-full flex-col items-center justify-center text-center space-y-3 px-4 py-8">
-          <div className="flex size-12 items-center justify-center rounded-full bg-zinc-950 border border-zinc-800 text-zinc-500">
-            <Sparkles className="size-5" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-zinc-300">Start a conversation</p>
-            <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
-              Ask questions about the problem description, request code hints, or understand
-              complexity.
-            </p>
-          </div>
-        </div>
-      ) : (
-        messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onOpenScratchpad={onOpenScratchpad}
-          />
-        ))
-      )}
+    <div
+      className="flex-1 space-y-5 overflow-y-auto px-6 py-6 editorial-scroll"
+      aria-live="polite"
+    >
+      {messages.map((message) => (
+        <MessageBubble key={message.id} message={message} />
+      ))}
 
       {isTyping && (
-        <div className="flex w-full gap-2.5 text-xs flex-row">
-          <div className="flex size-6.5 shrink-0 items-center justify-center rounded-full border bg-lagoon/15 border-lagoon/20 text-lagoon">
-            <Bot className="size-3" />
-          </div>
-          <div className="flex flex-col gap-1 max-w-[82%]">
-            <div className="flex items-center gap-1 bg-zinc-800 border border-zinc-750 rounded-2xl rounded-tl-none px-3.5 py-2 text-zinc-400">
-              <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
-                style={{ animationDelay: "0ms" }}
-              />
-              <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
-                style={{ animationDelay: "150ms" }}
-              />
-              <span
-                className="size-1.5 animate-bounce rounded-full bg-zinc-550"
-                style={{ animationDelay: "300ms" }}
-              />
-            </div>
-          </div>
+        <div
+          className="flex items-center gap-1 py-1"
+          role="status"
+          aria-label="The tutor is typing"
+        >
+          {[0, 150, 300].map((delay) => (
+            <span
+              key={delay}
+              className="size-1.5 animate-bounce rounded-full bg-ink-label"
+              style={{ animationDelay: `${delay}ms` }}
+            />
+          ))}
         </div>
       )}
 
@@ -338,14 +134,18 @@ export function MessageFeed({ messages, isTyping, onOpenScratchpad }: MessageFee
   );
 }
 
-// 4. Chat Input Component
+// 3. Chat input
 export interface ChatInputProps {
   onSendMessage: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({ onSendMessage, disabled, placeholder }: ChatInputProps) {
+export function ChatInput({
+  onSendMessage,
+  disabled,
+  placeholder,
+}: ChatInputProps) {
   const [text, setText] = React.useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -362,26 +162,29 @@ export function ChatInput({ onSendMessage, disabled, placeholder }: ChatInputPro
     }
   };
 
+  const canSend = !!text.trim() && !disabled;
   return (
-    <form onSubmit={handleSubmit} className="border-t border-zinc-850 bg-zinc-900/20 p-3 space-y-2">
-      <div className="relative flex items-end gap-2 bg-zinc-950 border border-zinc-800 focus-within:border-zinc-700 rounded-xl px-3.5 py-1.5 transition-all">
+    <form onSubmit={handleSubmit} className="bg-surface-void px-6 pb-3 pt-1">
+      <div className="flex items-end gap-2 rounded-[2px] border border-rule bg-surface-raised py-1.5 pl-3.5 pr-1.5 focus-within:border-rule-strong">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder ?? "Ask a question or request a hint..."}
+          placeholder={placeholder ?? "Ask the tutor…"}
+          aria-label="Message the tutor"
           disabled={disabled}
           rows={1}
-          className="flex-1 max-h-24 resize-none bg-transparent py-1 text-xs text-zinc-100 placeholder-zinc-650 outline-none select-text leading-relaxed"
+          className="max-h-24 flex-1 resize-none select-text bg-transparent py-1 font-sans text-xs leading-relaxed text-ink outline-none placeholder:text-ink-label disabled:cursor-not-allowed"
         />
         <button
           type="submit"
-          disabled={!text.trim() || disabled}
+          disabled={!canSend}
+          aria-label="Send"
           className={cn(
-            "inline-flex size-7 items-center justify-center rounded-lg transition-all select-none shrink-0 cursor-pointer",
-            text.trim() && !disabled
-              ? "bg-lagoon text-white hover:bg-lagoon-deep active:scale-95"
-              : "bg-zinc-900 border border-zinc-850 text-zinc-650 cursor-not-allowed"
+            "grid size-7 shrink-0 place-items-center rounded-[2px] transition-opacity select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+            canSend
+              ? "bg-brass-fill text-on-brass hover:opacity-90 cursor-pointer"
+              : "bg-surface-hover text-ink-faint cursor-not-allowed",
           )}
         >
           <Send className="size-3" />
@@ -392,7 +195,8 @@ export function ChatInput({ onSendMessage, disabled, placeholder }: ChatInputPro
 }
 
 // The student turn the Get help button adds to the conversation.
-export const GET_HELP_MESSAGE = "Please provide me an example to help me with this";
+export const GET_HELP_MESSAGE =
+  "Please provide me an example to help me with this";
 // The student turn the New example button adds.
 export const NEW_EXAMPLE_MESSAGE = "Please show me a different example";
 
@@ -408,15 +212,11 @@ export default function ChatBox({
   editorRef,
   currentCode,
   lessonId,
-  onCollapse,
-  onOpenScratchpad,
   onExampleRequested,
 }: {
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
-  onCollapse?: () => void;
-  onOpenScratchpad?: (code: string, language?: string) => void;
   onExampleRequested?: (trigger: ExampleTrigger, examplesUsed: number) => void;
 }) {
   const [isTyping, setIsTyping] = React.useState(false);
@@ -437,7 +237,7 @@ export default function ChatBox({
 
   // Convex integration
   const convexLessonId = lessonId as Id<"questions"> | undefined;
-  
+
   // Get or create chat session
   const [chatId, setChatId] = React.useState<string | null>(null);
   const getOrCreateChat = useMutation(api.chats.getOrCreateChat);
@@ -446,14 +246,13 @@ export default function ChatBox({
   // Fetch messages from Convex
   const dbMessages = useQuery(
     api.chats.getMessages,
-    convexLessonId ? { lessonId: convexLessonId } : "skip"
+    convexLessonId ? { lessonId: convexLessonId } : "skip",
   );
   // Example allowance for this lesson's current round (reactive).
   const allowance = useQuery(
     api.examples.getExampleAllowance,
-    convexLessonId ? { lessonId: convexLessonId } : "skip"
+    convexLessonId ? { lessonId: convexLessonId } : "skip",
   );
-  const cap = allowance?.cap ?? 3;
   const used = allowance?.used ?? 0;
   const remaining = allowance?.remaining ?? 0;
   const exhausted = allowance?.exhausted ?? false;
@@ -480,6 +279,7 @@ export default function ChatBox({
         sender: msg.sender as "user" | "assistant",
         content: msg.content,
         timestamp: new Date(msg._creationTime),
+        responseType: msg.response_type,
       }));
     }
 
@@ -498,7 +298,7 @@ export default function ChatBox({
   // /chat can tell whether the reply landed anyway.
   const assistantCount = React.useMemo(
     () => (dbMessages ?? []).filter((m) => m.sender === "assistant").length,
-    [dbMessages]
+    [dbMessages],
   );
   React.useEffect(() => {
     assistantCountRef.current = assistantCount;
@@ -509,12 +309,14 @@ export default function ChatBox({
   // Get help gives a round's first example; New example the rest.
   const canGetHelp = used === 0 && remaining > 0;
   const canNewExample = used > 0 && remaining > 0;
+  // One plain line about what to do next; counts and limits stay out of view.
   const exampleStatus = exhausted
-    ? `You've used all ${cap} examples for this lesson. Try a lesson on another topic, then come back for new examples.`
-    : remaining > 0
-      ? `${remaining} example${remaining === 1 ? "" : "s"} available`
-      : `Submit another attempt to unlock your next example (${cap - used} left).`;
-
+    ? "You've used this lesson's examples. Try a lesson on another topic, then come back for more."
+    : used === 0 && !canGetHelp
+      ? "Help unlocks after a Submit that doesn't pass."
+      : used > 0 && !canNewExample
+        ? "Try another submit to unlock the next example."
+        : null;
   // A reply landed in Convex for a send whose HTTP call failed — clear the
   // waiting state (and any timeout error we may have already shown). Runs
   // whenever the message list grows, regardless of `awaitingReply`.
@@ -538,7 +340,7 @@ export default function ChatBox({
       setAwaitingReply(false);
       setIsTyping(false);
       setLocalError(
-        "The connection dropped before a reply came back. If nothing appears shortly, please send your message again."
+        "The connection dropped before a reply came back. If nothing appears shortly, please send your message again.",
       );
     }, 30000);
     return () => clearTimeout(timer);
@@ -571,7 +373,7 @@ export default function ChatBox({
 
   const handleSendMessage = async (text: string, trigger?: ExampleTrigger) => {
     if (!chatId || !convexLessonId) return;
-    
+
     // Optmistically show typing state
     setIsTyping(true);
     setLocalError(null);
@@ -589,8 +391,8 @@ export default function ChatBox({
       // Prepare conversation payload for backend
       // Note: We use the existing messages array from the UI + the new message
       const conversationPayload = [
-        ...messages.filter(m => m.id !== "welcome"),
-        { sender: "user" as const, content: text }
+        ...messages.filter((m) => m.id !== "welcome"),
+        { sender: "user" as const, content: text },
       ];
 
       // Extract Monaco editor state
@@ -633,7 +435,13 @@ export default function ChatBox({
       // The response body is intentionally unused: the backend persists the
       // assistant reply to Convex and it renders from the reactive `dbMessages`
       // query. This POST just triggers the run.
-      await sendChatMessage(conversationPayload, chatId, 1, editorContext, trigger ?? "message");
+      await sendChatMessage(
+        conversationPayload,
+        chatId,
+        1,
+        editorContext,
+        trigger ?? "message",
+      );
       setIsTyping(false);
     } catch (error) {
       console.error("Error communicating with chat server:", error);
@@ -650,51 +458,65 @@ export default function ChatBox({
     const allowed = trigger === "get_help" ? canGetHelp : canNewExample;
     if (!allowed || isTyping) return;
     onExampleRequested?.(trigger, used);
-    handleSendMessage(trigger === "get_help" ? GET_HELP_MESSAGE : NEW_EXAMPLE_MESSAGE, trigger);
+    handleSendMessage(
+      trigger === "get_help" ? GET_HELP_MESSAGE : NEW_EXAMPLE_MESSAGE,
+      trigger,
+    );
   };
+
+  const exampleTrigger: ExampleTrigger =
+    used === 0 ? "get_help" : "new_example";
+  const exampleEnabled =
+    (exampleTrigger === "get_help" ? canGetHelp : canNewExample) &&
+    !!chatId &&
+    !!convexLessonId;
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      <ChatHeader isTyping={isTyping} onCollapse={onCollapse} />
-
-      <div className={cn("flex flex-1 min-h-0 flex-col", !helpStarted && !isTyping && "opacity-60")}>
-        <MessageFeed messages={messages} isTyping={isTyping} onOpenScratchpad={onOpenScratchpad} />
+      {/* Greyed until help starts, so the panel stays visible but quiet. */}
+      <div
+        className={cn(
+          "flex flex-1 min-h-0 flex-col",
+          !helpStarted && !isTyping && "opacity-60",
+        )}
+      >
+        <MessageFeed messages={messages} isTyping={isTyping} />
       </div>
 
-      {/* Get help starts a round (enabled by a failed Submit); New example continues it */}
-      {!isTyping && used === 0 && (
-        <div className="flex px-4 pb-2">
-          <button
-            type="button"
-            onClick={() => requestExample("get_help")}
-            disabled={!canGetHelp || !chatId || !convexLessonId}
-            title={canGetHelp ? "Get an example to help with this problem" : "Available after a failed Submit"}
-            className="inline-flex items-center gap-1.5 rounded-full border border-lagoon/30 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 transition-all select-none disabled:border-zinc-800 disabled:bg-zinc-950 disabled:text-zinc-600 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <Sparkles className="size-3.5" />
-            Get help
-          </button>
-        </div>
-      )}
-      {!isTyping && used > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
-          <button
-            type="button"
-            onClick={() => requestExample("new_example")}
-            disabled={!canNewExample || !chatId || !convexLessonId}
-            className="inline-flex items-center gap-1.5 rounded-full border border-lagoon/30 bg-lagoon/10 px-3 py-1 text-xs font-semibold text-lagoon hover:bg-lagoon/20 transition-all select-none disabled:border-zinc-800 disabled:bg-zinc-950 disabled:text-zinc-600 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <Sparkles className="size-3.5" />
-            New example
-          </button>
-          <span className="text-[10px] text-zinc-500 leading-snug">{exampleStatus}</span>
+      {/* Help: one button (Get help starts a round after a failed Submit; New example continues it)
+          and at most one plain line. Hidden while the tutor replies and once the lesson's examples are used. */}
+      {!isTyping && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-rule-strong bg-surface-void px-6 py-3">
+          {!exhausted && (
+            <button
+              type="button"
+              onClick={() => requestExample(exampleTrigger)}
+              disabled={!exampleEnabled}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-3 text-[11px] font-semibold tracking-[0.02em] transition-opacity select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+                exampleEnabled
+                  ? "border-brass-fill bg-brass-fill text-on-brass hover:opacity-90 cursor-pointer"
+                  : "border-rule-strong bg-transparent text-ink-faint cursor-not-allowed",
+              )}
+            >
+              <Sparkles className="size-3.5" />
+              {exampleTrigger === "get_help" ? "Get help" : "New example"}
+            </button>
+          )}
+          {exampleStatus && (
+            <span className="text-[11px] leading-snug text-ink-label">
+              {exampleStatus}
+            </span>
+          )}
         </div>
       )}
 
       <ChatInput
         onSendMessage={(text) => handleSendMessage(text)}
         disabled={!helpStarted || isTyping || !chatId || !convexLessonId}
-        placeholder={helpStarted ? undefined : "The chat opens after you press Get help"}
+        placeholder={
+          helpStarted ? undefined : "The chat opens after you press Get help"
+        }
       />
     </div>
   );

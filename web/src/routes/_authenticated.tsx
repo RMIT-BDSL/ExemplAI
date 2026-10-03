@@ -1,6 +1,6 @@
 import { usePostHog } from "@posthog/react";
 import { useEffect } from "react";
-import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useMatches, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { stripSearchParams } from "#/lib/auth-callback";
@@ -40,6 +40,7 @@ function AuthenticatedLayout() {
   const { session } = Route.useRouteContext();
   const { code /*, magic */ } = Route.useSearch();
   const navigate = useNavigate();
+  const isWorkspace = useMatches().some((m) => m.routeId === "/_authenticated/course");
   const posthog = usePostHog();
   const createUserAndUseCode = useMutation(api.invitationCodes.createUserAndUseCode);
 
@@ -102,7 +103,8 @@ function AuthenticatedLayout() {
 
   return (
     <>
-      <Navbar />
+      {/* The lesson workspace has its own status bar instead. */}
+      {!isWorkspace && <Navbar />}
       <Outlet />
     </>
   );

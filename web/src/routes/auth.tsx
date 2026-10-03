@@ -167,10 +167,10 @@ function AuthPage() {
   // tear the form down to a full-screen spinner.
   if (isSessionLoading && session === undefined) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[var(--bg-base)] text-[var(--sea-ink)]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="size-12 rounded-full border-4 border-zinc-200 border-t-[var(--lagoon-deep)] animate-spin" />
-          <p className="text-sm font-semibold tracking-wider animate-pulse">
+      <div className="xa-workspace flex min-h-dvh w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-6 rounded-full border-2 border-rule-strong border-t-brass animate-spin" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
             Checking credentials...
           </p>
         </div>
@@ -181,10 +181,10 @@ function AuthPage() {
   // Already authenticated / redirecting
   if (session?.user) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-[var(--bg-base)] text-[var(--sea-ink)]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="size-12 rounded-full border-4 border-zinc-200 border-t-[var(--lagoon-deep)] animate-spin" />
-          <p className="text-sm font-semibold tracking-wider animate-pulse">
+      <div className="xa-workspace flex min-h-dvh w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-6 rounded-full border-2 border-rule-strong border-t-brass animate-spin" />
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
             Redirecting...
           </p>
         </div>
@@ -194,12 +194,12 @@ function AuthPage() {
 
   // Login / Register Form
   return (
-    <div className="flex min-h-screen w-full items-center justify-center p-4">
+    <div className="xa-workspace flex min-h-dvh w-full items-center justify-center px-4 py-10">
       <AuthCard
         title={
           activeTab === "signin"
-            ? "Welcome Back"
-            : "Create Account"
+            ? "Welcome back"
+            : "Create your account"
           /*
           : activeTab === "magiclink"
             ? "Magic Link"
@@ -208,8 +208,8 @@ function AuthPage() {
         }
         subtitle={
           activeTab === "signin"
-            ? "Sign in with your email and password to access the platform."
-            : "Sign up to start tracking your learning progress and assignments."
+            ? "Sign in with your email and password to continue your course."
+            : "Sign up with the invitation code from your course to start."
           /*
           : activeTab === "magiclink"
             ? "Enter your email to receive a passwordless sign-in link."
@@ -222,16 +222,22 @@ function AuthPage() {
 
         {/* Global Error Banner */}
         {globalError && (
-          <div className="flex items-start gap-3 p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
-            <AlertCircle className="size-5 flex-shrink-0 mt-0.5" />
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-[2px] border border-danger px-3 py-2.5 text-xs text-danger"
+          >
+            <AlertCircle className="mt-px size-4 flex-shrink-0" />
             <p className="font-medium leading-relaxed">{globalError}</p>
           </div>
         )}
 
         {/* Global Success Banner */}
         {successMessage && (
-          <div className="flex items-start gap-3 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
-            <CheckCircle2 className="size-5 flex-shrink-0 mt-0.5" />
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-[2px] border border-success px-3 py-2.5 text-xs text-success"
+          >
+            <CheckCircle2 className="mt-px size-4 flex-shrink-0" />
             <p className="font-medium leading-relaxed">{successMessage}</p>
           </div>
         )}

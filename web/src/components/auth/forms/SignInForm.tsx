@@ -107,7 +107,7 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
       <div className="flex justify-end -mt-1">
         <button
           type="button"
-          className="text-xs font-semibold text-zinc-500 hover:underline outline-none cursor-pointer"
+          className="rounded-[2px] text-[11px] font-medium text-ink-label hover:text-brass hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
           onClick={() => {
             onError(
               "Password reset is not configured yet. Please contact your administrator.",
@@ -123,10 +123,10 @@ export function SignInForm({ onSuccess, onError }: SignInFormProps) {
           <AuthButton
             type="submit"
             variant="filled"
-            className="w-full h-12 text-base mt-2"
+            className="mt-1 w-full"
             isLoading={isSubmitting}
             disabled={isSubmitting}
-            icon={<ArrowRight className="size-5" />}
+            icon={<ArrowRight className="size-4" />}
           >
             Sign In
           </AuthButton>

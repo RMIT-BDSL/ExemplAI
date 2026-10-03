@@ -203,10 +203,10 @@ export function SignUpForm({ onSuccess, onError }: SignUpFormProps) {
           <AuthButton
             type="submit"
             variant="filled"
-            className="w-full h-12 text-base mt-2"
+            className="mt-1 w-full"
             isLoading={isSubmitting}
             disabled={isSubmitting}
-            icon={<ArrowRight className="size-5" />}
+            icon={<ArrowRight className="size-4" />}
           >
             Sign Up
           </AuthButton>

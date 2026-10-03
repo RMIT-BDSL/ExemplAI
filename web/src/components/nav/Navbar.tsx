@@ -1,50 +1,32 @@
-import { Link, useMatches } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import ChangelogButton from "../changelog/ChangelogButton";
 import UserStatusButton from "./UserStatusButton";
 
 /**
- * Top navigation bar for authenticated pages.
- *
- * Single responsibility: app-level layout — branding on the left, the user
- * status control on the right. Delegates all user/session concerns to
- * UserStatusButton.
+ * Top bar for authenticated pages (the syllabus). Same look as the lesson
+ * workspace's status bar: wordmark on the left, the account menu (theme
+ * switch, What's new, sign out) on the right. Not rendered on /course: the
+ * workspace has its own status bar (components/student/StatusBar).
  */
 export default function Navbar() {
-  const matches = useMatches();
-  const isSubPage = matches.some(
-    (match) =>
-      match.routeId === "/_authenticated/course"
-  );
-
+  const [whatsNewRequest, setWhatsNewRequest] = useState(0);
   return (
-    <header className="sticky top-0 z-45 border-b border-line bg-white/70 dark:bg-black/70 backdrop-blur-xl text-sea-ink">
-      <nav className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 dark:max-w-none dark:px-6">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/"
-            className="text-[14px] font-semibold tracking-tight text-sea-ink hover:text-lagoon transition-colors"
-          >
-            ExemplAI
-          </Link>
-
-          {isSubPage && (
-            <>
-              <div className="h-3 w-px bg-line" />
-              <Link
-                to="/"
-                className="flex items-center gap-1 text-[11px] font-medium text-sea-ink-soft hover:text-sea-ink hover:bg-sand transition-all px-2.5 py-1 rounded-md border border-line bg-white/40 dark:bg-transparent"
-              >
-                <ChevronLeft className="size-3" />
-                <span>Syllabus</span>
-              </Link>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ChangelogButton />
-          <UserStatusButton />
+    <header className="sticky top-0 z-45 border-b border-rule-strong bg-surface-void">
+      <nav className="flex h-9 items-center justify-between px-6">
+        <Link
+          to="/"
+          className="rounded-[2px] text-[13px] font-semibold tracking-tight text-ink hover:text-brass transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
+        >
+          ExemplAI
+        </Link>
+        <div className="flex items-center">
+          <UserStatusButton
+            variant="workspace"
+            onWhatsNew={() => setWhatsNewRequest((n) => n + 1)}
+          />
+          {/* Dialog only; opened from the account menu (and auto-opens for new notes). */}
+          <ChangelogButton trigger="none" openRequest={whatsNewRequest} />
         </div>
       </nav>
     </header>

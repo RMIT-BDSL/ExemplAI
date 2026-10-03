@@ -1,224 +1,127 @@
-import { Tag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-
-// Types for Problem
-/*
-export interface Example {
-  input: string
-  output: string
-  explanation?: string
-}
-*/
 
 export interface ProblemData {
   id: string;
   title: string;
-  // difficulty: "Easy" | "Medium" | "Hard"
-  // acceptanceRate: string
-  tags: string[];
   description: string;
-  // examples: Example[]
-  // constraints: string[]
+  /** Name of the function students write (from the starter code). */
+  functionName: string;
+  /** The one test case shown to students as a worked example. */
+  example?: { input: string; expectedOutput: string };
 }
 
-// Mock Problem Data for initial design
-export const MOCK_PROBLEM: ProblemData = {
-  id: "1",
-  title: "1. Two Sum",
-  // difficulty: "Easy",
-  // acceptanceRate: "54.2%",
-  tags: ["Array", "Hash Table"],
-  description:
-    "Given an array of integers `nums` and an integer `target`, return *indices of the two numbers* such that they add up to `target`.\n\nYou may assume that each input would have ***exactly* one solution**, and you may not use the *same* element twice.\n\nYou can return the answer in any order.",
-  /*
-  examples: [
-    {
-      input: "nums = [2,7,11,15], target = 9",
-      output: "[0,1]",
-      explanation: "Because nums[0] + nums[1] == 9, we return [0, 1]."
-    },
-    {
-      input: "nums = [3,2,4], target = 6",
-      output: "[1,2]",
-      explanation: "Because nums[1] + nums[2] == 6, we return [1, 2]."
-    },
-    {
-      input: "nums = [3,3], target = 6",
-      output: "[0,1]"
+/** Outcome of the latest Submit in this session (cleared on reload / lesson change). */
+export interface LastSubmit {
+  passed: number;
+  total: number;
+  /** The example's own result, when the server returned it (not hidden). */
+  example?: { passed: boolean; stdout: string; stderr: string };
+}
+
+/**
+ * Render a test-case input as a Python call, mirroring how the server's test
+ * runner turns stdin into arguments (server/services wrap_code_with_runner):
+ * empty → no args; a JSON list → that argument list; otherwise comma-separated
+ * JSON values, falling back to whitespace-separated tokens.
+ */
+export function formatCall(functionName: string, input: string): string {
+  const raw = input.trim();
+  const show = (v: unknown) =>
+    typeof v === "string" ? `"${v}"` : JSON.stringify(v);
+  let args: string[];
+  if (raw === "") {
+    args = [];
+  } else {
+    try {
+      const parsed =
+        raw.startsWith("[") && raw.endsWith("]")
+          ? JSON.parse(raw)
+          : JSON.parse(`[${raw}]`);
+      args = (Array.isArray(parsed) ? parsed : [parsed]).map(show);
+    } catch {
+      args = raw
+        .split(/\s+/)
+        .map((t) => (Number.isFinite(Number(t)) ? t : `"${t}"`));
     }
-  ],
-  constraints: [
-    "2 <= nums.length <= 10^4",
-    "-10^9 <= nums[i] <= 10^9",
-    "-10^9 <= target <= 10^9",
-    "Only one valid answer exists."
-  ]
-  */
-};
-
-// 1. Problem Header Component
-export interface ProblemHeaderProps {
-  title: string;
-  // difficulty: "Easy" | "Medium" | "Hard"
-  // acceptanceRate: string
-  tags: string[];
-}
-
-export function ProblemHeader({
-  title,
-  /* difficulty, acceptanceRate, */ tags,
-}: ProblemHeaderProps) {
-  /*
-  const difficultyStyles = {
-    Easy: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    Medium: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    Hard: "text-rose-400 bg-rose-500/10 border-rose-500/20",
   }
-  */
-
-  return (
-    <div className="space-y-3.5 border-b border-zinc-850 pb-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-          {title}
-        </h1>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Tag className="mr-1 size-3.5 text-zinc-500" />
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-medium text-zinc-400"
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
+  return `${functionName}(${args.join(", ")})`;
 }
 
-// 2. Problem Description Text Component
-export interface ProblemDescriptionTextProps {
-  description: string;
+function lastLine(text: string): string {
+  const lines = text.trim().split("\n");
+  return lines[lines.length - 1] ?? "";
 }
 
-export function ProblemDescriptionText({
-  description,
-}: ProblemDescriptionTextProps) {
-  return (
-    <div className="prose prose-invert prose-xs max-w-none text-zinc-300 leading-relaxed">
-      <ReactMarkdown>{description}</ReactMarkdown>
-    </div>
-  );
-}
-
-/*
-// 3. Problem Examples Component
-export interface ProblemExamplesProps {
-  examples: Example[]
-}
-
-export function ProblemExamples({ examples }: ProblemExamplesProps) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 border-b border-zinc-800/50 pb-2">
-        <Code2 className="size-4 text-indigo-400" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          Examples
-        </h2>
-      </div>
-
-      <div className="space-y-4">
-        {examples.map((example, idx) => (
-          <div key={idx} className="space-y-2">
-            <h3 className="text-xs font-semibold text-zinc-400">
-              Example {idx + 1}:
-            </h3>
-            <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 font-mono text-sm leading-6">
-              <div className="flex flex-col gap-1">
-                <div>
-                  <span className="font-semibold text-zinc-500 select-none">Input:</span>{" "}
-                  <span className="text-zinc-200">{example.input}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-zinc-500 select-none">Output:</span>{" "}
-                  <span className="text-zinc-200">{example.output}</span>
-                </div>
-                {example.explanation && (
-                  <div className="mt-2 border-t border-zinc-800/60 pt-2 text-zinc-400">
-                    <span className="font-semibold text-zinc-500 select-none font-sans mr-1">
-                      Explanation:
-                    </span>
-                    <span className="font-sans text-xs">
-                      {example.explanation}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// 4. Problem Constraints Component
-export interface ProblemConstraintsProps {
-  constraints: string[]
-}
-
-export function ProblemConstraints({ constraints }: ProblemConstraintsProps) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 border-b border-zinc-800/50 pb-2">
-        <Cpu className="size-4 text-emerald-400" />
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-          Constraints
-        </h2>
-      </div>
-
-      <ul className="list-inside list-disc space-y-2 pl-1 text-xs text-zinc-400">
-        {constraints.map((constraint, idx) => (
-          <li key={idx} className="leading-relaxed">
-            <code className="rounded bg-zinc-950 px-1.5 py-0.5 font-mono text-xs font-medium text-emerald-400">
-              {constraint}
-            </code>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-*/
-
-// 5. Main Default Problem Component
 export interface ProblemProps {
-  problem?: ProblemData;
+  problem: ProblemData;
+  lastSubmit?: LastSubmit;
 }
 
-export default function Problem({ problem = MOCK_PROBLEM }: ProblemProps) {
+export default function Problem({ problem, lastSubmit }: ProblemProps) {
+  const { example } = problem;
+  const exampleResult = lastSubmit?.example;
+  const allPassed =
+    lastSubmit !== undefined && lastSubmit.passed === lastSubmit.total;
+
   return (
-    <div className="flex h-full flex-col bg-transparent">
-      {/* Scrollable Container */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 scrollbar-thin scrollbar-thumb-zinc-800">
-        <ProblemHeader
-          title={problem.title}
-          // difficulty={problem.difficulty}
-          // acceptanceRate={problem.acceptanceRate}
-          tags={problem.tags}
-        />
+    <article>
+      <h1 className="!mb-4 flex items-baseline gap-3">
+        <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.15em] text-ink-label">
+          Exercise:
+        </span>
+        <span>{problem.title}</span>
+      </h1>
 
-        <div className="space-y-5">
-          <ProblemDescriptionText description={problem.description} />
+      <ReactMarkdown>{problem.description}</ReactMarkdown>
 
-          {/* <ProblemExamples examples={problem.examples} /> */}
+      {example && (
+        <section className="mt-6 border-t border-rule-strong pt-4 font-sans">
+          <h2 className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
+            Example
+          </h2>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 text-xs">
+            <dt className="text-[11px] text-ink-label">Input</dt>
+            <dd className="font-mono text-ink break-all">
+              {formatCall(problem.functionName, example.input)}
+            </dd>
+            <dt className="text-[11px] text-ink-label">Expected</dt>
+            <dd className="font-mono text-ink break-all">
+              {example.expectedOutput}
+            </dd>
+            {exampleResult && (
+              <>
+                <dt className="text-[11px] text-ink-label">Your output</dt>
+                <dd
+                  className={`font-mono break-all ${exampleResult.passed ? "text-success" : "text-danger"}`}
+                >
+                  {exampleResult.stdout.trim() ||
+                    (exampleResult.stderr
+                      ? lastLine(exampleResult.stderr)
+                      : "(nothing returned)")}
+                  <b className="ml-2 font-sans text-[9px] font-semibold tracking-[0.1em]">
+                    {exampleResult.passed ? "PASS" : "FAIL"}
+                  </b>
+                </dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
 
-          {/* <ProblemConstraints constraints={problem.constraints} /> */}
+      {lastSubmit && (
+        // A div, not a p: .editorial-prose forces serif styling on paragraphs.
+        <div
+          className="mt-4 border-t border-rule pt-4 font-sans text-xs"
+          aria-live="polite"
+        >
+          <span className="mr-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
+            Last submit
+          </span>
+          <span className={allPassed ? "text-success" : "text-danger"}>
+            {lastSubmit.passed} of {lastSubmit.total} tests passed
+          </span>
         </div>
-      </div>
-    </div>
+      )}
+    </article>
   );
 }

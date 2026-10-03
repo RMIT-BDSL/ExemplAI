@@ -5,7 +5,8 @@ import type * as React from "react";
 import { cn } from "#/lib/utils.ts";
 
 /**
- * Reusable modal built on top of `radix-ui`. Mirrors the `button.tsx` /
+ * Reusable modal built on top of `radix-ui`, styled with the workspace
+ * tokens (styles.css --xa-*), so it follows the light/dark theme. Mirrors the `button.tsx` /
  * `sonner.tsx` convention of a thin styled wrapper over the primitive.
  *
  * Usage:
@@ -44,7 +45,7 @@ function DialogOverlay({
     <Dialog.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+        "fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
       {...props}
@@ -66,7 +67,7 @@ function DialogContent({
       <Dialog.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-[560px] -translate-x-1/2 -translate-y-1/2 gap-4 border border-line bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl p-6 shadow-xl rounded-2xl",
+          "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[4px] border border-rule-strong bg-surface-raised p-6 text-ink shadow-lg",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-2",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
@@ -76,7 +77,7 @@ function DialogContent({
         {children}
         {showCloseButton && (
           <Dialog.Close
-            className="absolute right-4 top-4 rounded-md p-1 text-sea-ink-soft outline-none transition-colors hover:bg-sand dark:hover:bg-white/10 hover:text-sea-ink focus-visible:ring-1 focus-visible:ring-lagoon/40 cursor-pointer"
+            className="absolute right-4 top-4 grid size-6 place-items-center rounded-[2px] text-ink-label outline-none transition-colors hover:text-brass focus-visible:outline-2 focus-visible:outline-brass cursor-pointer"
             aria-label="Close"
           >
             <X className="size-4" />
@@ -118,7 +119,7 @@ function DialogTitle({
     <Dialog.Title
       data-slot="dialog-title"
       className={cn(
-        "text-base font-bold tracking-tight text-sea-ink",
+        "font-serif text-xl font-medium tracking-[-0.01em] text-ink",
         className,
       )}
       {...props}
@@ -133,7 +134,7 @@ function DialogDescription({
   return (
     <Dialog.Description
       data-slot="dialog-description"
-      className={cn("text-xs text-sea-ink-soft", className)}
+      className={cn("text-xs text-ink-label", className)}
       {...props}
     />
   );

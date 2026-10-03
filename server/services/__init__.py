@@ -200,6 +200,118 @@ if __name__ == "__main__":
     return student_code + "\n" + wrapper
 
 
+# ── Run mode (UX update): run the file, then call the function once ──────
+#
+# Run is unscored. It executes the student's file as written, then calls their
+# function once with the lesson's example arguments and prints the return
+# value after a sentinel line, so the console can show prints, the call's
+# result and any traceback separately. The arguments are embedded in the
+# program (not sent on stdin), so a stray input() hits EOF instead of eating
+# the test arguments.
+
+RUN_RETURN_SENTINEL = "__EXEMPLAI_RETURN_VALUE__"
+
+
+def _find_function(codes: list[Optional[str]]) -> tuple[Optional[str], int]:
+    """First function defined in starter, solution or student code (as the test runner does)."""
+    for code in codes:
+        if not code:
+            continue
+        try:
+            for node in ast.walk(ast.parse(code)):
+                if isinstance(node, ast.FunctionDef):
+                    return node.name, len(node.args.args)
+        except Exception:
+            continue
+    return None, 0
+
+
+def parse_test_input(input_data: str) -> list:
+    """Turn a test-case input string into call arguments, exactly like the
+    generated test runner: empty → no args; a JSON list → that list; else
+    comma-separated JSON values; else whitespace tokens (int, float or str)."""
+    input_data = (input_data or "").strip()
+    if not input_data:
+        return []
+    try:
+        if input_data.startswith("[") and input_data.endswith("]"):
+            args = json.loads(input_data)
+            return args if isinstance(args, list) else [args]
+        return json.loads("[" + input_data + "]")
+    except Exception:
+        args = []
+        for token in input_data.split():
+            try:
+                args.append(float(token) if "." in token else int(token))
+            except ValueError:
+                args.append(token)
+        return args
+
+
+def build_run_program(
+    student_code: str,
+    starter_code: Optional[str],
+    solution_code: Optional[str],
+    example_input: Optional[str],
+) -> str:
+    """Student code plus a single call on the example's arguments (Run mode).
+
+    With no function or no example, the file runs as written."""
+    func_name, n_params = _find_function([starter_code, solution_code, student_code])
+    if not func_name or example_input is None:
+        return student_code
+    args_json = json.dumps(parse_test_input(example_input))
+    return (
+        student_code
+        + "\n\n# --- AUTO-GENERATED RUN ---\n"
+        + 'if __name__ == "__main__":\n'
+        + "    import json as __xa_json\n"
+        + f"    __xa_args = __xa_json.loads({args_json!r})\n"
+        + f"    __xa_result = {func_name}(*__xa_args[:{n_params}])\n"
+        + f"    print({RUN_RETURN_SENTINEL!r})\n"
+        + "    print(repr(__xa_result))\n"
+    )
+
+
+def split_run_stdout(stdout: Optional[str]) -> tuple[str, Optional[str]]:
+    """Separate the student's prints from the call's return value."""
+    stdout = stdout or ""
+    marker = RUN_RETURN_SENTINEL + "\n"
+    if marker not in stdout:
+        return stdout, None
+    prints, _, rest = stdout.rpartition(marker)
+    return prints, rest.rstrip("\n")
+
+
+async def run_once(student_code: StudentCode) -> dict:
+    """Run mode: one Judge0 execution, no grading. Returns prints, the return
+    value of the example call (if it ran) and stderr."""
+    example = student_code.test_cases[0] if student_code.test_cases else None
+    program = build_run_program(
+        student_code.code,
+        student_code.starter_code,
+        student_code.solution_code,
+        example.input if example else None,
+    )
+    output = await _judge0_submit(program, student_code.language_id or 71)
+    status_info = output.get("status") or {}
+    prints, return_value = split_run_stdout(output.get("stdout"))
+    stderr = output.get("stderr") or output.get("compile_output") or ""
+    try:
+        time_ms = round(float(output.get("time")) * 1000)
+    except (TypeError, ValueError):
+        time_ms = None
+    return {
+        "mode": "run",
+        "error": status_info.get("id") != 3,
+        "status": status_info,
+        "stdout": prints,
+        "return_value": return_value,
+        "stderr": stderr,
+        "time_ms": time_ms,
+    }
+
+
 async def run_single_test_case(client, code, language_id, test_case, exec_url, headers, expected_output_from_sol=None):
     payload = {
         'source_code': code,
@@ -362,9 +474,10 @@ async def execute_code(
     background_tasks: BackgroundTasks,
     auth_token: Optional[str] = None,
 ) -> dict:
-    """Proxy a code submission to Judge0 and return a Pass/Fail result.
+    """Proxy a code submission to Judge0.
 
-    When test_cases are provided, runs each case (optionally computing expected
+    Run (action_type "run") executes once via run_once: prints, the example
+    call's return value and errors, no grading. Submit: when test_cases are provided, runs each case (optionally computing expected
     outputs from solution_code) and returns aggregate results; otherwise falls
     back to a single execution.
 
@@ -378,6 +491,14 @@ async def execute_code(
     language_id = student_code.language_id or 71
     action_type = student_code.action_type or "run"
     lesson_id = student_code.lesson_id
+
+    # Run is a single unscored execution (see run_once); only Submit grades.
+    if action_type == "run":
+        result = await run_once(student_code)
+        background_tasks.add_task(
+            _record_code_execution, auth_token, lesson_id, "run", not result["error"], None
+        )
+        return result
 
     # Check if test cases are provided
     if student_code.test_cases:
