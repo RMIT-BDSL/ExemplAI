@@ -3,7 +3,6 @@ import { useQuery } from "convex/react";
 import { Megaphone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Button } from "#/components/ui/button";
 import * as Dialog from "#/components/ui/dialog";
 import { authClient } from "#/lib/auth-client";
 import { cn } from "#/lib/utils.ts";
@@ -26,19 +25,9 @@ const TYPE_META: Record<
   ReleaseNote["type"],
   { label: string; className: string }
 > = {
-  feature: {
-    label: "New",
-    className: "bg-lagoon/10 text-lagoon border-lagoon/20",
-  },
-  fix: {
-    label: "Fixed",
-    className:
-      "bg-amber/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-  },
-  improvement: {
-    label: "Improved",
-    className: "bg-palm/10 text-palm border-palm/20",
-  },
+  feature: { label: "New", className: "text-brass" },
+  fix: { label: "Fixed", className: "text-ink-muted" },
+  improvement: { label: "Improved", className: "text-success" },
 };
 
 function readSeenTimestamp(): number {
@@ -63,17 +52,28 @@ function writeSeenTimestamp(ts: number) {
  *   arrives.
  * - Dedicated button always opens the modal and marks everything seen.
  */
-export default function ChangelogButton() {
+interface ChangelogButtonProps {
+  /** "icon" renders the megaphone button; "none" renders only the dialog
+   * (opened via `openRequest`, e.g. from the workspace account menu). */
+  trigger?: "icon" | "none";
+  /** Increment to open the dialog from outside. */
+  openRequest?: number;
+}
+
+export default function ChangelogButton(props: ChangelogButtonProps) {
   const { data: session } = authClient.useSession();
 
   if (!session?.user) {
     return null;
   }
 
-  return <AuthenticatedChangelogButton />;
+  return <AuthenticatedChangelogButton {...props} />;
 }
 
-function AuthenticatedChangelogButton() {
+function AuthenticatedChangelogButton({
+  trigger = "icon",
+  openRequest = 0,
+}: ChangelogButtonProps) {
   const notes = useQuery(api.releaseNotes.listPublic);
   const posthog = usePostHog();
   const [open, setOpen] = useState(false);
@@ -108,76 +108,88 @@ function AuthenticatedChangelogButton() {
     }
   };
 
-  const handleButtonClick = () => {
+  const openFrom = (source: "button" | "menu") => {
     if (latestTimestamp !== undefined) {
       seenRef.current = latestTimestamp;
       writeSeenTimestamp(latestTimestamp);
     }
-    posthog.capture("changelog_opened", { source: "button" });
+    posthog.capture("changelog_opened", { source });
     setOpen(true);
   };
+  const handleButtonClick = () => openFrom("button");
+
+  // Opened from outside (account menu "What's new").
+  const lastRequestRef = useRef(openRequest);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: openFrom only uses refs and setters; run on new requests only.
+  useEffect(() => {
+    if (openRequest === lastRequestRef.current) return;
+    lastRequestRef.current = openRequest;
+    openFrom("menu");
+  }, [openRequest]);
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <button
-        type="button"
-        onClick={handleButtonClick}
-        aria-label="What's new"
-        className="relative flex size-9 items-center justify-center rounded-full border border-line bg-white/70 dark:bg-white/5 text-sea-ink-soft outline-none transition-all hover:bg-sand/50 dark:hover:bg-white/10 hover:text-sea-ink focus-visible:ring-1 focus-visible:ring-lagoon/40 cursor-pointer"
-      >
-        <Megaphone className="size-4" />
-        {hasUnread && (
-          <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-palm ring-2 ring-white dark:ring-zinc-900" />
-        )}
-      </button>
+      {trigger === "icon" && (
+        <button
+          type="button"
+          onClick={handleButtonClick}
+          aria-label="What's new"
+          className="relative grid size-7 place-items-center rounded-full border border-rule-strong text-ink-label outline-none transition-colors hover:text-brass focus-visible:outline-2 focus-visible:outline-brass cursor-pointer"
+        >
+          <Megaphone className="size-4" />
+          {hasUnread && (
+            <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-brass-fill ring-2 ring-surface-void" />
+          )}
+        </button>
+      )}
 
       <Dialog.Content className="max-w-[600px]">
         <Dialog.Header>
-          <Dialog.Title className="flex items-center gap-2">
-            <Megaphone className="size-4 text-lagoon" />
-            What's new
-          </Dialog.Title>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">
+            Release notes
+          </p>
+          <Dialog.Title>What's new</Dialog.Title>
           <Dialog.Description>
             Recent updates and improvements to ExemplAI.
           </Dialog.Description>
         </Dialog.Header>
 
-        <div className="-mx-2 max-h-[60vh] overflow-y-auto px-2 pr-3">
+        <div className="-mx-6 max-h-[60vh] overflow-y-auto border-y border-rule-strong px-6 editorial-scroll">
           {notes === undefined ? (
-            <div className="space-y-3 py-2">
+            <div className="space-y-4 py-4" aria-hidden="true">
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-20 rounded-xl border border-line bg-zinc-100/60 dark:bg-white/5 animate-pulse"
+                  className="h-14 rounded bg-rule-strong animate-pulse"
                 />
               ))}
             </div>
           ) : notes.length === 0 ? (
-            <p className="py-6 text-center text-xs text-sea-ink-soft">
-              No updates yet. Check back soon!
+            <p className="py-8 text-center font-serif text-[0.95rem] text-ink-prose">
+              No updates yet. Check back soon.
             </p>
           ) : (
-            <ul className="space-y-4 py-1">
+            <ul>
               {notes.slice(0, MAX_NOTES).map((note) => {
                 const meta = TYPE_META[note.type];
                 return (
                   <li
                     key={note._id}
-                    className="rounded-xl border border-line bg-white/60 dark:bg-white/[0.02] p-3.5"
+                    className="border-b border-rule py-4 last:border-b-0"
                   >
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-baseline gap-2">
                       <span
                         className={cn(
-                          "inline-flex items-center border text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded",
+                          "shrink-0 text-[9px] font-semibold uppercase tracking-[0.15em]",
                           meta.className,
                         )}
                       >
                         {meta.label}
                       </span>
-                      <h4 className="text-[13px] font-semibold text-sea-ink">
+                      <h4 className="font-serif text-[15px] text-ink">
                         {note.title}
                       </h4>
-                      <time className="ml-auto text-[10px] text-sea-ink-soft">
+                      <time className="ml-auto shrink-0 text-[10px] text-ink-label">
                         {new Date(note.timestamp).toLocaleDateString(
                           undefined,
                           {
@@ -188,7 +200,7 @@ function AuthenticatedChangelogButton() {
                         )}
                       </time>
                     </div>
-                    <div className="prose prose-sm prose-zinc dark:prose-invert mt-2 max-w-none text-xs text-sea-ink-soft [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_a]:text-lagoon">
+                    <div className="mt-1.5 text-xs leading-relaxed text-ink-prose [&_a]:text-brass [&_a]:underline [&_code]:font-mono [&_code]:text-brass [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-4">
                       <ReactMarkdown>{note.content}</ReactMarkdown>
                     </div>
                   </li>
@@ -199,13 +211,13 @@ function AuthenticatedChangelogButton() {
         </div>
 
         <Dialog.Footer>
-          <Button
-            variant="default"
-            size="sm"
+          <button
+            type="button"
             onClick={() => handleOpenChange(false)}
+            className="h-7 rounded-[2px] border border-brass-fill bg-brass-fill px-4 text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity hover:opacity-90 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
           >
             Got it
-          </Button>
+          </button>
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
