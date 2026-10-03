@@ -9,6 +9,7 @@ import { convex } from "#/lib/convex";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 import { Toaster } from "#/components/ui/sonner";
+import { ThemeProvider } from "next-themes";
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -40,11 +41,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
+        {/* Light is the default; dark is opt-in from the account menu. */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="exemplai-theme" disableTransitionOnChange>
         <PostHogProvider
           apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_PROJECT_TOKEN!}
           options={{
@@ -61,6 +64,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           </ConvexBetterAuthProvider>
         </PostHogProvider>
         <Toaster position="top-center" />
+        </ThemeProvider>
         {import.meta.env.DEV && (
           <TanStackDevtools
             config={{

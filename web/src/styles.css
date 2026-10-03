@@ -166,6 +166,136 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ------------------------------------------------------------------------
+   ExemplAI workspace tokens (design system: claude.ai/artifact/E3n1PpWmBYNT6Pz19QXxpn).
+   Light ("Paper") is the default; dark ("Nocturne") applies under .dark,
+   which next-themes sets on <html>. Prefixed --xa-* so they never collide
+   with the landing pages' --line / --surface variables.
+   ------------------------------------------------------------------------ */
+:root {
+  --xa-surface-void: #ece7dc;
+  --xa-surface-page: #f3efe6;
+  --xa-surface-panel: #f4f0e6;
+  --xa-surface-editor: #fbf9f4;
+  --xa-surface-raised: #ffffff;
+  --xa-surface-hover: #efeae0;
+  --xa-surface-linehl: #f1ece2;
+  --xa-rule: #e2dccf;
+  --xa-rule-strong: #d3cbbb;
+  --xa-selection: #e9dcc0;
+  --xa-selection-inactive: #f0e7d4;
+  --xa-ink: #1c1b1f;
+  --xa-ink-chat: #34323a;
+  --xa-ink-prose: #3d3a42;
+  --xa-ink-muted: #5f5b64;
+  --xa-ink-label: #6b6670;
+  --xa-ink-faint: #a39d93;
+  --xa-brass: #8a6420;
+  --xa-brass-fill: #c29a53;
+  --xa-on-brass: #1c1b1f;
+  --xa-success: #3c6f50;
+  --xa-success-deep: #2f5940;
+  --xa-on-success: #ffffff;
+  --xa-danger: #c62828;
+}
+
+.dark {
+  --xa-surface-void: #09080b;
+  --xa-surface-page: #0b0a0d;
+  --xa-surface-panel: #0c0b0e;
+  --xa-surface-editor: #141318;
+  --xa-surface-raised: #121115;
+  --xa-surface-hover: #19181c;
+  --xa-surface-linehl: #131217;
+  --xa-rule: #1c1b1f;
+  --xa-rule-strong: #27272a;
+  --xa-selection: #282630;
+  --xa-selection-inactive: #1e1d24;
+  --xa-ink: #eaeaea;
+  --xa-ink-chat: #bfbdc4;
+  --xa-ink-prose: #b5b3b9;
+  --xa-ink-muted: #828087;
+  --xa-ink-label: #8a8891;
+  --xa-ink-faint: #4f4d54;
+  --xa-brass: #c29a53;
+  --xa-brass-fill: #c29a53;
+  --xa-on-brass: #0b0a0d;
+  --xa-success: #4f8a65;
+  --xa-success-deep: #3f6e51;
+  --xa-on-success: #eaeaea;
+  --xa-danger: #e5484d;
+}
+
+@theme inline {
+  --color-surface-void: var(--xa-surface-void);
+  --color-surface-page: var(--xa-surface-page);
+  --color-surface-panel: var(--xa-surface-panel);
+  --color-surface-editor: var(--xa-surface-editor);
+  --color-surface-raised: var(--xa-surface-raised);
+  --color-surface-hover: var(--xa-surface-hover);
+  --color-surface-linehl: var(--xa-surface-linehl);
+  --color-rule: var(--xa-rule);
+  --color-rule-strong: var(--xa-rule-strong);
+  --color-selection: var(--xa-selection);
+  --color-selection-inactive: var(--xa-selection-inactive);
+  --color-ink: var(--xa-ink);
+  --color-ink-chat: var(--xa-ink-chat);
+  --color-ink-prose: var(--xa-ink-prose);
+  --color-ink-muted: var(--xa-ink-muted);
+  --color-ink-label: var(--xa-ink-label);
+  --color-ink-faint: var(--xa-ink-faint);
+  --color-brass: var(--xa-brass);
+  --color-brass-fill: var(--xa-brass-fill);
+  --color-on-brass: var(--xa-on-brass);
+  --color-success: var(--xa-success);
+  --color-success-deep: var(--xa-success-deep);
+  --color-on-success: var(--xa-on-success);
+  --color-danger: var(--xa-danger);
+}
+
+/* Tailwind has no zinc-250/350/450/550/650/750/850; the workspace used them,
+   so they rendered as nothing. Define them so the classes exist. */
+@theme {
+  --color-zinc-250: #dcdce0;
+  --color-zinc-350: #b4b4bb;
+  --color-zinc-450: #8a8a93;
+  --color-zinc-550: #5f5f68;
+  --color-zinc-650: #4a4a51;
+  --color-zinc-750: #333338;
+  --color-zinc-850: #1f1f23;
+}
+
+/* Workspace scrollbars: thin, transparent track, rule-strong thumb. */
+.xa-workspace * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--xa-rule-strong) transparent;
+}
+
+/* Inside the lesson workspace, the zinc greys follow the active theme.
+   Temporary bridge: later phases replace zinc-* classes with semantic tokens. */
+.xa-workspace {
+  --color-zinc-50: var(--xa-ink);
+  --color-zinc-100: var(--xa-ink);
+  --color-zinc-200: var(--xa-ink-chat);
+  --color-zinc-250: var(--xa-ink-chat);
+  --color-zinc-300: var(--xa-ink-prose);
+  --color-zinc-350: var(--xa-ink-prose);
+  --color-zinc-400: var(--xa-ink-muted);
+  --color-zinc-450: var(--xa-ink-muted);
+  --color-zinc-500: var(--xa-ink-label);
+  --color-zinc-550: var(--xa-ink-label);
+  --color-zinc-600: var(--xa-ink-faint);
+  --color-zinc-650: var(--xa-ink-faint);
+  --color-zinc-700: var(--xa-ink-faint);
+  --color-zinc-750: var(--xa-rule-strong);
+  --color-zinc-800: var(--xa-rule-strong);
+  --color-zinc-850: var(--xa-rule);
+  --color-zinc-900: var(--xa-surface-raised);
+  --color-zinc-950: var(--xa-surface-page);
+  background-color: var(--xa-surface-page);
+  color: var(--xa-ink);
+}
+
 html,
 body,
 #app {
@@ -230,9 +360,9 @@ code {
 .dark code,
 .prose-invert code,
 [class*="bg-zinc-"] code {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #30d158 !important;
+  background: var(--xa-surface-raised) !important;
+  border: 1px solid var(--xa-rule) !important;
+  color: var(--xa-brass) !important;
 }
 
 pre code {
@@ -264,7 +394,7 @@ pre code {
   background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
-  color: #e4e4e7 !important;
+  color: var(--xa-ink) !important;
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace !important;
   font-size: 11px !important;
   font-weight: 400 !important;
@@ -405,18 +535,18 @@ a {
   background: transparent;
 }
 .editorial-scroll::-webkit-scrollbar-thumb {
-  background: #1c1b1f;
+  background: var(--xa-rule);
   border-radius: 2px;
 }
 .editorial-scroll::-webkit-scrollbar-thumb:hover {
-  background: #c29a53;
+  background: var(--xa-brass);
 }
 
 .editorial-prose h1 {
   font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
   font-weight: 500 !important;
   font-size: 1.6rem !important;
-  color: #eaeaea !important;
+  color: var(--xa-ink) !important;
   letter-spacing: -0.02em !important;
   margin-bottom: 0.5em !important;
 }
@@ -424,28 +554,36 @@ a {
   font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
   font-size: 0.95rem !important;
   line-height: 1.75 !important;
-  color: #b5b3b9 !important;
+  color: var(--xa-ink-prose) !important;
   margin-bottom: 1.25em !important;
 }
 .editorial-prose li {
   font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
   font-size: 0.95rem !important;
   line-height: 1.7 !important;
-  color: #b5b3b9 !important;
+  color: var(--xa-ink-prose) !important;
   margin-bottom: 0.5em !important;
+}
+/* @tailwindcss/typography wraps inline code in literal backticks via
+   ::before/::after; problem text showed `name()` with the backticks. */
+.editorial-prose code::before,
+.editorial-prose code::after,
+.editorial-chat-container .prose code::before,
+.editorial-chat-container .prose code::after {
+  content: none !important;
 }
 .editorial-prose code {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 0.85em !important;
-  background: #121115 !important;
-  color: #c29a53 !important;
+  background: var(--xa-surface-raised) !important;
+  color: var(--xa-brass) !important;
   padding: 2px 6px !important;
   border-radius: 3px !important;
-  border: 1px solid #1c1b1f !important;
+  border: 1px solid var(--xa-rule) !important;
 }
 .editorial-prose pre {
-  background: #121115 !important;
-  border: 1px solid #1c1b1f !important;
+  background: var(--xa-surface-raised) !important;
+  border: 1px solid var(--xa-rule) !important;
   border-radius: 4px !important;
   padding: 1rem !important;
   margin: 1.25em 0 !important;
@@ -453,85 +591,15 @@ a {
 .editorial-prose pre code {
   background: transparent !important;
   border: none !important;
-  color: #eaeaea !important;
+  color: var(--xa-ink) !important;
   padding: 0 !important;
 }
-.editorial-prose span[class*="rounded-md"] {
-  font-family: 'Inter', sans-serif !important;
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-  color: #828087 !important;
-  font-size: 9px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-}
 
-/* Overriding components to match the editorial layout */
-.editorial-editor-container .flex.h-11 {
-  background-color: #0c0b0e !important;
-  border-bottom: 1px solid #1c1b1f !important;
-  font-family: 'Inter', sans-serif !important;
-}
-.editorial-editor-container button {
-  font-family: 'Inter', sans-serif !important;
-}
-.editorial-editor-container .bg-zinc-950\/80 {
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-}
-.editorial-editor-container .flex.h-11.items-center {
-  background-color: #09080b !important;
-  border-top: 1px solid #1c1b1f !important;
-}
-.editorial-editor-container button.bg-lagoon {
-  background-color: #c29a53 !important;
-  color: #0b0a0d !important;
-  border-radius: 2px !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 11px !important;
-  letter-spacing: 0.02em !important;
-  font-weight: 500 !important;
-}
-.editorial-editor-container button.bg-palm {
-  background-color: #4f8a65 !important;
-  color: #eaeaea !important;
-  border-radius: 2px !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 11px !important;
-  letter-spacing: 0.02em !important;
-  font-weight: 500 !important;
-  border: 1px solid #4f8a65 !important;
-}
-.editorial-editor-container button.bg-palm:hover {
-  background-color: #3f6e51 !important;
-}
-.editorial-editor-container button.bg-zinc-850\/60 {
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-  color: #eaeaea !important;
-  border-radius: 2px !important;
-}
-.editorial-editor-container button.bg-zinc-850\/60:hover {
-  background-color: #1c1b1f !important;
-  color: #c29a53 !important;
-}
-.editorial-editor-container button.bg-zinc-800\/40 {
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-  color: #eaeaea !important;
-  border-radius: 2px !important;
-}
-.editorial-editor-container button.bg-zinc-800\/40:hover {
-  background-color: #1c1b1f !important;
-}
-.editorial-editor-container .bg-zinc-900 {
-  background-color: #0c0b0e !important;
-  border-top: 1px solid #1c1b1f !important;
-}
+/* Monaco background follows the editor token (themes also set it). */
 .editorial-editor-container .monaco-editor,
 .editorial-editor-container .monaco-editor .margin,
 .editorial-editor-container .monaco-editor-background {
-  background-color: #0c0b0e !important;
+  background-color: var(--xa-surface-editor) !important;
 }
 
 /* Chat container styling */
@@ -542,24 +610,18 @@ a {
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
-.editorial-chat-container .flex.h-11.items-center.justify-between {
-  display: none !important;
-}
-.editorial-chat-container .bg-lagoon {
-  background-color: #c29a53 !important;
-  color: #0b0a0d !important;
-  border-radius: 4px !important;
-  border-top-right-radius: 0 !important;
-  font-family: 'Inter', sans-serif !important;
-}
-.editorial-chat-container .bg-zinc-800 {
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-  color: #bfbdc4 !important;
-  border-radius: 4px !important;
-  border-top-left-radius: 0 !important;
-}
 .editorial-chat-container .prose {
+  /* Typography-plugin colours follow the workspace theme. */
+  --tw-prose-body: var(--xa-ink-chat);
+  --tw-prose-headings: var(--xa-ink);
+  --tw-prose-bold: var(--xa-ink);
+  --tw-prose-links: var(--xa-brass);
+  --tw-prose-bullets: var(--xa-ink-label);
+  --tw-prose-counters: var(--xa-ink-label);
+  --tw-prose-quotes: var(--xa-ink-prose);
+  --tw-prose-quote-borders: var(--xa-rule-strong);
+  --tw-prose-hr: var(--xa-rule-strong);
+  --tw-prose-code: var(--xa-brass);
   font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
   font-size: 0.9rem !important;
   line-height: 1.6 !important;
@@ -567,25 +629,8 @@ a {
 .editorial-chat-container .prose code {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 0.85em !important;
-  background: #19181c !important;
-  color: #c29a53 !important;
+  background: var(--xa-surface-hover) !important;
+  color: var(--xa-brass) !important;
   padding: 2px 4px !important;
-  border-radius: 2px !important;
-}
-.editorial-chat-container form,
-.editorial-chat-container .border-t {
-  background-color: #09080b !important;
-  border-color: #1c1b1f !important;
-}
-.editorial-chat-container textarea,
-.editorial-chat-container input {
-  background-color: #121115 !important;
-  border-color: #1c1b1f !important;
-  color: #eaeaea !important;
-  border-radius: 2px !important;
-}
-.editorial-chat-container button[type="submit"] {
-  background-color: #c29a53 !important;
-  color: #0b0a0d !important;
   border-radius: 2px !important;
 }
