@@ -87,6 +87,8 @@ async def _record_code_execution(
         "lessonId": lesson_id,
         "passed": passed,
         "actionType": action,
+        # Convex only accepts results from this server, not the student's browser.
+        "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value(),
     }
     if action == "submit" and not passed and error_trace:
         mutation_args["errorTrace"] = error_trace

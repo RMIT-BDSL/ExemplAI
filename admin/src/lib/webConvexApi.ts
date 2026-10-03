@@ -63,7 +63,7 @@ export type PublicApiType = {
       "public",
       {
         lessonId: Id<"questions">;
-        status: "in-progress" | "completed" | "pending";
+        status: "in-progress";
         tokenIdentifier: string;
       },
       any

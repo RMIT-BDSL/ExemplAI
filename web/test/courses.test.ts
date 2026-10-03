@@ -7,6 +7,9 @@ import schema from "../convex/schema";
 // Tests live outside the `convex/` folder, so we hand it the glob explicitly.
 const modules = import.meta.glob("../convex/**/*.ts");
 
+// recordCodeExecution / addSystemMessage only accept the backend secret.
+process.env.CONVEX_BACKEND_SECRET = "secret";
+
 const setup = () => convexTest(schema, modules);
 
 async function createMockAdmin(t: ReturnType<typeof setup>) {
@@ -408,6 +411,7 @@ describe("recordCodeExecution", () => {
     const student = await createMockStudent(t);
 
     const result = await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId,
       passed: true,
       actionType: "run",
@@ -459,6 +463,7 @@ describe("recordCodeExecution", () => {
     // Python server would compute this; Convex only stores it.
     const serverMastery = 0.42;
     const first = await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId,
       passed: true,
       actionType: "submit",
@@ -478,6 +483,7 @@ describe("recordCodeExecution", () => {
     expect(masteryAfterFirst[0].prob_mastery).toBe(serverMastery);
 
     const second = await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId,
       passed: false,
       actionType: "submit",
@@ -513,6 +519,7 @@ describe("recordCodeExecution", () => {
     const student = await createMockStudent(t);
     const submit = (lessonId: (typeof lessonIds)[number], passed: boolean, probMastery: number, mastered: boolean) =>
       student.mutation(api.courses.recordCodeExecution, {
+        backendSecret: "secret",
         lessonId,
         passed,
         actionType: "submit",

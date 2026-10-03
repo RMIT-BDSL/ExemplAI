@@ -15,6 +15,9 @@ import { triggers } from "../convex/triggers";
 
 const modules = import.meta.glob(["../convex/**/*.ts", "!../convex/betterAuth/**"]);
 const authModules = import.meta.glob("../convex/betterAuth/**/*.ts");
+// recordCodeExecution / addSystemMessage only accept the backend secret.
+process.env.CONVEX_BACKEND_SECRET = "secret";
+
 const setup = () => {
   const t = convexTest(schema, modules);
   t.registerComponent("betterAuth", betterAuthSchema, authModules);
@@ -120,7 +123,6 @@ async function makeLessons(admin: Awaited<ReturnType<typeof signIn>>["as"], name
 
 describe("student summaries", () => {
   it("keeps per-student, cohort and chat summaries in step with writes", async () => {
-    process.env.CONVEX_BACKEND_SECRET = "secret";
     const t = setup();
     const { as: admin } = await signIn(t, "admin", "admin");
     const [a, b] = await makeLessons(admin, ["A", "B"]);
@@ -135,6 +137,7 @@ describe("student summaries", () => {
     await student.mutation(api.courses.setLessonStatus, { lessonId: a, status: "in-progress" });
     // Fails, then passes: submitted, not first try. Mastery going in was 0.2.
     await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId: a,
       passed: false,
       actionType: "submit",
@@ -142,9 +145,10 @@ describe("student summaries", () => {
       priorMastery: 0.2,
       knowledgeComponent: "loops",
     });
-    await student.mutation(api.courses.recordCodeExecution, { lessonId: a, passed: true, actionType: "submit" });
+    await student.mutation(api.courses.recordCodeExecution, { lessonId: a, passed: true, actionType: "submit", backendSecret: "secret" });
     // First-try pass with mastery 0.4 going in.
     await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
       lessonId: b,
       passed: true,
       actionType: "submit",
@@ -208,6 +212,58 @@ describe("student summaries", () => {
     // Making a student staff takes them out of the cohort.
     await t.run((ctx) => triggers.wrapDB(ctx).db.patch(userId, { role: "management" }));
     expect(await admin.query(api.students.studentSummary, {})).toMatchObject({ students: 1, active: 0, submitted: 0 });
+  });
+
+  it("only records code execution results sent with the backend secret", async () => {
+    const t = setup();
+    const { as: admin } = await signIn(t, "admin", "admin");
+    const [lessonId] = await makeLessons(admin, ["A"]);
+    const { userId, as: student } = await signIn(t, "ana", "student");
+
+    // A student calling directly with their own session can't forge a pass.
+    for (const backendSecret of ["", "guess"]) {
+      await expect(
+        student.mutation(api.courses.recordCodeExecution, {
+          lessonId,
+          passed: true,
+          actionType: "submit",
+          probMastery: 1,
+          priorMastery: 0.9,
+          knowledgeComponent: "loops",
+          mastered: true,
+          backendSecret,
+        }),
+      ).rejects.toThrow(/backend secret/);
+    }
+    const written = await t.run(async (ctx) => ({
+      progress: await ctx.db.query("lessonProgress").collect(),
+      mastery: await ctx.db.query("bktMastery").collect(),
+    }));
+    expect(written).toEqual({ progress: [], mastery: [] });
+
+    await student.mutation(api.courses.recordCodeExecution, { lessonId, passed: true, actionType: "submit", backendSecret: "secret" });
+    const progress = await t.run((ctx) => ctx.db.query("lessonProgress").collect());
+    expect(progress).toMatchObject([{ userId, lessonId, status: "completed" }]);
+  });
+
+  it("lets a student only mark a lesson in progress, never complete or clear it", async () => {
+    const t = setup();
+    const { as: admin } = await signIn(t, "admin", "admin");
+    const [lessonId] = await makeLessons(admin, ["A"]);
+    const { as: student } = await signIn(t, "ana", "student");
+
+    await student.mutation(api.courses.setLessonStatus, { lessonId, status: "in-progress" });
+    await student.mutation(api.courses.recordCodeExecution, { lessonId, passed: false, actionType: "submit", backendSecret: "secret" });
+    for (const status of ["completed", "pending"]) {
+      await expect(
+        // Bypasses the client types, as a hand-crafted call would.
+        student.mutation(api.courses.setLessonStatus, { lessonId, status } as never),
+      ).rejects.toThrow();
+    }
+    // The failed Submit survives, so a later pass can't count as first try.
+    expect(await t.run((ctx) => ctx.db.query("lessonProgress").collect())).toMatchObject([
+      { status: "in-progress", failed_submits: 1 },
+    ]);
   });
 
   it("backfills summaries for data written without triggers", async () => {
