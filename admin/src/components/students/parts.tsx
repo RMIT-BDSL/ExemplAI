@@ -528,6 +528,15 @@ export const ReplyMixPanel: Component<{ replies: ReplyCounts; scope: string }> =
   </figure>
 );
 
+// ── Example allowance ──────────────────────────────────────────────────
+
+/** Where the student stands on examples this round, in words. */
+export function exampleStatus(ex: { used: number; cap: number; remaining: number }): string {
+  if (ex.used >= ex.cap) return 'all used this round';
+  if (ex.remaining > 0) return `${ex.remaining} unlocked, not yet asked for`;
+  return ex.used === 0 ? 'first unlocks on a failed Submit' : 'next unlocks on a failed Submit';
+}
+
 // ── Misc ───────────────────────────────────────────────────────────────
 
 export const LiveDot: Component<{ ok: boolean }> = (props) => (

@@ -14,6 +14,7 @@ import {
   ago,
   createLiveQuery,
   displayName,
+  exampleStatus,
   fullDate,
   pct,
   servingMode,
@@ -164,7 +165,10 @@ const NowPanel: Component<{ current: LessonSnapshot | null; tutor: TutorGroup | 
               when={serving().kind !== 'control'}
               fallback={<span class="text-muted">None: the normal tutor doesn't give worked examples</span>}
             >
-              <span class="font-mono tabular-nums">{c().examples.used} of {c().examples.cap} used · {c().examples.remaining} available</span>
+              <span>
+                <span class="font-mono tabular-nums">{c().examples.used} of {c().examples.cap} used</span>
+                <span class="text-muted"> · {exampleStatus(c().examples)}</span>
+              </span>
             </Show>
           </Row>
           <Row label="Last reply">

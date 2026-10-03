@@ -23,6 +23,7 @@ import {
   createLiveQuery,
   createPaginatedLiveQuery,
   displayName,
+  exampleStatus,
   fullDate,
   pct,
   servingMode,
@@ -129,8 +130,8 @@ const columns: ColumnDef<StudentRow>[] = [
             when={servingOf(s)?.kind !== 'control'}
             fallback={<span class="text-muted" title="The normal tutor doesn't give worked examples">none · normal tutor</span>}
           >
-            <span class="font-mono text-[12px] tabular-nums">{c!.examples.used} of {c!.examples.cap}</span>
-            <p class="font-mono text-[11px] text-muted">{c!.examples.remaining} available</p>
+            <span class="font-mono text-[12px] tabular-nums">{c!.examples.used} of {c!.examples.cap} used</span>
+            <p class="text-[11px] text-muted">{exampleStatus(c!.examples)}</p>
           </Show>
         </Show>
       );
@@ -457,7 +458,7 @@ const Definitions: Component = () => (
       </div>
       <div>
         <dt class="text-ink font-medium">Examples</dt>
-        <dd>Given this round of the current lesson, out of 3. "Available" are earned by failed Submits but not yet asked for.</dd>
+        <dd>Examples used this round of the current lesson, out of 3. Each failed Submit unlocks one more; the second line says whether one is waiting to be asked for or the student needs to fail a Submit first.</dd>
       </div>
       <div>
         <dt class="text-ink font-medium">Tutor</dt>
