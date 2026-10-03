@@ -1205,33 +1205,35 @@ const exemplaiProblems: SeedProblem[] = [
   },
 ];
 
+// Upsert: creates the course if needed, inserts lessons missing from it and
+// overwrites the content of existing ones (matched by problem_name) so their
+// ids, and any progress pointing at them, are kept.
 export const seedQuestions = internalMutation({
   args: {},
   handler: async (ctx) => {
     const existing = await ctx.db.query("course").collect();
-    const match = existing.find((c) => c.course_name === COURSE_NAME);
-    if (match) {
-      return {
-        success: true,
-        skipped: true,
-        courseId: match._id,
-        insertedCount: 0,
-      };
-    }
+    const courseId =
+      existing.find((c) => c.course_name === COURSE_NAME)?._id ??
+      (await ctx.db.insert("course", {
+        course_name: COURSE_NAME,
+        course_language: "Python",
+      }));
 
-    const courseId = await ctx.db.insert("course", {
-      course_name: COURSE_NAME,
-      course_language: "Python",
-    });
+    const current = await ctx.db
+      .query("questions")
+      .withIndex("by_course", (q) => q.eq("course", courseId))
+      .collect();
+    const byName = new Map(current.map((q) => [q.problem_name, q._id]));
 
     let insertedCount = 0;
+    let updatedCount = 0;
     for (const problem of [
       ...csedmProblems,
       ...csedm2Problems,
       ...csedmUnseededProblems,
       ...exemplaiProblems,
     ]) {
-      await ctx.db.insert("questions", {
+      const fields = {
         week: problem.week,
         course: courseId,
         problem_name: problem.problem_name,
@@ -1242,15 +1244,50 @@ export const seedQuestions = internalMutation({
         starter_code: problem.starter_code,
         solution_code: problem.solution_code,
         testCases: problem.testCases,
-      });
-      insertedCount++;
+      };
+      const id = byName.get(problem.problem_name);
+      if (id) {
+        await ctx.db.patch(id, fields);
+        updatedCount++;
+      } else {
+        await ctx.db.insert("questions", fields);
+        insertedCount++;
+      }
     }
 
-    return {
-      success: true,
-      skipped: false,
-      courseId,
-      insertedCount,
-    };
+    return { success: true, courseId, insertedCount, updatedCount };
+  },
+});
+
+// Wipes every course, lesson and per-lesson activity row (progress, BKT
+// mastery, chats, messages). Users, profiles, invitation codes, auth tables
+// and release notes are kept; users only lose their last_opened_lesson
+// pointer, which would otherwise dangle.
+export const resetCourseData = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const deleted: Record<string, number> = {};
+    for (const table of [
+      "chatMessages",
+      "chats",
+      "lessonProgress",
+      "bktMastery",
+      "questions",
+      "course",
+    ] as const) {
+      const rows = await ctx.db.query(table).collect();
+      for (const row of rows) await ctx.db.delete(row._id);
+      deleted[table] = rows.length;
+    }
+
+    let usersCleared = 0;
+    for (const user of await ctx.db.query("users").collect()) {
+      if (user.last_opened_lesson !== undefined) {
+        await ctx.db.patch(user._id, { last_opened_lesson: undefined });
+        usersCleared++;
+      }
+    }
+
+    return { deleted, usersCleared };
   },
 });
