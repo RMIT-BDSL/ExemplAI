@@ -1,13 +1,14 @@
 name: Automated Release
 
 on:
-  push:
-    branches:
-      - main # Triggers when code is merged into main
+  # Run manually (Actions -> Automated Release -> Run workflow) when main is
+  # ready to ship; a successful run triggers the production deploys.
+  workflow_dispatch:
 
 jobs:
   release:
     name: Generate Changelog & Release
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write # Crucial: Allows the bot to push changes and create releases

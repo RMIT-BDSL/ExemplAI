@@ -107,7 +107,11 @@ The web and admin apps deploy to Cloudflare Workers through GitHub Actions:
 |---|---|
 | Pull request to `main` / `dev` | Preview |
 | Push to `dev` | Development |
-| Merge to `main` (after the automated release) | Production |
+| Manual release from `main` | Production |
+
+Merging to `main` does not deploy. To ship, run **Actions → Automated Release → Run workflow**
+on `main`: it bumps the version from the commit messages, updates `CHANGELOG.md`, publishes a
+GitHub release, and then deploys the web and admin apps to production.
 
 ### Supabase Keep-Alive
 
