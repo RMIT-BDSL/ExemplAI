@@ -3,23 +3,24 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { BookOpen, ChevronRight, TerminalSquare } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import CodingBar from "#/components/student/InteractionBar";
+import { useTheme } from "next-themes";
+import { cn } from "#/lib/utils.ts";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
-import type { ScratchpadHandle } from "#/components/student/Scratchpad";
 
 // Heavy, non-LCP subtrees — kept out of the initial route chunk.
 // Monaco (via CodeEditor) alone is several hundred KB of JS.
 const CodeEditor = lazy(() => import("#/components/student/CodeEditor"));
-const Scratchpad = lazy(() => import("#/components/student/Scratchpad"));
 const SidePanel = lazy(() => import("#/components/student/SidePane"));
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
+import { formatCall, type LastSubmit } from "#/components/student/problem/Problem";
+import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
+import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
@@ -44,6 +45,63 @@ export const Route = createFileRoute("/_authenticated/course")({
   },
 });
 
+// Monaco themes built from the workspace tokens (styles.css --xa-*).
+// Monaco needs literal hex values, so keep these in step with the tokens.
+const EDITOR_THEMES = {
+  exemplaiLight: {
+    base: "vs",
+    inherit: true,
+    rules: [
+      { token: "comment", foreground: "8a8580", fontStyle: "italic" },
+      { token: "keyword", foreground: "8a6420", fontStyle: "bold" },
+      { token: "string", foreground: "3c6f50" },
+      { token: "number", foreground: "8a6420" },
+      { token: "operator", foreground: "5f5b64" },
+    ],
+    colors: {
+      "editor.background": "#fbf9f4",
+      "editor.foreground": "#1c1b1f",
+      "editorLineNumber.foreground": "#a39d93",
+      "editorLineNumber.activeForeground": "#8a6420",
+      "editor.lineHighlightBackground": "#f0e7d4",
+      "editor.lineHighlightBorder": "#00000000",
+      "editorGutter.background": "#fbf9f4",
+      "editorCursor.foreground": "#8a6420",
+      "editor.selectionBackground": "#e9dcc0",
+      "editor.inactiveSelectionBackground": "#f0e7d4",
+    },
+  },
+  exemplaiDark: {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "comment", foreground: "6e6d73", fontStyle: "italic" },
+      { token: "keyword", foreground: "c29a53", fontStyle: "bold" },
+      { token: "string", foreground: "769480" },
+      { token: "number", foreground: "b89053" },
+      { token: "operator", foreground: "9f9da4" },
+    ],
+    colors: {
+      "editor.background": "#141318",
+      "editor.foreground": "#eaeaea",
+      "editorLineNumber.foreground": "#4f4d54",
+      "editorLineNumber.activeForeground": "#c29a53",
+      "editor.lineHighlightBackground": "#1e1d24",
+      "editor.lineHighlightBorder": "#00000000",
+      "editorGutter.background": "#141318",
+      "editorCursor.foreground": "#c29a53",
+      "editor.selectionBackground": "#282630",
+      "editor.inactiveSelectionBackground": "#1e1d24",
+    },
+  },
+} as const;
+
+function defineEditorThemes(monaco: any) {
+  for (const [name, theme] of Object.entries(EDITOR_THEMES)) {
+    monaco.editor.defineTheme(name, theme);
+  }
+}
+
 const CODE_TEMPLATES = {
   python: `def main():\n    # Write your Python code here\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()`,
 };
@@ -51,6 +109,8 @@ const CODE_TEMPLATES = {
 function Course() {
   const editorRef = useRef<any>(null);
   const posthog = usePostHog();
+  const { resolvedTheme } = useTheme();
+  const editorTheme = resolvedTheme === "dark" ? "exemplaiDark" : "exemplaiLight";
   const url = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
   const { problemId } = Route.useSearch();
@@ -74,20 +134,29 @@ function Course() {
     )
   );
 
-  const [language, setLanguage] = useState<string>("python");
-  const [fontSize, setFontSize] = useState<number>(14);
+  // Python is the only course language; the editor font size is fixed.
+  const language = "python";
+  const fontSize = 14;
   const [codeTemplates, setCodeTemplates] = useState(CODE_TEMPLATES);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [executionResult, setExecutionResult] = useState<any>(null);
+  // Console log of Runs (and Submits that hit a code error); per lesson, per session.
+  const [runs, setRuns] = useState<ConsoleRun[]>([]);
+  const runIdRef = useRef(0);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  const [isProblemCollapsed, setIsProblemCollapsed] = useState<boolean>(false);
-  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(true);
+  // Latest Submit in this session, shown in the Description column. Tagged with
+  // its lesson so a new lesson never shows the previous one's result, even for a frame.
+  const [submitRecord, setSubmitRecord] = useState<(LastSubmit & { lessonId: string }) | undefined>(
+    undefined,
+  );
+  // The tutor is pinned open on wide screens. Below 1100px it collapses to a
+  // rail; isTutorOpen then shows it as an overlay (×, Esc or click outside closes).
+  const [isTutorOpen, setIsTutorOpen] = useState<boolean>(false);
+  const tutorRef = useRef<HTMLDivElement | null>(null);
+  const tutorRailRef = useRef<HTMLButtonElement | null>(null);
   const [isIndexOpen, setIsIndexOpen] = useState<boolean>(false);
 
-  const [isScratchpadVisible, setIsScratchpadVisible] = useState<boolean>(false);
-  const scratchpadRef = useRef<ScratchpadHandle | null>(null);
 
   const activeQuestion = problemId
     ? fetchedQuestion
@@ -97,18 +166,22 @@ function Course() {
         ? questions[0]
         : null;
 
-  const [isSaved, setIsSaved] = useState<boolean>(true);
-
-  useEffect(() => {
-    document.body.classList.add("dark");
-    return () => {
-      document.body.classList.remove("dark");
-    };
-  }, []);
+  // Autosave (no indicator): edits are written to localStorage shortly after
+  // typing stops, and flushed on lesson change, unmount and page hide.
+  const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function flushSave() {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+    const pending = pendingSaveRef.current;
+    if (pending) localStorage.setItem(pending.key, pending.code);
+    pendingSaveRef.current = null;
+  }
 
   const activeQuestionId = activeQuestion?._id;
   const activeProgress = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId);
-  const isCompleted = activeProgress?.status === "completed";
+  const lastSubmit =
+    submitRecord && submitRecord.lessonId === activeQuestionId ? submitRecord : undefined;
   // Failed Submits on this lesson; the first unlocks Get help in the chat.
   const failedSubmits: number = activeProgress?.failed_submits ?? 0;
 
@@ -125,10 +198,16 @@ function Course() {
           to: "/course",
           search: { problemId: nextQuestion._id },
         });
-        setExecutionResult(null);
         setIsConsoleOpen(false);
       }
     : undefined;
+
+  // Submit results are per lesson and per session.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset whenever the lesson changes
+  useEffect(() => {
+    setSubmitRecord(undefined);
+    setRuns([]);
+  }, [activeQuestionId]);
 
   useEffect(() => {
     if (tokenIdentifier && activeQuestionId) {
@@ -154,16 +233,15 @@ function Course() {
         if (editorRef.current) {
           editorRef.current.setValue(savedCode);
         }
-        setIsSaved(true);
       } else if (activeQuestion.starter_code) {
+        const starter = activeQuestion.starter_code;
         setCodeTemplates((prev) => ({
           ...prev,
-          [language]: activeQuestion.starter_code,
+          [language]: starter,
         }));
         if (editorRef.current) {
-          editorRef.current.setValue(activeQuestion.starter_code);
+          editorRef.current.setValue(starter);
         }
-        setIsSaved(true);
       } else {
         const defaultCode = CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
         setCodeTemplates((prev) => ({
@@ -173,25 +251,46 @@ function Course() {
         if (editorRef.current) {
           editorRef.current.setValue(defaultCode);
         }
-        setIsSaved(true);
       }
     }
   }, [activeQuestionId, language, problemId]);
 
+  // Crossing the 1100px breakpoint resets the overlay (pinned ⇄ rail).
   useEffect(() => {
-    if (!problemId) return;
+    const narrow = window.matchMedia("(max-width: 1099px)");
+    const reset = () => setIsTutorOpen(false);
+    narrow.addEventListener("change", reset);
+    return () => narrow.removeEventListener("change", reset);
+  }, []);
 
-    const interval = setInterval(() => {
-      if (!isSaved && editorRef.current) {
-        const currentVal = editorRef.current.getValue();
-        const storageKey = `exemplai_code_${problemId}_${language}`;
-        localStorage.setItem(storageKey, currentVal);
-        setIsSaved(true);
-      }
-    }, 5000);
+  useEffect(() => {
+    if (!isTutorOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsTutorOpen(false);
+    };
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (tutorRef.current?.contains(target) || tutorRailRef.current?.contains(target)) return;
+      // Leave dialogs (reset confirm, account menu) alone.
+      if ((target as Element).closest?.("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      setIsTutorOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [isTutorOpen]);
 
-    return () => clearInterval(interval);
-  }, [problemId, language, isSaved]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: flushSave only touches refs
+  useEffect(() => {
+    window.addEventListener("pagehide", flushSave);
+    return () => {
+      window.removeEventListener("pagehide", flushSave);
+      flushSave();
+    };
+  }, [problemId]);
 
   if (activeQuestion === undefined) {
     return <LessonSkeleton />;
@@ -199,48 +298,29 @@ function Course() {
 
   if (activeQuestion === null) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-400">
+      <div className="xa-workspace flex h-dvh w-screen items-center justify-center bg-surface-page text-ink-label">
         No questions found.
       </div>
     );
   }
 
+  // The example is the first visible test case (hidden tests are never shown).
+  const exampleIndex = (activeQuestion.testCases ?? []).findIndex((tc: any) => !tc.hidden);
+  const firstTest = exampleIndex >= 0 ? activeQuestion.testCases?.[exampleIndex] : undefined;
   const mappedProblem = {
     id: activeQuestion._id,
     title: activeQuestion.problem_name,
     description: activeQuestion.problem_description,
-    detail: activeQuestion.detail,
-    tags: ["Python"],
+    // The function students write: from the starter code, else the lesson name.
+    functionName:
+      /def\s+(\w+)\s*\(/.exec(activeQuestion.starter_code ?? "")?.[1] ?? activeQuestion.problem_name,
+    example: firstTest
+      ? { input: firstTest.input, expectedOutput: firstTest.expectedOutput }
+      : undefined,
   };
 
-  function handleEditorMount(editor: any, monaco: any) {
+  function handleEditorMount(editor: any) {
     editorRef.current = editor;
-
-    // Define an elegant editorial-style theme matching "Academic Nocturne"
-    monaco.editor.defineTheme("academicNocturne", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "comment", foreground: "6e6d73", fontStyle: "italic" },
-        { token: "keyword", foreground: "c29a53", fontStyle: "bold" },
-        { token: "string", foreground: "769480" },
-        { token: "number", foreground: "b89053" },
-        { token: "operator", foreground: "9f9da4" },
-      ],
-      colors: {
-        "editor.background": "#0c0b0e",
-        "editor.foreground": "#eaeaea",
-        "editorLineNumber.foreground": "#4f4d54",
-        "editorLineNumber.activeForeground": "#c29a53",
-        "editor.lineHighlightBackground": "#131217",
-        "editor.lineHighlightBorder": "#00000000",
-        "editorGutter.background": "#0c0b0e",
-        "editorCursor.foreground": "#c29a53",
-        "editor.selectionBackground": "#282630",
-        "editor.inactiveSelectionBackground": "#1e1d24",
-      },
-    });
-    monaco.editor.setTheme("academicNocturne");
   }
 
   function handleCodeChange(value: string | undefined) {
@@ -249,18 +329,13 @@ function Course() {
         ...prev,
         [language]: value,
       }));
-      setIsSaved(false);
+      if (problemId) {
+        pendingSaveRef.current = { key: `exemplai_code_${problemId}_${language}`, code: value };
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(flushSave, 800);
+      }
     }
   }
-
-  const handleSave = () => {
-    if (!problemId || !editorRef.current) return;
-    const currentVal = editorRef.current.getValue();
-    const storageKey = `exemplai_code_${problemId}_${language}`;
-    localStorage.setItem(storageKey, currentVal);
-    setIsSaved(true);
-    toast.success("Progress saved locally.");
-  };
 
   function handleReset() {
     posthog.capture("code_reset", { problem_id: problemId, language });
@@ -273,39 +348,27 @@ function Course() {
     if (editorRef.current) {
       editorRef.current.setValue(defaultCode);
     }
-    setIsSaved(false);
+  }
+
+  function addRun(entry: Omit<ConsoleRun, "id" | "at">) {
+    runIdRef.current += 1;
+    setRuns((prev) => [...prev, { ...entry, id: runIdRef.current, at: new Date() }]);
   }
 
   async function handleExecute(actionType: "run" | "submit") {
     if (!editorRef.current) return;
+    const isRun = actionType === "run";
 
-    if (actionType === "run") {
+    if (isRun) {
       setIsRunning(true);
+      // Run always shows its output.
+      setIsConsoleOpen(true);
     } else {
       setIsSubmitting(true);
     }
 
-    setExecutionResult(null);
-    setIsConsoleOpen(true);
-
-    const submissionCode = editorRef.current.getValue();
-
-    const LANGUAGE_IDS = {
-      python: 71,
-      javascript: 63,
-      typescript: 74,
-      cpp: 54,
-      java: 62,
-      go: 60,
-      rust: 73,
-      sql: 82,
-    };
-    const activeLang = language.toLowerCase();
-    const languageId = LANGUAGE_IDS[activeLang as keyof typeof LANGUAGE_IDS] || 71;
-
-    const allTestCases = activeQuestion?.testCases || [];
-    const testCasesToRun =
-      actionType === "run" ? allTestCases.filter((tc: any) => !tc.hidden) : allTestCases;
+    const submissionCode: string = editorRef.current.getValue();
+    const example = firstTest;
 
     try {
       const { default: axios } = await import("axios");
@@ -316,36 +379,77 @@ function Course() {
         `${url}/execute`,
         {
           code: submissionCode,
-          language_id: languageId,
+          language_id: 71, // Python 3 (Judge0)
           starter_code: activeQuestion?.starter_code,
           solution_code: activeQuestion?.solution_code,
-          test_cases: testCasesToRun,
+          // Run calls the function once on the Description's example; Submit grades every test.
+          test_cases: isRun ? (example ? [example] : []) : activeQuestion?.testCases || [],
           lesson_id: activeQuestionId ?? undefined,
           action_type: actionType,
         },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        },
       );
-      setExecutionResult(response.data);
-      const succeeded = !response.data?.error;
-      // A failed Submit unlocks Get help, so bring the chat into view.
-      if (actionType === "submit" && !succeeded) {
-        setIsChatCollapsed(false);
+      const data = response.data;
+      const succeeded = !data?.error;
+
+      if (isRun) {
+        const stderr: string = data?.stderr ?? "";
+        addRun({
+          kind: "run",
+          timeMs: data?.time_ms ?? null,
+          call: example ? formatCall(mappedProblem.functionName, example.input) : undefined,
+          returnValue: data?.return_value ?? null,
+          stdout: data?.stdout ?? "",
+          stderr,
+          inputNote: /EOFError/.test(stderr) && /\binput\s*\(/.test(submissionCode),
+        });
+      } else {
+        const results: any[] = data?.test_results ?? [];
+        // test_results follow the order of the test cases sent.
+        const first = exampleIndex >= 0 ? results[exampleIndex] : undefined;
+        setSubmitRecord({
+          lessonId: activeQuestion?._id ?? "",
+          passed: results.filter((r) => r.passed).length,
+          total: results.length,
+          example:
+            first && !first.hidden
+              ? { passed: !!first.passed, stdout: first.stdout ?? "", stderr: first.stderr ?? "" }
+              : undefined,
+        });
+        // Submit results live in the Description; the console opens only when
+        // the code itself failed (syntax or runtime error), to show the trace.
+        const codeError =
+          data?.status?.id === 6
+            ? data?.stderr
+            : results.find((r) => !r.hidden && r.stderr)?.stderr;
+        if (codeError) {
+          addRun({ kind: "submit", stdout: "", stderr: codeError, inputNote: false });
+          setIsConsoleOpen(true);
+        }
+        // A failed Submit unlocks Get help: on narrow screens, bring the tutor into view.
+        if (!succeeded && window.matchMedia("(max-width: 1099px)").matches) {
+          setIsTutorOpen(true);
+        }
       }
-      posthog.capture(actionType === "run" ? "code_run" : "code_submitted", {
+      posthog.capture(isRun ? "code_run" : "code_submitted", {
         problem_id: problemId,
         language,
         success: succeeded,
       });
     } catch (error: any) {
       posthog.captureException(error);
-
-      setExecutionResult({
-        error: true,
-        message: error.message || "Execution failed",
-        stderr: error.response?.data?.detail || error.response?.data?.message || error.message,
+      addRun({
+        kind: "error",
+        stdout: "",
+        stderr:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          `Couldn't reach the code runner (${error.message || "request failed"}). Try again in a moment.`,
+        inputNote: false,
       });
+      setIsConsoleOpen(true);
     } finally {
       setIsRunning(false);
       setIsSubmitting(false);
@@ -353,14 +457,9 @@ function Course() {
   }
 
   const currentCode = codeTemplates[language as keyof typeof codeTemplates] || "";
+  const passedThisSession =
+    !!lastSubmit && lastSubmit.total > 0 && lastSubmit.passed === lastSubmit.total;
 
-  function handleOpenScratchpad(code: string, snippetLanguage?: string) {
-    setIsScratchpadVisible(true);
-    // Defer so the Scratchpad mounts before we try to preload it.
-    setTimeout(() => {
-      scratchpadRef.current?.openWith(code, snippetLanguage);
-    }, 0);
-  }
 
   function handleExampleRequested(trigger: "get_help" | "new_example", examplesUsed: number) {
     posthog.capture(trigger === "get_help" ? "get_help_clicked" : "new_example_clicked", {
@@ -373,30 +472,21 @@ function Course() {
   // Navigation is handled by the <Link> in LessonIndex; this just resets
   // the transient run state so the console doesn't carry over between lessons.
   function handleSelectLesson(_id: string) {
-    setExecutionResult(null);
     setIsConsoleOpen(false);
   }
 
   return (
-      <div className="dark flex h-[calc(100vh-48px)] w-full flex-col bg-[#0b0a0d] text-zinc-100 antialiased overflow-hidden">
-        {/* Running Header */}
-        <div className="flex h-9 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0 font-sans text-[10px] uppercase tracking-[0.15em] text-zinc-500 select-none">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-zinc-400">ExemplAI</span>
-            <span>·</span>
-            <span>Course Reader</span>
-          </div>
-          <div className="font-serif italic text-zinc-400 font-normal normal-case">
-            {activeQuestion?.problem_name}
-          </div>
-          <div>
-            <span>Lesson {currentIndex + 1}</span>
-          </div>
-        </div>
+      <div className="xa-workspace flex h-dvh w-full flex-col bg-surface-page text-ink antialiased overflow-hidden">
+        <StatusBar
+          week={activeQuestion?.week}
+          topic={activeQuestion?.topic}
+          isIndexOpen={isIndexOpen}
+          onOpenIndex={() => setIsIndexOpen(true)}
+        />
 
         {/* Workspace Spread Container */}
-        <div className="relative flex flex-1 flex-row overflow-hidden w-full bg-[#0b0a0d]">
-          {/* Index of Lessons Sidebar */}
+        <div className="relative flex flex-1 flex-row overflow-hidden w-full bg-surface-page">
+          {/* Lesson index drawer (opened from the status bar) */}
           <LessonIndex
             isIndexOpen={isIndexOpen}
             setIsIndexOpen={setIsIndexOpen}
@@ -408,79 +498,40 @@ function Course() {
 
           {/* Description (Problem Panel) */}
           <LessonExposition
-            isProblemCollapsed={isProblemCollapsed}
-            setIsProblemCollapsed={setIsProblemCollapsed}
             mappedProblem={mappedProblem}
+            lastSubmit={lastSubmit}
           />
 
           {/* Editor Panel */}
-          <div className="flex flex-1 flex-col overflow-hidden bg-[#0c0b0e] editorial-editor-container">
-            <div className="flex h-10 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0">
-              <div className="flex items-center gap-2 text-[10px] font-semibold text-[#c29a53] uppercase tracking-[0.15em]">
-                <span>Editor</span>
-              </div>
-              <div className="flex items-center gap-4">
+          <div className="flex flex-1 flex-col overflow-hidden bg-surface-editor editorial-editor-container">
+            <div className="flex h-10 flex-shrink-0 items-center justify-between border-b border-rule-strong bg-surface-void px-6">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">
+                Editor
+              </span>
+              <div className="-mr-1 flex items-center">
                 <button
                   type="button"
-                  onClick={() => setIsScratchpadVisible(!isScratchpadVisible)}
-                  className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
-                  title="Toggle scratchpad"
+                  onClick={() => setShowResetModal(true)}
+                  aria-label="Reset to starter code"
+                  title="Reset to starter code"
+                  className="grid size-6 place-items-center rounded-[2px] text-ink-label hover:text-brass transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
                 >
-                  <TerminalSquare className="size-3" />
-                  <span>{isScratchpadVisible ? "Show Editor" : "Scratchpad"}</span>
+                  <RotateCcw className="size-3.5" />
                 </button>
-                {isProblemCollapsed && (
-                  <button
-                    type="button"
-                    onClick={() => setIsProblemCollapsed(false)}
-                    className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
-                  >
-                    <BookOpen className="size-3" />
-                    <span>Show Description</span>
-                  </button>
-                )}
-                {isChatCollapsed && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      posthog.capture("ai_chat_opened", { problem_id: problemId });
-                      setIsChatCollapsed(false);
-                    }}
-                    className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-zinc-400 hover:text-[#c29a53] transition-colors cursor-pointer"
-                  >
-                    <span>Show Chat</span>
-                  </button>
-                )}
               </div>
             </div>
-
-            <CodingBar
-              language={language}
-              setLanguage={setLanguage}
-              fontSize={fontSize}
-              setFontSize={setFontSize}
-              onResetClick={() => setShowResetModal(true)}
-              isProblemCollapsed={isProblemCollapsed}
-              setIsProblemCollapsed={setIsProblemCollapsed}
-              isChatCollapsed={isChatCollapsed}
-              setIsChatCollapsed={(collapsed) => {
-                if (!collapsed) posthog.capture("ai_chat_opened", { problem_id: problemId });
-                setIsChatCollapsed(collapsed);
-              }}
-            />
 
             <div className="flex flex-1 flex-col overflow-hidden relative">
               <Suspense
                 fallback={
-                  <div className="flex flex-1 items-center justify-center bg-[#0c0b0e] text-[10px] uppercase tracking-[0.15em] text-zinc-600">
+                  <div className="flex flex-1 items-center justify-center bg-surface-editor text-[10px] uppercase tracking-[0.15em] text-ink-label">
                     Loading editor…
                   </div>
                 }
               >
-              {isScratchpadVisible ? (
-                <Scratchpad ref={scratchpadRef} />
-              ) : (
                 <CodeEditor
+                  beforeMount={defineEditorThemes}
+                  theme={editorTheme}
                   onMount={handleEditorMount}
                   language={language}
                   value={currentCode}
@@ -488,72 +539,78 @@ function Course() {
                   fontSize={fontSize}
                   isRunning={isRunning}
                   isSubmitting={isSubmitting}
-                  executionResult={executionResult}
+                  runs={runs}
+                  onClearRuns={() => setRuns([])}
                   isConsoleOpen={isConsoleOpen}
                   setIsConsoleOpen={setIsConsoleOpen}
                   onRun={() => handleExecute("run")}
                   onSubmit={() => handleExecute("submit")}
-                  isSaved={isSaved}
-                  onSave={handleSave}
-                  testCases={activeQuestion?.testCases || []}
-                  isCompleted={isCompleted}
-                  onNextLesson={handleNextLesson}
+                  // After a passing Submit (this session), Submit becomes "Next lesson".
+                  onNextLesson={passedThisSession ? handleNextLesson : undefined}
                 />
-              )}
               </Suspense>
             </div>
           </div>
 
-          {/* AI Chat Assistant Panel */}
-          {!isChatCollapsed && (
-            <div className="flex flex-col border-l border-zinc-800 bg-[#0c0b0e] text-zinc-100 flex-shrink-0 z-30 lg:relative lg:w-[340px] xl:w-[440px] lg:right-0 lg:top-0 lg:bottom-0 absolute right-0 top-0 bottom-0 w-[calc(100vw-20px)] md:w-[360px] transition-all duration-200">
-              <div className="flex h-10 items-center justify-between border-b border-zinc-800 bg-[#09080b] px-4 flex-shrink-0">
-                <div className="flex items-center gap-2 text-[10px] font-semibold text-[#c29a53] uppercase tracking-[0.15em]">
-                  <span>AI Assistant</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsChatCollapsed(true)}
-                  className="rounded-md p-1 text-zinc-500 hover:text-zinc-100 transition-colors cursor-pointer"
-                  title="Collapse Chat"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
-              <div className="flex-1 min-h-0 editorial-chat-container">
-                <Suspense
-                  fallback={
-                    <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-[0.15em] text-zinc-600">
-                      Loading assistant…
-                    </div>
-                  }
-                >
-                  <SidePanel
-                    onCollapse={() => setIsChatCollapsed(true)}
-                    editorRef={editorRef}
-                    currentCode={currentCode}
-                    lessonId={activeQuestionId}
-                    onOpenScratchpad={handleOpenScratchpad}
-                    onExampleRequested={handleExampleRequested}
-                  />
-                </Suspense>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Running Foot */}
-        <div className="flex h-8 items-center justify-between border-t border-zinc-800 bg-[#09080b] px-4 text-[10px] uppercase tracking-[0.15em] text-zinc-500 font-sans select-none flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[#c29a53] font-semibold">ExemplAI</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className={isCompleted ? 'text-[#4f8a65]' : 'text-zinc-400'}>
-              {isCompleted ? '❖ Completed' : '✦ In Progress'}
+          {/* Tutor rail (below 1100px): opens the tutor as an overlay */}
+          <button
+            ref={tutorRailRef}
+            type="button"
+            onClick={() => {
+              posthog.capture("ai_chat_opened", { problem_id: problemId });
+              setIsTutorOpen(true);
+            }}
+            aria-label="Open tutor"
+            aria-expanded={isTutorOpen}
+            aria-controls="tutor-panel"
+            className="flex w-9 flex-shrink-0 flex-col items-center gap-3.5 border-l border-rule-strong bg-surface-panel pt-4 text-brass hover:bg-surface-raised transition-colors cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brass min-[1100px]:hidden"
+          >
+            <span aria-hidden="true">◈</span>
+            <span
+              className="text-[9px] font-semibold uppercase tracking-[0.2em]"
+              style={{ writingMode: "vertical-rl" }}
+            >
+              Tutor
             </span>
-          </div>
-          <div>
-            <span>Problem {currentIndex + 1} of {questions?.length || 1}</span>
+          </button>
+
+          {/* Tutor panel: pinned at ≥1100px (no hide control), overlay below */}
+          <div
+            ref={tutorRef}
+            id="tutor-panel"
+            className={cn(
+              "absolute inset-y-0 right-0 z-40 w-[min(400px,calc(100%-48px))] flex-col border-l border-rule-strong bg-surface-panel text-ink",
+              "min-[1100px]:relative min-[1100px]:inset-auto min-[1100px]:z-auto min-[1100px]:flex min-[1100px]:w-[340px] min-[1100px]:flex-shrink-0 xl:w-[400px]",
+              isTutorOpen ? "flex" : "hidden",
+            )}
+          >
+            <div className="flex h-10 flex-shrink-0 items-center justify-between border-b border-rule-strong bg-surface-void px-6">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">Tutor</span>
+              <button
+                type="button"
+                onClick={() => setIsTutorOpen(false)}
+                aria-label="Close tutor"
+                className="-mr-1 grid size-6 place-items-center rounded-[2px] text-ink-label hover:text-brass transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-brass min-[1100px]:hidden"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 editorial-chat-container">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-[0.15em] text-ink-label">
+                    Loading tutor…
+                  </div>
+                }
+              >
+                <SidePanel
+                  editorRef={editorRef}
+                  currentCode={currentCode}
+                  lessonId={activeQuestionId}
+                  onExampleRequested={handleExampleRequested}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
 
