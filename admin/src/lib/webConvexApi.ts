@@ -170,6 +170,18 @@ export type PublicApiType = {
     listStudents: FunctionReference<
       "query",
       "public",
+      {
+        paginationOpts: {
+          cursor: string | null;
+          numItems: number;
+          endCursor?: string | null;
+        };
+      },
+      any
+    >;
+    studentSummary: FunctionReference<
+      "query",
+      "public",
       Record<string, never>,
       any
     >;

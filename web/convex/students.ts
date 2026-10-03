@@ -1,93 +1,42 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { adminQuery } from "./functions";
-import { computeAllowance } from "./examples";
+import { allowanceFrom, roundExamplesUsed } from "./examples";
+import { adminQuery, internalMutation } from "./functions";
+import {
+  ZERO,
+  addCounts,
+  bandsFromCounts,
+  countFields,
+  firstTryByBand,
+  isFirstTry,
+  isStudent,
+  isSubmitted,
+  mean,
+  modeForMastery,
+  modeFromModel,
+  pickCounts,
+  progressActivityAt,
+} from "./studentMetrics";
+import { rebuildChat, syncStudent } from "./triggers";
 
 /**
- * Admin view of how students are doing.
+ * Admin view of how students are doing. Metric definitions live in
+ * convex/studentMetrics.ts so the list, detail and stored summaries agree.
  *
- * Definitions (shared by the list and detail views so the numbers agree):
- * - Submitted lesson: completed, or at least one failed Submit. Run never counts.
- * - First-try pass: completed with zero failed Submits.
- * - Mastery is BKT P(L) per knowledge component (KC); a lesson's mastery is its
- *   KC's. Week and overall mastery are averages, computed here, not stored.
- * - Example mode mirrors server/ai/graph_router.py orchestrator_router.
- * - First try by band: each submitted lesson grouped by the student's topic
- *   mastery just before its first Submit (mastery_before), so the outcome
- *   isn't already baked into the mastery it's compared with.
+ * Reads stay bounded as the cohort and chats grow: the list pages through
+ * studentStats, cohort totals come from the single cohortStats row, and chat
+ * details come from the summary fields on `chats` and from chatEvents, never
+ * from a whole conversation. convex/triggers.ts keeps all of those current.
  */
 
-// Roles that are staff, not students; they're left out of every view.
-export const STAFF_ROLES = new Set(["admin", "management"]);
-
-export type ExampleMode = "complete" | "faded" | "erroneous";
-
-// Keep in step with orchestrator_router (< 0.3, 0.3-0.7, > 0.7).
-export function modeForMastery(mastery: number): ExampleMode {
-  if (mastery < 0.3) return "complete";
-  if (mastery <= 0.7) return "faded";
-  return "erroneous";
-}
-
-// The tutor's reply records the node that wrote it (server _determine_chosen_model).
-export type ReplyMode = ExampleMode | "control" | "blocked";
-export function modeFromModel(model: string | undefined): ReplyMode | null {
-  switch (model) {
-    case "complete_example_node":
-      return "complete";
-    case "faded_example_node":
-      return "faded";
-    case "erroneous_example_node":
-      return "erroneous";
-    case "control_agent_node":
-      return "control";
-    case "guardrail_blocked":
-      return "blocked";
-    default:
-      return null;
-  }
-}
-
-export function isSubmitted(p: Pick<Doc<"lessonProgress">, "status" | "failed_submits">) {
-  return p.status === "completed" || (p.failed_submits ?? 0) > 0;
-}
-
-export function isFirstTry(p: Pick<Doc<"lessonProgress">, "status" | "failed_submits">) {
-  return p.status === "completed" && (p.failed_submits ?? 0) === 0;
-}
-
-export function mean(xs: number[]): number | null {
-  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-}
-
-export type BandStat = { band: ExampleMode; lessons: number; firstTry: number };
-
-/** First-try passes per mastery band, over submitted lessons that recorded mastery going in. */
-export function firstTryByBand(
-  rows: Pick<Doc<"lessonProgress">, "status" | "failed_submits" | "mastery_before">[],
-): BandStat[] {
-  const out: BandStat[] = (["complete", "faded", "erroneous"] as const).map((band) => ({
-    band,
-    lessons: 0,
-    firstTry: 0,
-  }));
-  for (const p of rows) {
-    if (p.mastery_before === undefined || !isSubmitted(p)) continue;
-    const stat = out.find((b) => b.band === modeForMastery(p.mastery_before!))!;
-    stat.lessons++;
-    if (isFirstTry(p)) stat.firstTry++;
-  }
-  return out;
-}
-
-export function progressActivityAt(p: Doc<"lessonProgress">) {
-  return p.updated_at ?? p._creationTime;
-}
-
-function isStudent(u: Doc<"users">) {
-  return !u.role || !STAFF_ROLES.has(u.role);
-}
+// Students per page of the list; each one costs a handful of indexed reads.
+const MAX_PAGE = 100;
+// Counting "active this week" stops here rather than reading every student.
+export const ACTIVE_WEEK_CAP = 1000;
+const ACTIVITY_LIMIT = 40;
 
 type LessonInfo = {
   lessonId: Id<"questions">;
@@ -115,23 +64,14 @@ async function lessonSnapshot(
   userId: Id<"users">,
   lesson: Doc<"questions">,
   progress: Doc<"lessonProgress"> | null,
-  masteryByKc: Map<string, Doc<"bktMastery">>,
+  mastery: Doc<"bktMastery"> | null,
 ) {
   const chat = await ctx.db
     .query("chats")
     .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", lesson._id))
     .unique();
-  const messages = chat
-    ? await ctx.db
-        .query("chatMessages")
-        .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
-        .collect()
-    : [];
-  const allowance = computeAllowance(messages, progress);
-  const lastReply = [...messages].reverse().find((m) => m.sender === "assistant");
-  const mastery = lesson.knowledge_component
-    ? masteryByKc.get(lesson.knowledge_component)
-    : undefined;
+  const used = chat ? await roundExamplesUsed(ctx, chat._id, progress) : 0;
+  const allowance = allowanceFrom(used, progress, chat?.last_reply_at !== undefined);
 
   return {
     ...lessonInfo(lesson),
@@ -140,106 +80,94 @@ async function lessonSnapshot(
     mastery: mastery?.prob_mastery ?? null,
     mode: mastery ? modeForMastery(mastery.prob_mastery) : null,
     examples: { used: allowance.used, cap: allowance.cap, remaining: allowance.remaining },
-    lastReply: lastReply
-      ? {
-          mode: modeFromModel(lastReply.model),
-          responseType: lastReply.response_type ?? null,
-          at: lastReply._creationTime,
-        }
-      : null,
-    lastMessageAt: messages.length ? messages[messages.length - 1]._creationTime : null,
+    lastReply:
+      chat?.last_reply_at !== undefined
+        ? {
+            mode: modeFromModel(chat.last_reply_model),
+            responseType: chat.last_reply_response_type ?? null,
+            at: chat.last_reply_at,
+          }
+        : null,
+    lastMessageAt: chat?.last_message_at ?? null,
   };
 }
 
-/**
- * Every student with a one-line summary, plus course-wide first-try rate and
- * how mastery relates to first-try passes.
- */
+/** One list row: the stored counters plus a snapshot of the lesson opened last. */
+async function studentRow(ctx: QueryCtx, stats: Doc<"studentStats">) {
+  const user = await ctx.db.get(stats.userId);
+  if (!user || !isStudent(user)) return null;
+
+  const lesson = user.last_opened_lesson ? await ctx.db.get(user.last_opened_lesson) : null;
+  let current = null;
+  if (lesson) {
+    const progress = await ctx.db
+      .query("lessonProgress")
+      .withIndex("by_user_lesson", (q) => q.eq("userId", user._id).eq("lessonId", lesson._id))
+      .unique();
+    const kc = lesson.knowledge_component;
+    const mastery = kc
+      ? await ctx.db
+          .query("bktMastery")
+          .withIndex("by_user_kc", (q) => q.eq("userId", user._id).eq("knowledge_component", kc))
+          .unique()
+      : null;
+    current = await lessonSnapshot(ctx, user._id, lesson, progress, mastery);
+  }
+
+  return {
+    userId: user._id,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    joinedAt: user._creationTime,
+    lastActivityAt: stats.lastActivityAt || null,
+    current,
+    started: stats.started,
+    submitted: stats.submitted,
+    completed: stats.completed,
+    firstTry: stats.firstTry,
+    firstTryRate: stats.submitted ? stats.firstTry / stats.submitted : null,
+    overallMastery: stats.topicsTracked ? stats.masterySum / stats.topicsTracked : null,
+    topicsMastered: stats.topicsMastered,
+    topicsTracked: stats.topicsTracked,
+  };
+}
+
+/** Students, most recently active first, one page at a time. */
 export const listStudents = adminQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { paginationOpts }) => {
+    const result = await ctx.db
+      .query("studentStats")
+      .withIndex("by_last_activity")
+      .order("desc")
+      .paginate({ ...paginationOpts, numItems: Math.min(paginationOpts.numItems, MAX_PAGE) });
+    const rows = await Promise.all(result.page.map((stats) => studentRow(ctx, stats)));
+    return { ...result, page: rows.filter((r) => r !== null) };
+  },
+});
+
+/** Course-wide totals and how mastery relates to first-try passes. */
+export const studentSummary = adminQuery({
   args: {},
   handler: async (ctx) => {
-    const users = (await ctx.db.query("users").collect()).filter(isStudent);
-    const lessons = new Map(
-      (await ctx.db.query("questions").collect()).map((q) => [q._id, q] as const),
-    );
-
-    const allProgress: Doc<"lessonProgress">[] = [];
-    let submittedTotal = 0;
-    let firstTryTotal = 0;
-
-    const students = [];
-    for (const user of users) {
-      const progress = await ctx.db
-        .query("lessonProgress")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .collect();
-      const masteryRows = await ctx.db
-        .query("bktMastery")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .collect();
-      const masteryByKc = new Map(masteryRows.map((m) => [m.knowledge_component, m] as const));
-
-      const submitted = progress.filter(isSubmitted);
-      const firstTry = submitted.filter(isFirstTry);
-      const completed = progress.filter((p) => p.status === "completed");
-      submittedTotal += submitted.length;
-      firstTryTotal += firstTry.length;
-      allProgress.push(...progress);
-
-      const overallMastery = mean(masteryRows.map((m) => m.prob_mastery));
-      const firstTryRate = submitted.length ? firstTry.length / submitted.length : null;
-
-      const lastLessonDoc = user.last_opened_lesson ? lessons.get(user.last_opened_lesson) : undefined;
-      const current = lastLessonDoc
-        ? await lessonSnapshot(
-            ctx,
-            user._id,
-            lastLessonDoc,
-            progress.find((p) => p.lessonId === lastLessonDoc._id) ?? null,
-            masteryByKc,
-          )
-        : null;
-
-      const lastActivityAt = Math.max(
-        0,
-        ...progress.map(progressActivityAt),
-        ...masteryRows.map((m) => m.updatedAt),
-        current?.lastMessageAt ?? 0,
-      );
-
-      students.push({
-        userId: user._id,
-        name: user.name ?? null,
-        email: user.email ?? null,
-        joinedAt: user._creationTime,
-        lastActivityAt: lastActivityAt || null,
-        current,
-        started: progress.length,
-        submitted: submitted.length,
-        completed: completed.length,
-        firstTry: firstTry.length,
-        firstTryRate,
-        overallMastery,
-        topicsMastered: masteryRows.filter((m) => m.mastered).length,
-        topicsTracked: masteryRows.length,
-      });
-    }
-
-    students.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
+    const c = await ctx.db.query("cohortStats").first();
+    const counts = c ? pickCounts(c) : ZERO;
     const weekAgo = Date.now() - 7 * 86400_000;
+    const recent = await ctx.db
+      .query("studentStats")
+      .withIndex("by_last_activity", (q) => q.gte("lastActivityAt", weekAgo))
+      .take(ACTIVE_WEEK_CAP + 1);
 
     return {
-      students,
-      summary: {
-        students: students.length,
-        active: students.filter((s) => s.started > 0).length,
-        activeThisWeek: students.filter((s) => (s.lastActivityAt ?? 0) >= weekAgo).length,
-        submitted: submittedTotal,
-        firstTry: firstTryTotal,
-        firstTryRate: submittedTotal ? firstTryTotal / submittedTotal : null,
-        topicsMastered: students.reduce((n, s) => n + s.topicsMastered, 0),
-        firstTryByBand: firstTryByBand(allProgress),
-      },
+      students: c?.students ?? 0,
+      active: c?.active ?? 0,
+      activeThisWeek: Math.min(recent.length, ACTIVE_WEEK_CAP),
+      activeThisWeekCapped: recent.length > ACTIVE_WEEK_CAP,
+      submitted: counts.submitted,
+      firstTry: counts.firstTry,
+      firstTryRate: counts.submitted ? counts.firstTry / counts.submitted : null,
+      topicsMastered: counts.topicsMastered,
+      firstTryByBand: bandsFromCounts(counts),
     };
   },
 });
@@ -271,12 +199,13 @@ export const getStudent = adminQuery({
       (await ctx.db.query("course").collect()).map((c) => [c._id, c.course_name] as const),
     );
 
-    // Examples given per lesson (all rounds) plus chat events for the timeline.
+    // At most one chat per lesson; the counts come from its summary fields.
     const chats = await ctx.db
       .query("chats")
       .withIndex("by_user_lesson", (q) => q.eq("userId", userId))
       .collect();
-    const examplesByLesson = new Map<Id<"questions">, number>();
+    const examplesByLesson = new Map(chats.map((c) => [c.lessonId, c.examples_given ?? 0] as const));
+
     type Activity = {
       at: number;
       kind: "started" | "submitted" | "completed" | "mastered" | "help" | "example";
@@ -287,34 +216,13 @@ export const getStudent = adminQuery({
     const activity: Activity[] = [];
     const nameOf = (id: Id<"questions">) => lessonById.get(id)?.problem_name ?? "Deleted lesson";
 
-    for (const chat of chats) {
-      const messages = await ctx.db
-        .query("chatMessages")
-        .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
-        .collect();
-      let given = 0;
-      for (const m of messages) {
-        if (m.sender === "user" && m.trigger) {
-          activity.push({
-            at: m._creationTime,
-            kind: "help",
-            lessonId: chat.lessonId,
-            lessonName: nameOf(chat.lessonId),
-            detail: m.trigger === "get_help" ? "Get help" : "New example",
-          });
-        }
-        if (m.sender === "assistant" && m.response_type === "new_example") {
-          given++;
-          activity.push({
-            at: m._creationTime,
-            kind: "example",
-            lessonId: chat.lessonId,
-            lessonName: nameOf(chat.lessonId),
-            detail: modeFromModel(m.model),
-          });
-        }
-      }
-      examplesByLesson.set(chat.lessonId, given);
+    const chatEvents = await ctx.db
+      .query("chatEvents")
+      .withIndex("by_user_at", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(ACTIVITY_LIMIT);
+    for (const e of chatEvents) {
+      activity.push({ at: e.at, kind: e.kind, lessonId: e.lessonId, lessonName: nameOf(e.lessonId), detail: e.detail ?? null });
     }
 
     for (const p of progress) {
@@ -400,7 +308,13 @@ export const getStudent = adminQuery({
 
     const lastLesson = user.last_opened_lesson ? lessonById.get(user.last_opened_lesson) : undefined;
     const current = lastLesson
-      ? await lessonSnapshot(ctx, userId, lastLesson, progressByLesson.get(lastLesson._id) ?? null, masteryByKc)
+      ? await lessonSnapshot(
+          ctx,
+          userId,
+          lastLesson,
+          progressByLesson.get(lastLesson._id) ?? null,
+          (lastLesson.knowledge_component && masteryByKc.get(lastLesson.knowledge_component)) || null,
+        )
       : null;
 
     const submitted = lessons.filter((l) => l.submitted);
@@ -431,7 +345,78 @@ export const getStudent = adminQuery({
       lessons,
       topics,
       weeks,
-      activity: activity.slice(0, 40),
+      activity: activity.slice(0, ACTIVITY_LIMIT),
     };
+  },
+});
+
+const BACKFILL_BATCH = 20;
+
+/**
+ * Builds the summaries from existing data, a batch per transaction so each one
+ * stays within Convex's read limits: chat summaries first (student activity
+ * reads them), then each student's stats, then the cohort totals recounted
+ * from those. Safe to re-run; live writes keep going meanwhile.
+ *
+ *   npx convex run students:backfillSummaries
+ */
+export const backfillSummaries = internalMutation({
+  args: {
+    phase: v.optional(v.union(v.literal("chats"), v.literal("students"), v.literal("cohort"))),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    totals: v.optional(v.object({ students: v.number(), active: v.number(), counts: v.object(countFields) })),
+  },
+  handler: async (ctx, args) => {
+    const phase = args.phase ?? "chats";
+    const cursor = args.cursor ?? null;
+    const next = (fields: { phase: "chats" | "students" | "cohort"; cursor: string | null; totals?: typeof args.totals }) =>
+      ctx.scheduler.runAfter(0, internal.students.backfillSummaries, fields);
+
+    if (phase === "chats") {
+      const { page, isDone, continueCursor } = await ctx.db
+        .query("chats")
+        .paginate({ cursor, numItems: BACKFILL_BATCH });
+      for (const chat of page) await rebuildChat(ctx, chat);
+      await next(isDone ? { phase: "students", cursor: null } : { phase, cursor: continueCursor });
+      return { phase, processed: page.length };
+    }
+
+    if (phase === "students") {
+      const { page, isDone, continueCursor } = await ctx.db
+        .query("users")
+        .paginate({ cursor, numItems: BACKFILL_BATCH });
+      for (const user of page) await syncStudent(ctx, user._id);
+      await next(isDone ? { phase: "cohort", cursor: null } : { phase, cursor: continueCursor });
+      return { phase, processed: page.length };
+    }
+
+    // Recount the cohort from the stats rows, dropping rows whose user is gone.
+    const totals = args.totals ?? { students: 0, active: 0, counts: ZERO };
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("studentStats")
+      .paginate({ cursor, numItems: BACKFILL_BATCH * 5 });
+    for (const row of page) {
+      const user = await ctx.db.get(row.userId);
+      if (!user || !isStudent(user)) {
+        await ctx.db.delete(row._id);
+        continue;
+      }
+      totals.students++;
+      if (row.started > 0) totals.active++;
+      totals.counts = addCounts(totals.counts, pickCounts(row));
+    }
+    if (!isDone) {
+      await next({ phase, cursor: continueCursor, totals });
+      return { phase, processed: page.length };
+    }
+    const fields = { students: totals.students, active: totals.active, ...totals.counts };
+    const existing = await ctx.db.query("cohortStats").collect();
+    if (existing.length) {
+      await ctx.db.replace(existing[0]._id, fields);
+      for (const extra of existing.slice(1)) await ctx.db.delete(extra._id);
+    } else {
+      await ctx.db.insert("cohortStats", fields);
+    }
+    return { phase, processed: page.length, done: true };
   },
 });

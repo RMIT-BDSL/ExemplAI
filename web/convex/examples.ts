@@ -47,6 +47,14 @@ export function computeAllowance(
       m.response_type === "new_example" &&
       m._creationTime > roundStart
   ).length;
+  return allowanceFrom(used, progress, messages.some((m) => m.sender === "assistant"));
+}
+
+export function allowanceFrom(
+  used: number,
+  progress: Doc<"lessonProgress"> | null,
+  helpStarted: boolean
+): ExampleAllowance {
   // Rows from before rounds existed only have the lesson total.
   const roundFailedSubmits = progress?.round_failed_submits ?? progress?.failed_submits ?? 0;
   const earned = Math.min(EXAMPLE_CAP, roundFailedSubmits);
@@ -56,8 +64,28 @@ export function computeAllowance(
     earned,
     remaining: Math.max(0, earned - used),
     exhausted: used >= EXAMPLE_CAP,
-    helpStarted: messages.some((m) => m.sender === "assistant"),
+    helpStarted,
   };
+}
+
+/**
+ * Examples given this round, read from an index range and capped at
+ * EXAMPLE_CAP, so it never loads the conversation. Every allowance rule only
+ * compares `used` against the cap, so the capped count gives the same answers.
+ */
+export async function roundExamplesUsed(
+  ctx: QueryCtx,
+  chatId: Id<"chats">,
+  progress: Doc<"lessonProgress"> | null
+) {
+  const roundStart = progress?.round_started_at ?? 0;
+  const given = await ctx.db
+    .query("chatMessages")
+    .withIndex("by_chat_response", (q) =>
+      q.eq("chatId", chatId).eq("response_type", "new_example").gt("_creationTime", roundStart)
+    )
+    .take(EXAMPLE_CAP);
+  return given.length;
 }
 
 export async function allowanceForChat(ctx: QueryCtx, chat: Doc<"chats">) {

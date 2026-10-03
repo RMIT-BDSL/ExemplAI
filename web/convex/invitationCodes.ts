@@ -1,6 +1,6 @@
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { adminQuery, adminMutation } from "./functions";
+import { adminQuery, adminMutation, mutation } from "./functions";
 
 /**
  * Creates a new invitation code.

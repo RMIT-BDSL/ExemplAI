@@ -44,18 +44,17 @@ export interface StudentRow {
   topicsTracked: number;
 }
 
-export interface StudentList {
-  students: StudentRow[];
-  summary: {
-    students: number;
-    active: number;
-    submitted: number;
-    firstTry: number;
-    firstTryRate: number | null;
-    activeThisWeek: number;
-    topicsMastered: number;
-    firstTryByBand: BandStat[];
-  };
+export interface StudentSummary {
+  students: number;
+  active: number;
+  submitted: number;
+  firstTry: number;
+  firstTryRate: number | null;
+  activeThisWeek: number;
+  // activeThisWeek stopped counting at the server's cap.
+  activeThisWeekCapped: boolean;
+  topicsMastered: number;
+  firstTryByBand: BandStat[];
 }
 
 export interface LessonRow {

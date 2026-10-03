@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./functions";
 
 const COURSE_NAME = "Introduction to Python (CSEDM 2019 - A/B Groups)";
 

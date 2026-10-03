@@ -30,6 +30,101 @@ export function createLiveQuery<T>(
   return { data, error };
 }
 
+type PageResult<T> = {
+  page: T[];
+  isDone: boolean;
+  continueCursor: string;
+  splitCursor?: string | null;
+  pageStatus?: 'SplitRecommended' | 'SplitRequired' | null;
+};
+type PageSpec = { cursor: string | null; endCursor?: string };
+const specKey = (s: PageSpec) => `${s.cursor ?? ''}|${s.endCursor ?? ''}`;
+
+/**
+ * Live, paginated Convex query, like convex/react's usePaginatedQuery. Each
+ * loaded page is its own subscription; once a page first loads it is pinned to
+ * the cursor range it covered, so rows moving between pages (a student becoming
+ * active) neither repeat nor vanish. A page the server says has grown too big
+ * is split in two.
+ */
+export function createPaginatedLiveQuery<T>(
+  query: FunctionReference<'query', 'public', any, any>,
+  numItems: number,
+) {
+  const [specs, setSpecs] = createSignal<PageSpec[]>([{ cursor: null }]);
+  const [results, setResults] = createSignal<Record<string, PageResult<T>>>({});
+  const [error, setError] = createSignal<Error | null>(null);
+  const subs = new Map<string, () => void>();
+
+  const replaceSpec = (old: PageSpec, next: PageSpec[], carry?: PageResult<T>) => {
+    if (carry) setResults((r) => ({ ...r, [specKey(next[0])]: carry }));
+    setSpecs((list) => list.flatMap((s) => (specKey(s) === specKey(old) ? next : [s])));
+  };
+
+  createEffect(() => {
+    const wanted = new Set(specs().map(specKey));
+    for (const [key, unsubscribe] of subs) {
+      if (!wanted.has(key)) {
+        unsubscribe();
+        subs.delete(key);
+      }
+    }
+    for (const spec of specs()) {
+      const key = specKey(spec);
+      if (subs.has(key)) continue;
+      const paginationOpts = { numItems, cursor: spec.cursor, ...(spec.endCursor ? { endCursor: spec.endCursor } : {}) };
+      subs.set(
+        key,
+        convex.onUpdate(
+          query,
+          { paginationOpts },
+          (r: PageResult<T>) => {
+            setError(null);
+            setResults((prev) => ({ ...prev, [key]: r }));
+            if (!spec.endCursor && !r.isDone) {
+              replaceSpec(spec, [{ cursor: spec.cursor, endCursor: r.continueCursor }], r);
+            } else if (r.splitCursor && (r.pageStatus === 'SplitRecommended' || r.pageStatus === 'SplitRequired')) {
+              replaceSpec(spec, [
+                { cursor: spec.cursor, endCursor: r.splitCursor },
+                { cursor: r.splitCursor, endCursor: spec.endCursor ?? r.continueCursor },
+              ]);
+            }
+          },
+          (err: Error) => setError(err),
+        ),
+      );
+    }
+  });
+  onCleanup(() => {
+    for (const unsubscribe of subs.values()) unsubscribe();
+    subs.clear();
+  });
+
+  // Rows of every page loaded so far, stopping at the first one still loading.
+  const items = () => {
+    const out: T[] = [];
+    for (const spec of specs()) {
+      const r = results()[specKey(spec)];
+      if (!r) return out;
+      out.push(...r.page);
+    }
+    return out;
+  };
+  const last = () => {
+    const list = specs();
+    return results()[specKey(list[list.length - 1])];
+  };
+  const loaded = () => specs().every((s) => results()[specKey(s)] !== undefined);
+  const isDone = () => loaded() && (last()?.isDone ?? false);
+  const loadMore = () => {
+    const r = last();
+    if (!r || r.isDone) return;
+    setSpecs((list) => [...list, { cursor: r.continueCursor }]);
+  };
+
+  return { items, firstLoaded: () => results()[specKey(specs()[0])] !== undefined, loading: () => !loaded(), isDone, loadMore, error };
+}
+
 // ── Formatting ─────────────────────────────────────────────────────────
 
 export const pct = (x: number | null | undefined) => (x == null ? '—' : `${Math.round(x * 100)}%`);

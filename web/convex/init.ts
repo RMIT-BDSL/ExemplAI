@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./functions";
 import { createAuth, authComponent } from "./auth";
 import { components } from "./_generated/api";
 

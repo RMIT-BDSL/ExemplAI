@@ -10,7 +10,7 @@ import {
   type Updater,
 } from '@tanstack/solid-table';
 import { api } from '../lib/webConvexApi';
-import type { StudentList, StudentRow } from '../components/students/types';
+import type { StudentRow, StudentSummary } from '../components/students/types';
 import {
   BandChart,
   LiveDot,
@@ -19,6 +19,7 @@ import {
   StatusText,
   ago,
   createLiveQuery,
+  createPaginatedLiveQuery,
   displayName,
   fullDate,
   pct,
@@ -148,6 +149,9 @@ const columns: ColumnDef<StudentRow>[] = [
   },
 ];
 
+// Students fetched per page; the server caps it at 100.
+const PAGE_SIZE = 50;
+
 const DEFAULT_SORT: SortingState = [{ id: 'lastActive', desc: true }];
 
 // Sorting lives in the URL as `sort=column` or `sort=-column` (descending).
@@ -156,14 +160,17 @@ const parseSort = (raw?: string): SortingState =>
 
 const StudentsPage: Component = () => {
   const [params, setParams] = useSearchParams<{ q?: string; sort?: string; show?: Filter }>();
-  const { data, error } = createLiveQuery<StudentList>(api.students.listStudents, () => ({}));
+  // Most recently active first; more pages load on request.
+  const students = createPaginatedLiveQuery<StudentRow>(api.students.listStudents, PAGE_SIZE);
+  const { data: summary, error: summaryError } = createLiveQuery<StudentSummary>(api.students.studentSummary, () => ({}));
+  const error = () => summaryError() ?? students.error();
 
   const show = () => params.show ?? 'all';
   const q = () => (params.q ?? '').trim().toLowerCase();
   const sorting = () => parseSort(params.sort);
 
   const rows = createMemo(() => {
-    let list = data()?.students ?? [];
+    let list = students.items();
     if (show() === 'active') list = list.filter((s) => s.started > 0);
     if (show() === 'idle') list = list.filter((s) => s.started === 0);
     if (q()) {
@@ -194,8 +201,6 @@ const StudentsPage: Component = () => {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
-
-  const summary = () => data()?.summary;
 
   return (
     <div class="max-w-6xl mx-auto px-4 sm:px-8 lg:px-10 py-9 sm:py-12">
@@ -228,7 +233,7 @@ const StudentsPage: Component = () => {
         />
         <Figure
           label="Active this week"
-          value={summary() ? String(summary()!.activeThisWeek) : null}
+          value={summary() ? `${summary()!.activeThisWeek}${summary()!.activeThisWeekCapped ? '+' : ''}` : null}
           note="did something in the last 7 days"
           class="border-b lg:border-b-0 lg:border-r"
         />
@@ -322,7 +327,7 @@ const StudentsPage: Component = () => {
             </thead>
             <tbody class="divide-y divide-line/70">
               <Show
-                when={data()}
+                when={students.firstLoaded()}
                 fallback={
                   <For each={[0, 1, 2, 3]}>
                     {() => (
@@ -340,7 +345,7 @@ const StudentsPage: Component = () => {
                   fallback={
                     <tr>
                       <td colspan={columns.length} class="px-4 py-12 text-center text-sm text-muted">
-                        {data()!.students.length ? 'No students match these filters.' : 'No students yet. They appear here after redeeming an invitation code.'}
+                        {students.items().length ? 'No loaded students match these filters.' : 'No students yet. They appear here after redeeming an invitation code.'}
                       </td>
                     </tr>
                   }
@@ -359,6 +364,21 @@ const StudentsPage: Component = () => {
             </tbody>
           </table>
         </div>
+        <Show when={students.firstLoaded() && !students.isDone()}>
+          <div class="border-t border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-muted">
+            <span>
+              Showing the {students.items().length} most recently active of {summary()?.students ?? 'all'} students. Search, filters and sorting apply to these.
+            </span>
+            <button
+              type="button"
+              onClick={() => students.loadMore()}
+              disabled={students.loading()}
+              class="self-start sm:self-auto rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink hover:border-garnet disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-garnet"
+            >
+              {students.loading() ? 'Loading…' : `Load ${PAGE_SIZE} more`}
+            </button>
+          </div>
+        </Show>
       </section>
 
       <div class="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">

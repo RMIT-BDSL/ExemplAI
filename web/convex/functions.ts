@@ -1,7 +1,20 @@
 import { zCustomMutation, zCustomQuery } from "convex-helpers/server/zod4";
-import { customMutation, customQuery, NoOp } from "convex-helpers/server/customFunctions";
-import { mutation, query } from "./_generated/server";
+import { customCtx, customMutation, customQuery, NoOp } from "convex-helpers/server/customFunctions";
+import {
+  internalMutation as rawInternalMutation,
+  mutation as rawMutation,
+  query,
+} from "./_generated/server";
 import { authComponent } from "./auth";
+import { triggers } from "./triggers";
+
+/**
+ * `mutation` / `internalMutation` with the summary triggers (convex/triggers.ts)
+ * attached. Build every mutation on these, never on ./_generated/server, or
+ * the admin student summaries drift.
+ */
+export const mutation = customMutation(rawMutation, customCtx(triggers.wrapDB));
+export const internalMutation = customMutation(rawInternalMutation, customCtx(triggers.wrapDB));
 
 /**
  * Base query helper that requires user authentication.
