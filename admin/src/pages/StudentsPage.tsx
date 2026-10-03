@@ -16,14 +16,21 @@ import {
   LiveDot,
   MasteryRule,
   ModeTag,
+  ReplyMixPanel,
   StatusText,
+  TutorTag,
   ago,
   createLiveQuery,
   createPaginatedLiveQuery,
   displayName,
+  exampleStatus,
   fullDate,
   pct,
+  servingMode,
+  servingNow,
 } from '../components/students/parts';
+
+const servingOf = (s: StudentRow) => (s.current ? servingNow(s.current.mastery, s.current.lastReply, s.tutor) : null);
 
 type Filter = 'all' | 'active' | 'idle';
 
@@ -90,16 +97,20 @@ const columns: ColumnDef<StudentRow>[] = [
   {
     id: 'mastery',
     header: 'Topic mastery',
-    meta: { hint: "BKT mastery of the current lesson's topic. Ticks: 0.30 and 0.70 switch example mode; 0.95 is mastered." },
+    meta: { hint: "BKT mastery of the current lesson's topic, and what the tutor is generating now. Hover the bar for details." },
     accessorFn: (s) => s.current?.mastery ?? undefined,
     sortUndefined: 'last',
     cell: (info) => {
-      const c = info.row.original.current;
+      const s = info.row.original;
+      const serving = servingOf(s);
       return (
-        <Show when={c} fallback={<span class="text-muted">—</span>}>
+        <Show when={s.current && serving} fallback={<span class="text-muted">—</span>}>
           <div class="flex items-center gap-2">
-            <MasteryRule value={c!.mastery} compact />
-            <ModeTag mode={c!.mode} />
+            <MasteryRule value={s.current!.mastery} compact serving={serving!} replies={s.replies} />
+            {/* What's being generated, not what mastery alone implies. */}
+            <Show when={servingMode(serving!)} fallback={<span class="font-mono text-[11px] text-muted">no reply</span>}>
+              {(mode) => <ModeTag mode={mode()} />}
+            </Show>
           </div>
         </Show>
       );
@@ -111,14 +122,28 @@ const columns: ColumnDef<StudentRow>[] = [
     meta: { hint: 'Examples given in the current round of this lesson, out of 3' },
     enableSorting: false,
     cell: (info) => {
-      const c = info.row.original.current;
+      const s = info.row.original;
+      const c = s.current;
       return (
         <Show when={c} fallback={<span class="text-muted">—</span>}>
-          <span class="font-mono text-[12px] tabular-nums">{c!.examples.used} of {c!.examples.cap}</span>
-          <p class="font-mono text-[11px] text-muted">{c!.examples.remaining} available</p>
+          <Show
+            when={servingOf(s)?.kind !== 'control'}
+            fallback={<span class="text-muted" title="The normal tutor doesn't give worked examples">none · normal tutor</span>}
+          >
+            <span class="font-mono text-[12px] tabular-nums">{c!.examples.used} of {c!.examples.cap} used</span>
+            <p class="text-[11px] text-muted">{exampleStatus(c!.examples)}</p>
+          </Show>
         </Show>
       );
     },
+  },
+  {
+    id: 'tutor',
+    header: 'Tutor',
+    meta: { hint: "Which tutor wrote this student's replies so far: example tutor, normal tutor, or both. Hover for the mix." },
+    accessorFn: (s) => (s.tutor ? { examples: 0, mixed: 1, control: 2 }[s.tutor] : undefined),
+    sortUndefined: 'last',
+    cell: (info) => <TutorTag tutor={info.row.original.tutor} replies={info.row.original.replies} />,
   },
   {
     id: 'firstTry',
@@ -203,7 +228,7 @@ const StudentsPage: Component = () => {
   });
 
   return (
-    <div class="max-w-6xl mx-auto px-4 sm:px-8 lg:px-10 py-9 sm:py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-8 lg:px-10 py-9 sm:py-12">
       <header class="border-b border-line pb-7 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <p class="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">Students</p>
@@ -286,7 +311,7 @@ const StudentsPage: Component = () => {
       {/* Student table */}
       <section class="mt-4 rounded-md border border-line bg-white overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="w-full min-w-[72rem] text-sm">
             <caption class="sr-only">Students and their current lesson. Select a column heading to sort.</caption>
             <thead>
               <For each={table.getHeaderGroups()}>
@@ -387,7 +412,10 @@ const StudentsPage: Component = () => {
             when={summary()}
             fallback={<div class="h-72 rounded-md border border-line bg-white/50 animate-pulse motion-reduce:animate-none" />}
           >
-            <BandChart bands={summary()!.firstTryByBand} scope="students" />
+            <div class="space-y-5">
+              <BandChart bands={summary()!.firstTryByBand} scope="students" />
+              <ReplyMixPanel replies={summary()!.replies} scope="students" />
+            </div>
           </Show>
         </div>
         <Definitions />
@@ -430,7 +458,11 @@ const Definitions: Component = () => (
       </div>
       <div>
         <dt class="text-ink font-medium">Examples</dt>
-        <dd>Given this round of the current lesson, out of 3. "Available" are earned by failed Submits but not yet asked for.</dd>
+        <dd>Examples used this round of the current lesson, out of 3. Each failed Submit unlocks one more; the second line says whether one is waiting to be asked for or the student needs to fail a Submit first.</dd>
+      </div>
+      <div>
+        <dt class="text-ink font-medium">Tutor</dt>
+        <dd>Whether the student's replies came from the example tutor, the normal tutor (no examples), or both. The group is decided on each request, so it's read from the replies rather than assumed.</dd>
       </div>
     </dl>
   </section>

@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { countFields as counts } from "./studentMetrics";
+import { countFields as counts, replyCountFields } from "./studentMetrics";
 
 export default defineSchema({
   course: defineTable({
@@ -133,6 +133,8 @@ export default defineSchema({
     last_reply_model: v.optional(v.string()),
     last_reply_response_type: v.optional(v.string()),
     examples_given: v.optional(v.number()),
+    // Tutor replies by who wrote them (studentMetrics ReplyKind).
+    reply_counts: v.optional(replyCountFields),
   }).index("by_user_lesson", ["userId", "lessonId"]),
   // One row per student: their counters and last activity, maintained by
   // convex/triggers.ts. The admin student list pages through this.

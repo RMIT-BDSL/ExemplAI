@@ -49,6 +49,20 @@ export function modeFromModel(model: string | undefined): ReplyMode | null {
   }
 }
 
+/**
+ * Which tutor wrote a reply. A student's group comes from a PostHog flag on
+ * each request (falling back to the normal tutor when the flag can't be read),
+ * so the replies, not mastery, say whether they actually got examples.
+ */
+export const REPLY_KINDS = ["complete", "faded", "erroneous", "control", "blocked", "other"] as const;
+export type ReplyKind = (typeof REPLY_KINDS)[number];
+export type ReplyCounts = Record<ReplyKind, number>;
+export const NO_REPLIES: ReplyCounts = { complete: 0, faded: 0, erroneous: 0, control: 0, blocked: 0, other: 0 };
+
+export function replyKind(model: string | undefined): ReplyKind {
+  return modeFromModel(model) ?? "other";
+}
+
 export function isSubmitted(p: Pick<Doc<"lessonProgress">, "status" | "failed_submits">) {
   return p.status === "completed" || (p.failed_submits ?? 0) > 0;
 }
@@ -101,6 +115,22 @@ export type Counts = {
   fadedFirstTry: number;
   erroneousLessons: number;
   erroneousFirstTry: number;
+  // Tutor replies by who wrote them (ReplyKind).
+  replyComplete: number;
+  replyFaded: number;
+  replyErroneous: number;
+  replyControl: number;
+  replyBlocked: number;
+  replyOther: number;
+};
+
+const REPLY_KEY: Record<ReplyKind, keyof Counts> = {
+  complete: "replyComplete",
+  faded: "replyFaded",
+  erroneous: "replyErroneous",
+  control: "replyControl",
+  blocked: "replyBlocked",
+  other: "replyOther",
 };
 
 export const ZERO: Counts = {
@@ -117,12 +147,29 @@ export const ZERO: Counts = {
   fadedFirstTry: 0,
   erroneousLessons: 0,
   erroneousFirstTry: 0,
+  replyComplete: 0,
+  replyFaded: 0,
+  replyErroneous: 0,
+  replyControl: 0,
+  replyBlocked: 0,
+  replyOther: 0,
 };
 
 // Validators for Counts, spread into the studentStats / cohortStats schemas.
-export const countFields = Object.fromEntries(Object.keys(ZERO).map((k) => [k, v.number()])) as {
-  [K in keyof Counts]: ReturnType<typeof v.number>;
+// Reply counters came later, so rows written before them may lack them (read as 0).
+type ReplyCountKey = Extract<keyof Counts, `reply${string}`>;
+type StoredCounts = { [K in Exclude<keyof Counts, ReplyCountKey>]: number } & { [K in ReplyCountKey]?: number };
+export const countFields = Object.fromEntries(
+  Object.keys(ZERO).map((k) => [k, k.startsWith("reply") ? v.optional(v.number()) : v.number()]),
+) as unknown as {
+  [K in keyof Counts]: K extends `reply${string}`
+    ? ReturnType<typeof v.optional<ReturnType<typeof v.number>>>
+    : ReturnType<typeof v.number>;
 };
+
+export const replyCountFields = v.object(
+  Object.fromEntries(REPLY_KINDS.map((k) => [k, v.number()])) as { [K in ReplyKind]: ReturnType<typeof v.number> },
+);
 
 export const COUNT_KEYS = Object.keys(ZERO) as (keyof Counts)[];
 
@@ -162,12 +209,42 @@ export function isZero(c: Counts) {
   return COUNT_KEYS.every((k) => c[k] === 0);
 }
 
-export function pickCounts(c: Counts): Counts {
+export function pickCounts(c: StoredCounts): Counts {
   const out = { ...ZERO };
-  for (const k of COUNT_KEYS) out[k] = c[k];
+  for (const k of COUNT_KEYS) out[k] = c[k] ?? 0;
   return out;
 }
 
 export function bandsFromCounts(c: Counts): BandStat[] {
   return BANDS.map((band) => ({ band, lessons: c[`${band}Lessons`], firstTry: c[`${band}FirstTry`] }));
+}
+
+/** A chat's reply counts as a Counts delta (chats predating the summary count as none). */
+export function chatCounts(chat: { reply_counts?: ReplyCounts } | null): Counts {
+  const out = { ...ZERO };
+  if (chat?.reply_counts) for (const k of REPLY_KINDS) out[REPLY_KEY[k]] = chat.reply_counts[k];
+  return out;
+}
+
+export function repliesFromCounts(c: Counts): ReplyCounts {
+  const out = { ...NO_REPLIES };
+  for (const k of REPLY_KINDS) out[k] = c[REPLY_KEY[k]];
+  return out;
+}
+
+export function addReplies(a: ReplyCounts, b: ReplyCounts): ReplyCounts {
+  const out = { ...a };
+  for (const k of REPLY_KINDS) out[k] += b[k];
+  return out;
+}
+
+export type TutorGroup = "examples" | "control" | "mixed";
+
+/** Which tutor a student has been getting, from their replies (null before any). */
+export function tutorGroup(r: ReplyCounts): TutorGroup | null {
+  const examples = r.complete + r.faded + r.erroneous;
+  if (examples && r.control) return "mixed";
+  if (examples) return "examples";
+  if (r.control) return "control";
+  return null;
 }

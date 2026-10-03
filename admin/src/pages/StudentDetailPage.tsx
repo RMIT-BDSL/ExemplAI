@@ -2,18 +2,23 @@ import { Component, For, JSX, Match, Show, Switch } from 'solid-js';
 import { A, useParams, useSearchParams } from '@solidjs/router';
 import type { GenericId as Id } from 'convex/values';
 import { api } from '../lib/webConvexApi';
-import type { ActivityItem, LessonSnapshot, StudentDetail } from '../components/students/types';
+import type { ActivityItem, LessonSnapshot, ReplyCounts, StudentDetail, TutorGroup } from '../components/students/types';
 import {
   BandChart,
   LiveDot,
   MasteryRule,
   ModeTag,
+  ReplyMixPanel,
   StatusText,
+  TutorTag,
   ago,
   createLiveQuery,
   displayName,
+  exampleStatus,
   fullDate,
   pct,
+  servingMode,
+  servingNow,
 } from '../components/students/parts';
 
 type View = 'topic' | 'week' | 'lesson';
@@ -66,7 +71,7 @@ const StudentDetailPage: Component = () => {
               </header>
 
               <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                <NowPanel current={d().current} />
+                <NowPanel current={d().current} tutor={d().totals.tutor} replies={d().totals.replies} />
                 <Totals d={d()} />
               </div>
 
@@ -100,6 +105,7 @@ const StudentDetailPage: Component = () => {
                 </section>
                 <div class="space-y-5">
                   <BandChart bands={d().firstTryByBand} scope="this student" />
+                  <ReplyMixPanel replies={d().totals.replies} scope="this student" />
                   <Activity items={d().activity} />
                 </div>
               </div>
@@ -113,11 +119,13 @@ const StudentDetailPage: Component = () => {
 
 // ── Now panel (the student's current lesson at a glance) ───────────────
 
-const NowPanel: Component<{ current: LessonSnapshot | null }> = (props) => (
+const NowPanel: Component<{ current: LessonSnapshot | null; tutor: TutorGroup | null; replies: ReplyCounts }> = (props) => (
   <section class="lg:col-span-3 rounded-md border border-line bg-white p-5">
     <h2 class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Working on now</h2>
     <Show when={props.current} fallback={<p class="mt-4 text-sm text-muted">This student hasn't opened a lesson yet.</p>}>
-      {(c) => (
+      {(c) => {
+        const serving = () => servingNow(c().mastery, c().lastReply, props.tutor);
+        return (
         <dl class="mt-3 grid grid-cols-[7.5rem_1fr] gap-x-4 gap-y-3 text-sm">
           <Row label="Lesson">
             <span class="font-mono text-ink">{c().name}</span>
@@ -129,10 +137,17 @@ const NowPanel: Component<{ current: LessonSnapshot | null }> = (props) => (
           </Row>
           <Row label="Mastery">
             <div class="flex items-center gap-3">
-              <div class="flex-1 max-w-64"><MasteryRule value={c().mastery} /></div>
-              <Show when={c().mode} fallback={<span class="text-xs text-muted">No graded Submit on this topic yet</span>}>
-                <span class="text-muted" aria-hidden="true">→</span>
-                <ModeTag mode={c().mode} />
+              <div class="flex-1 max-w-64"><MasteryRule value={c().mastery} serving={serving()} replies={props.replies} /></div>
+              <Show
+                when={servingMode(serving())}
+                fallback={<span class="text-xs text-muted">No tutor reply yet; hover the bar for what's next</span>}
+              >
+                {(mode) => (
+                  <>
+                    <span class="text-muted" aria-hidden="true">→</span>
+                    <ModeTag mode={mode()} />
+                  </>
+                )}
               </Show>
             </div>
           </Row>
@@ -142,8 +157,19 @@ const NowPanel: Component<{ current: LessonSnapshot | null }> = (props) => (
               <span class="ml-2 text-muted">· {c().failedSubmits} failed Submit{c().failedSubmits === 1 ? '' : 's'}</span>
             </Show>
           </Row>
+          <Row label="Tutor">
+            <TutorTag tutor={props.tutor} replies={props.replies} />
+          </Row>
           <Row label="Examples">
-            <span class="font-mono tabular-nums">{c().examples.used} of {c().examples.cap} used · {c().examples.remaining} available</span>
+            <Show
+              when={serving().kind !== 'control'}
+              fallback={<span class="text-muted">None: the normal tutor doesn't give worked examples</span>}
+            >
+              <span>
+                <span class="font-mono tabular-nums">{c().examples.used} of {c().examples.cap} used</span>
+                <span class="text-muted"> · {exampleStatus(c().examples)}</span>
+              </span>
+            </Show>
           </Row>
           <Row label="Last reply">
             <Show when={c().lastReply} fallback={<span class="text-muted">No tutor replies on this lesson</span>}>
@@ -157,7 +183,8 @@ const NowPanel: Component<{ current: LessonSnapshot | null }> = (props) => (
             </Show>
           </Row>
         </dl>
-      )}
+        );
+      }}
     </Show>
   </section>
 );

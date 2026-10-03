@@ -168,6 +168,16 @@ describe("student summaries", () => {
       responseType: "new_example",
       backendSecret: "secret",
     });
+    // Another session fell back to the normal tutor (no examples).
+    const otherChat = await student.mutation(api.chats.getOrCreateChat, { lessonId: b });
+    await student.mutation(api.chats.addSystemMessage, {
+      chatId: otherChat,
+      sender: "assistant",
+      content: "plain help",
+      model: "control_agent_node",
+      backendSecret: "secret",
+    });
+    const mix = { complete: 1, faded: 0, erroneous: 0, control: 1, blocked: 0, other: 0 };
 
     const summary = await admin.query(api.students.studentSummary, {});
     expect(summary).toMatchObject({
@@ -183,6 +193,7 @@ describe("student summaries", () => {
         { band: "faded", lessons: 1, firstTry: 1 },
         { band: "erroneous", lessons: 0, firstTry: 0 },
       ],
+      replies: mix,
     });
 
     const first = await admin.query(api.students.listStudents, { paginationOpts: { numItems: 1, cursor: null } });
@@ -191,6 +202,7 @@ describe("student summaries", () => {
     const ana = first.page[0];
     expect(ana).toMatchObject({ userId, name: "ana", started: 2, submitted: 2, firstTry: 1, completed: 2, topicsMastered: 1 });
     expect(ana.overallMastery).toBeCloseTo(0.98);
+    expect(ana).toMatchObject({ replies: mix, tutor: "mixed" });
     expect(ana.current).toMatchObject({
       lessonId: a,
       status: "completed",
@@ -201,7 +213,7 @@ describe("student summaries", () => {
     expect(rest.page.map((s) => s.name)).toEqual(["ben"]);
 
     const detail = await admin.query(api.students.getStudent, { userId });
-    expect(detail!.totals.examplesGiven).toBe(1);
+    expect(detail!.totals).toMatchObject({ examplesGiven: 1, replies: mix, tutor: "mixed" });
     expect(
       detail!.activity
         .filter((e) => e.kind === "help" || e.kind === "example")
@@ -296,7 +308,11 @@ describe("student summaries", () => {
         { band: "erroneous", lessons: 1, firstTry: 1 },
       ],
     });
-    expect(await t.run((ctx) => ctx.db.get(chatId))).toMatchObject({ message_count: 1, examples_given: 1 });
+    expect(await t.run((ctx) => ctx.db.get(chatId))).toMatchObject({
+      message_count: 1,
+      examples_given: 1,
+      reply_counts: { complete: 0, faded: 0, erroneous: 0, control: 0, blocked: 0, other: 1 },
+    });
     const events = await t.run((ctx) => ctx.db.query("chatEvents").collect());
     expect(events.map((e) => e.kind)).toEqual(["example"]);
   });

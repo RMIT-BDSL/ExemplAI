@@ -1,7 +1,8 @@
-import { Component, For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
+import { Component, For, JSX, Show, createEffect, createSignal, createUniqueId, onCleanup } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { FunctionReference } from 'convex/server';
 import { convex } from '../../lib/convex';
-import type { BandStat, ExampleMode, LessonStatus, ReplyMode } from './types';
+import type { BandStat, ExampleMode, LessonStatus, ReplyCounts, ReplyKind, ReplyMode, TutorGroup } from './types';
 
 /**
  * Subscribes to a Convex query so the page updates as students work.
@@ -210,36 +211,330 @@ export const StatusText: Component<{ status: LessonStatus }> = (props) => (
   </span>
 );
 
+// ── Hover card ─────────────────────────────────────────────────────────
+
+/**
+ * Details shown on hover or keyboard focus. Rendered in a portal with fixed
+ * positioning so table scroll containers don't clip it; flips above the
+ * trigger near the bottom of the window.
+ */
+export const HoverCard: Component<{ trigger: JSX.Element; children: JSX.Element; class?: string }> = (props) => {
+  const [pos, setPos] = createSignal<{ x: number; y: number; above: boolean } | null>(null);
+  const id = createUniqueId();
+  let el!: HTMLSpanElement;
+  const hide = () => {
+    setPos(null);
+    window.removeEventListener('scroll', hide, true);
+  };
+  const show = () => {
+    const r = el.getBoundingClientRect();
+    const above = r.bottom + 220 > window.innerHeight && r.top > 220;
+    setPos({ x: Math.min(Math.max(8, r.left), window.innerWidth - 300), y: above ? r.top - 8 : r.bottom + 8, above });
+    window.addEventListener('scroll', hide, true);
+  };
+  onCleanup(hide);
+  return (
+    <span
+      ref={el}
+      tabindex="0"
+      aria-describedby={pos() ? id : undefined}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+      onKeyDown={(e) => e.key === 'Escape' && hide()}
+      class={`cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-garnet ${props.class ?? ''}`}
+    >
+      {props.trigger}
+      <Show when={pos()}>
+        {(p) => (
+          <Portal>
+            <div
+              id={id}
+              role="tooltip"
+              class="fixed z-50 w-[18.5rem] rounded-md border border-line bg-white px-4 py-3 text-[13px] leading-snug text-body shadow-[0_6px_24px_-8px_rgba(26,34,56,0.28)] pointer-events-none"
+              style={{ left: `${p().x}px`, top: `${p().y}px`, transform: p().above ? 'translateY(-100%)' : undefined }}
+            >
+              {props.children}
+            </div>
+          </Portal>
+        )}
+      </Show>
+    </span>
+  );
+};
+
+const CardLabel: Component<{ children: JSX.Element }> = (props) => (
+  <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">{props.children}</p>
+);
+
+// ── What the tutor is serving ──────────────────────────────────────────
+
+const EXAMPLE_MODES: ReplyMode[] = ['complete', 'faded', 'erroneous'];
+const isExample = (m: ReplyMode | null | undefined): m is ExampleMode => !!m && EXAMPLE_MODES.includes(m);
+// Mastery before any graded Submit: the server's BKT prior (P-Init) unless the topic overrides it.
+const PRIOR = 0.15;
+
+export type Serving =
+  | { kind: 'control'; at: number | null }
+  | { kind: 'examples'; next: ExampleMode; fromPrior: boolean; last: { mode: ExampleMode; at: number } | null }
+  | { kind: 'unknown'; next: ExampleMode; fromPrior: boolean };
+
+/**
+ * What the tutor would generate next on this lesson. A student's group (example
+ * tutor or normal tutor) is decided on each request, so it is read from the
+ * replies they actually got, never assumed from mastery.
+ */
+export function servingNow(
+  mastery: number | null,
+  lastReply: { mode: ReplyMode | null; at: number } | null,
+  tutor: TutorGroup | null,
+): Serving {
+  const next = modeOf(mastery ?? PRIOR);
+  const fromPrior = mastery == null;
+  if (lastReply?.mode === 'control') return { kind: 'control', at: lastReply.at };
+  if (lastReply && isExample(lastReply.mode)) return { kind: 'examples', next, fromPrior, last: { mode: lastReply.mode, at: lastReply.at } };
+  if (tutor === 'control') return { kind: 'control', at: null };
+  if (tutor) return { kind: 'examples', next, fromPrior, last: null };
+  return { kind: 'unknown', next, fromPrior };
+}
+
+/** The mode tag for what's being generated: the normal tutor, or the next example. Null before any reply. */
+export const servingMode = (sv: Serving): ReplyMode | null =>
+  sv.kind === 'control' ? 'control' : sv.kind === 'examples' ? sv.next : null;
+
+const exampleReplies = (r: ReplyCounts) => r.complete + r.faded + r.erroneous;
+const totalReplies = (r: ReplyCounts) => REPLY_ORDER.reduce((n, k) => n + r[k], 0);
+
+const ServingDetail: Component<{ serving: Serving; mastery: number | null; replies?: ReplyCounts }> = (props) => {
+  const mixed = () => (props.replies && props.replies.control > 0 && exampleReplies(props.replies) > 0 ? props.replies : null);
+  const control = () => (props.serving.kind === 'control' ? props.serving : null);
+  const generating = () => (props.serving.kind !== 'control' ? props.serving : null);
+  const last = () => (props.serving.kind === 'examples' ? props.serving.last : null);
+  return (
+    <div class="mt-2.5 pt-2.5 border-t border-line space-y-1.5">
+      <CardLabel>Being generated now</CardLabel>
+      <Show when={control()}>
+        {(c) => (
+          <>
+            <p class="flex items-center gap-2"><ModeTag mode="control" /> <span class="text-ink">no examples</span></p>
+            <p>
+              <Show
+                when={c().at}
+                fallback={<>Every reply this student has had so far came from the normal tutor, so no worked examples are expected.</>}
+              >
+                {(at) => <>The latest reply on this lesson came from the normal tutor ({ago(at())}), so no worked examples are being generated, whatever the mastery.</>}
+              </Show>
+            </p>
+          </>
+        )}
+      </Show>
+      <Show when={generating()}>
+        {(g) => (
+          <>
+            <p class="flex items-center gap-2">
+              <span class="text-ink">{g().kind === 'unknown' ? 'If in the example group:' : 'Next example:'}</span>
+              <ModeTag mode={g().next} />
+            </p>
+            <p>
+              <Show
+                when={!g().fromPrior}
+                fallback={<>No graded Submit on this topic yet, so the tutor starts from the BKT prior (about {PRIOR.toFixed(2)}).</>}
+              >
+                From mastery {prob(props.mastery)} ({BAND_RANGE[g().next]}).
+              </Show>
+            </p>
+            <Show when={last()}>
+              {(l) => (
+                <p class="text-muted">
+                  Last example reply: {MODE_LABEL[l().mode]}, {ago(l().at)}
+                  {l().mode !== g().next ? ' — mastery has moved since.' : '.'}
+                </p>
+              )}
+            </Show>
+            <Show when={g().kind === 'unknown'}>
+              <p class="text-muted">No tutor reply yet. Students in the normal-tutor group get no examples.</p>
+            </Show>
+          </>
+        )}
+      </Show>
+      <Show when={mixed()}>
+        {(r) => (
+          <p class="text-brass">
+            Mixed sessions: {r().control} of {totalReplies(r())} replies so far came from the normal tutor.
+          </p>
+        )}
+      </Show>
+    </div>
+  );
+};
+
 // ── Mastery rule ───────────────────────────────────────────────────────
+
+const BAND_MEANING: Record<ExampleMode, string> = {
+  complete: 'fully worked examples',
+  faded: 'examples with steps left for the student',
+  erroneous: 'examples with a bug to find',
+};
 
 /**
  * Mastery as a ruler: the fill is P(L), the ticks are where the tutor changes
  * example mode (0.30, 0.70) and where a topic counts as mastered (0.95).
+ * Hover for the band and, given `serving`, what the tutor is generating now.
  */
-export const MasteryRule: Component<{ value: number | null; compact?: boolean }> = (props) => (
-  <div class="flex items-center gap-2.5 min-w-0">
-    <span class="font-mono text-[13px] tabular-nums text-ink w-9 shrink-0">{prob(props.value)}</span>
-    <div
-      role="meter"
-      aria-label="Mastery"
-      aria-valuemin={0}
-      aria-valuemax={1}
-      aria-valuenow={props.value ?? undefined}
-      aria-valuetext={props.value == null ? 'No graded Submit yet' : `${prob(props.value)}, ${modeLabel(modeOf(props.value))} examples`}
-      class={`relative h-2 bg-line/80 rounded-[1px] ${props.compact ? 'w-20' : 'w-full min-w-24'}`}
-    >
-      <Show when={props.value != null}>
-        <div class="absolute inset-y-0 left-0 bg-ink rounded-[1px]" style={{ width: `${(props.value ?? 0) * 100}%` }} />
-      </Show>
-      <span class="absolute -top-0.5 -bottom-0.5 left-[30%] w-px bg-muted/70" />
-      <span class="absolute -top-0.5 -bottom-0.5 left-[70%] w-px bg-muted/70" />
-      <span class="absolute -top-0.5 -bottom-0.5 left-[95%] w-px bg-garnet" />
-    </div>
-  </div>
+export const MasteryRule: Component<{
+  value: number | null;
+  compact?: boolean;
+  serving?: Serving;
+  replies?: ReplyCounts;
+}> = (props) => (
+  <HoverCard
+    class="flex items-center gap-2.5 min-w-0"
+    trigger={
+      <>
+        <span class="font-mono text-[13px] tabular-nums text-ink w-9 shrink-0">{prob(props.value)}</span>
+        <div
+          role="meter"
+          aria-label="Mastery"
+          aria-valuemin={0}
+          aria-valuemax={1}
+          aria-valuenow={props.value ?? undefined}
+          aria-valuetext={props.value == null ? 'No graded Submit yet' : `${prob(props.value)}, ${modeLabel(modeOf(props.value))} band`}
+          class={`relative h-2 bg-line/80 rounded-[1px] ${props.compact ? 'w-20' : 'w-full min-w-24'}`}
+        >
+          <Show when={props.value != null}>
+            <div class="absolute inset-y-0 left-0 bg-ink rounded-[1px]" style={{ width: `${(props.value ?? 0) * 100}%` }} />
+          </Show>
+          <span class="absolute -top-0.5 -bottom-0.5 left-[30%] w-px bg-muted/70" />
+          <span class="absolute -top-0.5 -bottom-0.5 left-[70%] w-px bg-muted/70" />
+          <span class="absolute -top-0.5 -bottom-0.5 left-[95%] w-px bg-garnet" />
+        </div>
+      </>
+    }
+  >
+    <CardLabel>Topic mastery</CardLabel>
+    <Show when={props.value != null} fallback={<p class="mt-1">No graded Submit on this topic yet.</p>}>
+      <p class="mt-1">
+        <span class="font-mono text-ink">{prob(props.value)}</span> · {modeLabel(modeOf(props.value!))} band: {BAND_MEANING[modeOf(props.value!)]} for
+        students in the example group.
+        <Show when={props.value! >= 0.95}> Mastered.</Show>
+      </p>
+    </Show>
+    <Show when={props.serving}>
+      {(sv) => <ServingDetail serving={sv()} mastery={props.value} replies={props.replies} />}
+    </Show>
+  </HoverCard>
 );
 
 function modeOf(m: number): ExampleMode {
   return m < 0.3 ? 'complete' : m <= 0.7 ? 'faded' : 'erroneous';
+}
+
+// ── Tutor group and reply mix ──────────────────────────────────────────
+
+const REPLY_ORDER: ReplyKind[] = ['complete', 'faded', 'erroneous', 'control', 'blocked', 'other'];
+const REPLY_LABEL: Record<ReplyKind, string> = {
+  complete: 'Complete example',
+  faded: 'Faded example',
+  erroneous: 'Erroneous example',
+  control: 'Normal tutor',
+  blocked: 'Blocked by guardrail',
+  other: 'Unrecognised model',
+};
+const REPLY_FILL: Record<ReplyKind, string> = {
+  complete: 'bg-brass',
+  faded: 'bg-ink',
+  erroneous: 'bg-ivy',
+  control: 'bg-muted/45',
+  blocked: 'bg-garnet',
+  other: 'bg-line',
+};
+
+const TUTOR_LABEL: Record<TutorGroup, string> = { examples: 'Examples', control: 'Normal tutor', mixed: 'Mixed' };
+const TUTOR_CLASS: Record<TutorGroup, string> = {
+  examples: 'text-ink border-ink/30',
+  control: 'text-muted border-line',
+  mixed: 'text-brass border-brass/40',
+};
+
+/** Stacked bar of tutor replies by who wrote them, with a legend. */
+export const ReplyMix: Component<{ replies: ReplyCounts; compact?: boolean }> = (props) => {
+  const total = () => totalReplies(props.replies);
+  const shown = () => REPLY_ORDER.filter((k) => props.replies[k] > 0);
+  return (
+    <Show when={total() > 0} fallback={<p class="text-sm text-muted">No tutor replies yet.</p>}>
+      <div
+        role="img"
+        aria-label={`${total()} tutor replies: ${shown().map((k) => `${props.replies[k]} ${REPLY_LABEL[k]}`).join(', ')}`}
+        class={`flex w-full overflow-hidden rounded-[1px] bg-paper ${props.compact ? 'h-2' : 'h-4'}`}
+      >
+        <For each={shown()}>
+          {(k) => <div class={REPLY_FILL[k]} style={{ width: `${(props.replies[k] / total()) * 100}%`, 'min-width': '2px' }} />}
+        </For>
+      </div>
+      <ul class={`grid grid-cols-[auto_1fr_auto] gap-x-2.5 gap-y-1 text-[12px] ${props.compact ? 'mt-2' : 'mt-3'}`}>
+        <For each={shown()}>
+          {(k) => (
+            <li class="contents">
+              <span aria-hidden="true" class={`mt-1 w-2.5 h-2.5 rounded-[1px] ${REPLY_FILL[k]}`} />
+              <span>{REPLY_LABEL[k]}</span>
+              <span class="font-mono tabular-nums text-ink text-right">
+                {props.replies[k]} <span class="text-muted">· {pct(props.replies[k] / total())}</span>
+              </span>
+            </li>
+          )}
+        </For>
+      </ul>
+    </Show>
+  );
+};
+
+/** Which tutor a student has been getting; hover for their reply mix. */
+export const TutorTag: Component<{ tutor: TutorGroup | null; replies: ReplyCounts }> = (props) => (
+  <Show when={props.tutor} fallback={<span class="text-muted">No replies</span>}>
+    {(g) => (
+      <HoverCard
+        trigger={
+          <span class={`inline-flex items-center rounded-[3px] border px-1.5 py-px font-mono text-[11px] uppercase tracking-[0.08em] whitespace-nowrap ${TUTOR_CLASS[g()]}`}>
+            {TUTOR_LABEL[g()]}
+          </span>
+        }
+      >
+        <CardLabel>Tutor replies so far</CardLabel>
+        <div class="mt-2"><ReplyMix replies={props.replies} compact /></div>
+        <p class="mt-2.5 text-muted">
+          {g() === 'mixed'
+            ? 'This student has had both example and normal-tutor sessions; the group is decided per request.'
+            : g() === 'control'
+              ? 'Only the normal tutor so far: no worked examples, whatever the mastery.'
+              : 'Only the example tutor so far.'}
+        </p>
+      </HoverCard>
+    )}
+  </Show>
+);
+
+/** Panel: every tutor reply in scope, by who wrote it. */
+export const ReplyMixPanel: Component<{ replies: ReplyCounts; scope: string }> = (props) => (
+  <figure class="rounded-md border border-line bg-white p-5">
+    <figcaption>
+      <h2 class="font-display text-lg text-ink">Who wrote the tutor replies</h2>
+      <p class="mt-1 text-sm text-body">
+        Every tutor reply {props.scope} got, by the model that wrote it. A student's group is decided on each request, so not every
+        session gets examples.
+      </p>
+    </figcaption>
+    <div class="mt-4"><ReplyMix replies={props.replies} /></div>
+  </figure>
+);
+
+// ── Example allowance ──────────────────────────────────────────────────
+
+/** Where the student stands on examples this round, in words. */
+export function exampleStatus(ex: { used: number; cap: number; remaining: number }): string {
+  if (ex.used >= ex.cap) return 'all used this round';
+  if (ex.remaining > 0) return `${ex.remaining} unlocked, not yet asked for`;
+  return ex.used === 0 ? 'first unlocks on a failed Submit' : 'next unlocks on a failed Submit';
 }
 
 // ── Misc ───────────────────────────────────────────────────────────────
@@ -278,7 +573,7 @@ export const BandChart: Component<{ bands: BandStat[]; scope: string }> = (props
       <figcaption>
         <h2 class="font-display text-lg text-ink">First-try passes by mastery going in</h2>
         <p class="mt-1 text-sm text-body">
-          Of the lessons {props.scope} submitted, the share that passed on the first Submit, grouped by topic mastery just before that Submit.
+          Of the lessons {props.scope} submitted, the share that passed on the first Submit, grouped by topic mastery just before that Submit. Bands are mastery levels: lessons from normal-tutor sessions, which got no examples, are counted too.
         </p>
       </figcaption>
 
