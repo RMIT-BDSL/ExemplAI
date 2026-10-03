@@ -46,3 +46,37 @@ export async function sendChatMessage(
   );
   return response.data;
 }
+
+/** Judge0's raw result for an ungraded run (see server run_scratchpad). */
+export interface ScratchpadRunResult {
+  stdout?: string | null;
+  stderr?: string | null;
+  compile_output?: string | null;
+  /** Seconds, as a string, e.g. "0.012". */
+  time?: string | null;
+  status?: { id: number; description: string };
+}
+
+// Runs a snippet as-is: no test cases, no grading, no lesson progress.
+export async function scratchpadExecute(
+  code: string,
+  languageId = 71,
+  stdin = ""
+): Promise<ScratchpadRunResult> {
+  const tokenRes = await authClient.convex.token();
+  const token = tokenRes.data?.token;
+
+  const response = await axios.post<ScratchpadRunResult>(
+    `${BACKEND_URL}/scratchpad/execute`,
+    {
+      code,
+      language_id: languageId,
+      stdin: stdin || undefined,
+    },
+    {
+      timeout: 30000,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  return response.data;
+}
