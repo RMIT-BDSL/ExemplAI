@@ -19,6 +19,10 @@ import {
   modeFromModel,
   pickCounts,
   progressActivityAt,
+  NO_REPLIES,
+  addReplies,
+  repliesFromCounts,
+  tutorGroup,
 } from "./studentMetrics";
 import { rebuildChat, syncStudent } from "./triggers";
 
@@ -99,6 +103,7 @@ async function studentRow(ctx: QueryCtx, stats: Doc<"studentStats">) {
 
   const lesson = user.last_opened_lesson ? await ctx.db.get(user.last_opened_lesson) : null;
   let current = null;
+  const replies = repliesFromCounts(pickCounts(stats));
   if (lesson) {
     const progress = await ctx.db
       .query("lessonProgress")
@@ -129,6 +134,8 @@ async function studentRow(ctx: QueryCtx, stats: Doc<"studentStats">) {
     overallMastery: stats.topicsTracked ? stats.masterySum / stats.topicsTracked : null,
     topicsMastered: stats.topicsMastered,
     topicsTracked: stats.topicsTracked,
+    replies,
+    tutor: tutorGroup(replies),
   };
 }
 
@@ -168,6 +175,7 @@ export const studentSummary = adminQuery({
       firstTryRate: counts.submitted ? counts.firstTry / counts.submitted : null,
       topicsMastered: counts.topicsMastered,
       firstTryByBand: bandsFromCounts(counts),
+      replies: repliesFromCounts(counts),
     };
   },
 });
@@ -205,6 +213,7 @@ export const getStudent = adminQuery({
       .withIndex("by_user_lesson", (q) => q.eq("userId", userId))
       .collect();
     const examplesByLesson = new Map(chats.map((c) => [c.lessonId, c.examples_given ?? 0] as const));
+    const replies = chats.reduce((sum, c) => addReplies(sum, c.reply_counts ?? NO_REPLIES), NO_REPLIES);
 
     type Activity = {
       at: number;
@@ -340,6 +349,8 @@ export const getStudent = adminQuery({
         topicsMastered: masteryRows.filter((m) => m.mastered).length,
         topicsTracked: masteryRows.length,
         examplesGiven: [...examplesByLesson.values()].reduce((a, b) => a + b, 0),
+        replies,
+        tutor: tutorGroup(replies),
       },
       firstTryByBand: firstTryByBand(progress),
       lessons,
@@ -403,7 +414,7 @@ export const backfillSummaries = internalMutation({
       }
       totals.students++;
       if (row.started > 0) totals.active++;
-      totals.counts = addCounts(totals.counts, pickCounts(row));
+      totals.counts = addCounts(pickCounts(totals.counts), pickCounts(row));
     }
     if (!isDone) {
       await next({ phase, cursor: continueCursor, totals });

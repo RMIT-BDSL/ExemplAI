@@ -6,6 +6,13 @@ export type ExampleMode = 'complete' | 'faded' | 'erroneous';
 export type ReplyMode = ExampleMode | 'control' | 'blocked';
 export type LessonStatus = 'pending' | 'in-progress' | 'completed';
 
+// Tutor replies by who wrote them: an example node, the normal (control)
+// tutor, the guardrail, or an unrecognised model.
+export type ReplyKind = ReplyMode | 'other';
+export type ReplyCounts = Record<ReplyKind, number>;
+// Which tutor a student has been getting, from their replies.
+export type TutorGroup = 'examples' | 'control' | 'mixed';
+
 export interface BandStat {
   band: ExampleMode;
   lessons: number;
@@ -42,6 +49,8 @@ export interface StudentRow {
   overallMastery: number | null;
   topicsMastered: number;
   topicsTracked: number;
+  replies: ReplyCounts;
+  tutor: TutorGroup | null;
 }
 
 export interface StudentSummary {
@@ -55,6 +64,7 @@ export interface StudentSummary {
   activeThisWeekCapped: boolean;
   topicsMastered: number;
   firstTryByBand: BandStat[];
+  replies: ReplyCounts;
 }
 
 export interface LessonRow {
@@ -127,6 +137,8 @@ export interface StudentDetail {
     topicsMastered: number;
     topicsTracked: number;
     examplesGiven: number;
+    replies: ReplyCounts;
+    tutor: TutorGroup | null;
   };
   firstTryByBand: BandStat[];
   lessons: LessonRow[];

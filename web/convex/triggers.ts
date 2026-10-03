@@ -5,13 +5,16 @@ import {
   type Counts,
   ZERO,
   addCounts,
+  chatCounts,
   isStudent,
+  NO_REPLIES,
   isZero,
   masteryCounts,
   modeFromModel,
   pickCounts,
   progressActivityAt,
   progressCounts,
+  replyKind,
 } from "./studentMetrics";
 
 /**
@@ -66,6 +69,7 @@ async function countStudent(ctx: Ctx, userId: Id<"users">) {
   let counts = ZERO;
   for (const p of progress) counts = addCounts(counts, progressCounts(p));
   for (const m of mastery) counts = addCounts(counts, masteryCounts(m));
+  for (const c of chats) counts = addCounts(counts, chatCounts(c));
   const lastActivityAt = Math.max(
     0,
     ...progress.map(progressActivityAt),
@@ -149,7 +153,10 @@ export async function rebuildChat(ctx: Ctx, chat: Doc<"chats">) {
     if (event) await ctx.db.insert("chatEvents", event);
   }
   const lastReply = [...messages].reverse().find((m) => m.sender === "assistant");
+  const replyCounts = { ...NO_REPLIES };
+  for (const m of messages) if (m.sender === "assistant") replyCounts[replyKind(m.model)]++;
   await ctx.db.patch(chat._id, {
+    reply_counts: replyCounts,
     message_count: messages.length,
     last_message_at: messages.at(-1)?._creationTime,
     last_reply_at: lastReply?._creationTime,
@@ -193,32 +200,45 @@ triggers.register("chatMessages", async (ctx, change) => {
     }
     if (chat.message_count !== undefined) {
       const wasExample = m.sender === "assistant" && m.response_type === "new_example";
+      const replyCounts =
+        chat.reply_counts && m.sender === "assistant"
+          ? { ...chat.reply_counts, [replyKind(m.model)]: Math.max(0, chat.reply_counts[replyKind(m.model)] - 1) }
+          : chat.reply_counts;
       await ctx.db.patch(chat._id, {
         message_count: Math.max(0, chat.message_count - 1),
         examples_given: Math.max(0, (chat.examples_given ?? 0) - (wasExample ? 1 : 0)),
+        reply_counts: replyCounts,
       });
     }
-    return;
+  } else {
+    const m = change.newDoc;
+    if (chat.message_count === undefined || chat.reply_counts === undefined) {
+      // First message since (this part of) the summary existed: count the whole chat once.
+      await rebuildChat(ctx, chat);
+    } else {
+      const isReply = m.sender === "assistant";
+      await ctx.db.patch(chat._id, {
+        message_count: chat.message_count + 1,
+        last_message_at: m._creationTime,
+        ...(isReply
+          ? {
+              last_reply_at: m._creationTime,
+              last_reply_model: m.model,
+              last_reply_response_type: m.response_type,
+              reply_counts: { ...chat.reply_counts, [replyKind(m.model)]: chat.reply_counts[replyKind(m.model)] + 1 },
+            }
+          : {}),
+        ...(isReply && m.response_type === "new_example" ? { examples_given: (chat.examples_given ?? 0) + 1 } : {}),
+      });
+      const event = chatEventFor(chat, m);
+      if (event) await ctx.db.insert("chatEvents", event);
+    }
   }
 
-  const m = change.newDoc;
-  if (chat.message_count === undefined) {
-    // First message since summaries existed: count the whole chat once.
-    await rebuildChat(ctx, chat);
-  } else {
-    const isReply = m.sender === "assistant";
-    await ctx.db.patch(chat._id, {
-      message_count: chat.message_count + 1,
-      last_message_at: m._creationTime,
-      ...(isReply
-        ? { last_reply_at: m._creationTime, last_reply_model: m.model, last_reply_response_type: m.response_type }
-        : {}),
-      ...(isReply && m.response_type === "new_example" ? { examples_given: (chat.examples_given ?? 0) + 1 } : {}),
-    });
-    const event = chatEventFor(chat, m);
-    if (event) await ctx.db.insert("chatEvents", event);
-  }
-  await applyToStudent(ctx, chat.userId, ZERO, m._creationTime);
+  // The student's reply mix moves by however much this chat's counts moved.
+  const after = await ctx.db.get(chat._id);
+  const delta = addCounts(chatCounts(after), chatCounts(chat), -1);
+  await applyToStudent(ctx, chat.userId, delta, change.newDoc?._creationTime ?? null);
 });
 
 triggers.register("chats", async (ctx, change) => {
@@ -229,4 +249,7 @@ triggers.register("chats", async (ctx, change) => {
     .collect()) {
     await ctx.db.delete(e._id);
   }
+  // Replies still counted in a deleted chat leave the student's mix.
+  const delta = addCounts(ZERO, chatCounts(change.oldDoc), -1);
+  if (!isZero(delta)) await applyToStudent(ctx, change.oldDoc.userId, delta, null);
 });
