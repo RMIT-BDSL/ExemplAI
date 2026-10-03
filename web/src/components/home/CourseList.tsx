@@ -1,86 +1,39 @@
 import { usePostHog } from "@posthog/react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Compass,
-  HelpCircle,
-  PlayCircle,
-  Search,
-} from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import { authClient } from "#/lib/auth-client";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../convex/_generated/api";
+
+type Status = "completed" | "in-progress" | "pending";
 
 export type ShortProblem = {
   id: string;
   name: string;
   description: string;
   week: number;
-  status: "completed" | "in-progress" | "pending";
-  language: "Python";
-  difficulty: "Easy" | "Medium" | "Hard";
-  tags: string[];
-  // acceptance: string
+  topic?: string;
+  status: Status;
 };
 
-/*
-const MOCK_METADATA: Record<string, Partial<ShortProblem>> = {
-  "Two Sum": {
-    status: "completed",
-    difficulty: "Easy",
-    tags: ["Array", "Hash Table"],
-    acceptance: "54.2%",
-  },
-  "Valid Parentheses": {
-    status: "completed",
-    difficulty: "Easy",
-    tags: ["Stack", "String"],
-    acceptance: "41.5%",
-  },
-  "Merge Two Sorted Lists": {
-    status: "in-progress",
-    difficulty: "Medium",
-    tags: ["Linked List", "Recursion"],
-    acceptance: "63.7%",
-  },
-  "Maximum Subarray": {
-    status: "pending",
-    difficulty: "Medium",
-    tags: ["Array", "Divide & Conquer"],
-    acceptance: "50.1%",
-  },
-  "Binary Tree Inorder Traversal": {
-    status: "pending",
-    difficulty: "Easy",
-    tags: ["Tree", "DFS"],
-    acceptance: "74.8%",
-  },
-  "Clone Graph": {
-    status: "pending",
-    difficulty: "Medium",
-    tags: ["Graph", "BFS"],
-    acceptance: "56.2%",
-  },
-  "Course Schedule": {
-    status: "pending",
-    difficulty: "Hard",
-    tags: ["Graph", "DFS", "BFS"],
-    acceptance: "60.4%",
-  },
-  "Longest Palindromic Substring": {
-    status: "pending",
-    difficulty: "Medium",
-    tags: ["String", "Dynamic Programming"],
-    acceptance: "34.1%",
-  },
-}
-*/
+const STATUS_FILTERS: { value: Status | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Not started" },
+  { value: "in-progress", label: "Started" },
+  { value: "completed", label: "Done" },
+];
 
+/** Strip markdown backticks for the one-line description preview. */
+function plain(text: string) {
+  return text.replace(/`/g, "");
+}
+
+/**
+ * Syllabus: the course as a book-style contents list grouped by week (same
+ * language as the workspace's lesson index), with search and filters.
+ */
 export default function CourseList() {
   const questions = useQuery(api.courses.getAllCourses);
 
@@ -90,219 +43,209 @@ export default function CourseList() {
   const tokenIdentifier = session?.user?.id;
   const lessonProgress = useQuery(
     api.courses.getLessonProgress,
-    tokenIdentifier ? {} : "skip"
+    tokenIdentifier ? {} : "skip",
   );
-
-  // lessonId -> status. Lessons absent from the map are "pending".
-  const progressByLesson = new Map((lessonProgress ?? []).map((p) => [p.lessonId, p.status]));
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
-  const [selectedStatus, setSelectedStatus] = useState<ShortProblem["status"] | "all">("all");
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>({});
+  const [selectedStatus, setSelectedStatus] = useState<Status | "all">("all");
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>(
+    {},
+  );
 
-  if (questions === undefined) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div>
-          <div className="h-6 w-48 bg-zinc-200 rounded"></div>
-          <div className="h-4 w-72 bg-zinc-100 rounded mt-2"></div>
-        </div>
-        <div className="h-24 bg-zinc-200/50 rounded-xl border border-line"></div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-zinc-200/30 rounded-xl border border-line"></div>
-          ))}
-        </div>
-      </div>
+  const problems: ShortProblem[] = useMemo(() => {
+    // lessonId -> status. Lessons absent from the map are "pending".
+    const progressByLesson = new Map(
+      (lessonProgress ?? []).map((p) => [p.lessonId, p.status]),
     );
-  }
-
-  const problems: ShortProblem[] = questions.map((q: any) => {
-    return {
+    return (questions ?? []).map((q: any) => ({
       id: q._id,
       name: q.problem_name,
       description: q.problem_description,
       week: q.week,
-      status: progressByLesson.get(q._id) ?? "pending",
-      language: "Python",
-      difficulty: "Easy",
-      tags: [],
-      // acceptance: "50.0%",
-    };
-  });
+      topic: q.topic,
+      status: (progressByLesson.get(q._id) as Status | undefined) ?? "pending",
+    }));
+  }, [questions, lessonProgress]);
 
-  // Filter problems based on states
-  const filteredProblems = problems.filter((problem) => {
-    const matchesSearch =
-      problem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      problem.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesWeek = selectedWeek === "all" || problem.week === selectedWeek;
-    const matchesStatus = selectedStatus === "all" || problem.status === selectedStatus;
-
-    return matchesSearch && matchesWeek && matchesStatus;
-  });
-
-  // Group filtered problems by week
-  const problemsByWeek = filteredProblems.reduce<Record<number, ShortProblem[]>>(
-    (groups, problem) => {
-      if (!groups[problem.week]) {
-        groups[problem.week] = [];
-      }
-      groups[problem.week].push(problem);
-      return groups;
-    },
-    {}
+  // Every week that has lessons, not a fixed list.
+  const allWeeks = useMemo(
+    () => [...new Set(problems.map((p) => p.week))].sort((a, b) => a - b),
+    [problems],
   );
 
-  // Get sorted list of active weeks
+  if (questions === undefined) {
+    return <SyllabusSkeleton />;
+  }
+
+  const term = searchTerm.trim().toLowerCase();
+  const filteredProblems = problems.filter(
+    (p) =>
+      (term === "" ||
+        p.name.toLowerCase().includes(term) ||
+        p.description.toLowerCase().includes(term) ||
+        (p.topic ?? "").toLowerCase().includes(term)) &&
+      (selectedWeek === "all" || p.week === selectedWeek) &&
+      (selectedStatus === "all" || p.status === selectedStatus),
+  );
+
+  const problemsByWeek = filteredProblems.reduce<
+    Record<number, ShortProblem[]>
+  >((groups, p) => {
+    if (!groups[p.week]) groups[p.week] = [];
+    groups[p.week].push(p);
+    return groups;
+  }, {});
   const sortedWeeks = Object.keys(problemsByWeek)
     .map(Number)
     .sort((a, b) => a - b);
 
-  const toggleWeek = (weekNum: number) => {
-    setCollapsedWeeks((prev) => ({
-      ...prev,
-      [weekNum]: !prev[weekNum],
-    }));
-  };
+  const totalDone = problems.filter((p) => p.status === "completed").length;
 
   return (
-    <div className="space-y-6">
-      {/* Title & Introduction */}
-      <div>
-        <h2 className="text-lg font-bold text-sea-ink tracking-tight flex items-center gap-2">
-          <Compass className="size-4.5 text-lagoon" />
-          <span>Python Programming Syllabus</span>
-        </h2>
-        <p className="text-xs text-sea-ink-soft mt-1 leading-relaxed">
-          Complete the challenges below sequentially. Use the workspace editor to run and submit
-          your solutions.
+    <div>
+      {/* Title */}
+      <header className="mb-8">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">
+          Syllabus
         </p>
-      </div>
+        <h1 className="font-serif text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-ink">
+          Python Programming
+        </h1>
+        <p className="mt-2 font-serif text-[0.95rem] leading-[1.75] text-ink-prose">
+          Work through the exercises in order. Each one opens in the workspace,
+          where you can run your code, submit it, and ask the tutor for help.
+        </p>
+        <p className="mt-3 text-[11px] text-ink-label">
+          {totalDone} of {problems.length} exercises done
+        </p>
+      </header>
 
-      {/* Interactive Controls (Search & Filters) */}
-      <div className="island-shell rounded-xl p-3.5 border border-line space-y-3.5">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* Search bar */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 size-3.5 text-sea-ink-soft" />
+      {/* Search and filters */}
+      <div className="mb-8 space-y-3 border-y border-rule-strong py-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <label className="relative flex-1">
+            <span className="sr-only">Search exercises</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-label" />
             <input
-              type="text"
-              placeholder="Search exercises, descriptions, or tags..."
+              type="search"
+              placeholder="Search exercises or topics…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-sand/50 dark:bg-white/5 border border-line rounded-lg py-1.5 pl-9 pr-4 text-xs text-sea-ink placeholder:text-sea-ink-soft/60 outline-none focus:border-lagoon/50 focus:ring-1 focus:ring-lagoon/20 transition-all"
+              className="h-8 w-full rounded-[2px] border border-rule bg-surface-raised pl-9 pr-3 text-xs text-ink outline-none placeholder:text-ink-label focus:border-brass"
             />
-          </div>
+          </label>
 
-          {/* Status filter tabs (Segmented Control style) */}
-          <div className="flex bg-sand/60 dark:bg-white/5 border border-line rounded-lg p-0.5 shrink-0">
-            {(["all", "completed", "in-progress", "pending"] as const).map((status) => (
+          <fieldset
+            aria-label="Filter by status"
+            className="m-0 flex min-w-0 shrink-0 overflow-hidden rounded-[2px] border border-rule-strong p-0"
+          >
+            {STATUS_FILTERS.map(({ value, label }) => (
               <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
+                key={value}
+                type="button"
+                aria-pressed={selectedStatus === value}
+                onClick={() => setSelectedStatus(value)}
                 className={cn(
-                  "px-3 py-1 text-[11px] font-medium capitalize rounded-md transition-all cursor-pointer",
-                  selectedStatus === status
-                    ? "bg-white dark:bg-zinc-800 text-sea-ink shadow-sm border border-line/10"
-                    : "text-sea-ink-soft hover:text-sea-ink"
+                  "h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors cursor-pointer [&+&]:border-l [&+&]:border-rule-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brass",
+                  selectedStatus === value
+                    ? "bg-brass-fill text-on-brass"
+                    : "text-ink-muted hover:text-brass",
                 )}
               >
-                {status === "all" ? "All" : status.replace("-", " ")}
+                {label}
               </button>
             ))}
-          </div>
+          </fieldset>
         </div>
 
-        {/* Week filter tabs */}
-        <div className="flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
-          <button
-            onClick={() => setSelectedWeek("all")}
-            className={cn(
-              "px-3 py-1 text-[11px] font-medium rounded-full cursor-pointer transition-all border",
-              selectedWeek === "all"
-                ? "bg-lagoon/10 border-lagoon/30 text-lagoon font-semibold"
-                : "bg-white/40 dark:bg-transparent border-line text-sea-ink-soft hover:text-sea-ink hover:bg-sand"
-            )}
-          >
-            All Weeks
-          </button>
-          {[1, 2, 3, 4].map((wk) => (
+        <fieldset
+          aria-label="Filter by week"
+          className="m-0 flex min-w-0 flex-wrap gap-x-4 gap-y-1 border-0 p-0"
+        >
+          {(["all", ...allWeeks] as const).map((wk) => (
             <button
               key={wk}
+              type="button"
+              aria-pressed={selectedWeek === wk}
               onClick={() => setSelectedWeek(wk)}
               className={cn(
-                "px-3 py-1 text-[11px] font-medium rounded-full cursor-pointer transition-all border",
+                "border-b py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
                 selectedWeek === wk
-                  ? "bg-lagoon/10 border-lagoon/30 text-lagoon font-semibold"
-                  : "bg-white/40 dark:bg-transparent border-line text-sea-ink-soft hover:text-sea-ink hover:bg-sand"
+                  ? "border-brass text-brass"
+                  : "border-transparent text-ink-label hover:text-ink",
               )}
             >
-              Week {wk}
+              {wk === "all" ? "All weeks" : `Week ${wk}`}
             </button>
           ))}
-        </div>
+        </fieldset>
       </div>
 
-      {/* Problems List Stack grouped by Week */}
+      {/* Contents, grouped by week */}
       {sortedWeeks.length > 0 ? (
-        <div className="space-y-5">
+        <div className="space-y-8">
           {sortedWeeks.map((weekNum) => {
             const isCollapsed = collapsedWeeks[weekNum];
             const weekProblems = problemsByWeek[weekNum];
-            const completedCount = weekProblems.filter((p) => p.status === "completed").length;
-            const completedPct = Math.round((completedCount / weekProblems.length) * 100);
-
+            const doneCount = weekProblems.filter(
+              (p) => p.status === "completed",
+            ).length;
+            const topic = weekProblems[0]?.topic;
             return (
-              <div key={weekNum} className="space-y-2.5">
+              <section key={weekNum} aria-labelledby={`week-${weekNum}`}>
                 <button
-                  onClick={() => toggleWeek(weekNum)}
-                  className="w-full flex items-center gap-3 pb-1 text-left cursor-pointer group transition-colors"
+                  type="button"
+                  onClick={() =>
+                    setCollapsedWeeks((prev) => ({
+                      ...prev,
+                      [weekNum]: !prev[weekNum],
+                    }))
+                  }
+                  aria-expanded={!isCollapsed}
+                  className="group mb-2 flex w-full items-center gap-3 text-left cursor-pointer"
                 >
-                  <h3 className="font-semibold text-xs tracking-tight text-sea-ink group-hover:text-lagoon shrink-0">
-                    Week {weekNum} &middot; <span className="text-sea-ink-soft font-normal text-[11px]">{weekProblems.length} {weekProblems.length === 1 ? "exercise" : "exercises"}</span>
-                  </h3>
-
-                  {/* Week progress bar + count */}
-                  <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <div className="h-1 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden max-w-[120px]">
-                      <div
-                        className="h-full rounded-full bg-palm transition-all"
-                        style={{ width: `${completedPct}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-medium text-sea-ink-soft tabular-nums shrink-0">
-                      {completedCount}/{weekProblems.length}
-                    </span>
-                  </div>
-
+                  <h2
+                    id={`week-${weekNum}`}
+                    className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-brass"
+                  >
+                    Week {weekNum}
+                    {topic && (
+                      <span className="font-medium text-ink-label">
+                        {" "}
+                        · {topic}
+                      </span>
+                    )}
+                  </h2>
+                  <span className="h-px flex-1 bg-rule-strong" />
+                  <span className="shrink-0 text-[10px] tabular-nums text-ink-label">
+                    {doneCount}/{weekProblems.length} done
+                  </span>
                   {isCollapsed ? (
-                    <ChevronRight className="size-3.5 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
+                    <ChevronRight className="size-3.5 shrink-0 text-ink-label group-hover:text-brass" />
                   ) : (
-                    <ChevronDown className="size-3.5 text-sea-ink-soft group-hover:text-sea-ink shrink-0" />
+                    <ChevronDown className="size-3.5 shrink-0 text-ink-label group-hover:text-brass" />
                   )}
                 </button>
 
                 {!isCollapsed && (
-                  <div className="flex flex-col gap-2">
+                  <ul>
                     {weekProblems.map((problem) => (
-                      <ShortProblemCard key={problem.id} {...problem} />
+                      <LessonRow key={problem.id} {...problem} />
                     ))}
-                  </div>
+                  </ul>
                 )}
-              </div>
+              </section>
             );
           })}
         </div>
       ) : (
-        <div className="island-shell rounded-xl p-8 text-center border border-line">
-          <HelpCircle className="size-6 text-sea-ink-soft/60 mx-auto mb-2" />
-          <p className="text-xs font-semibold text-sea-ink">No exercises found</p>
-          <p className="text-[11px] text-sea-ink-soft mt-1">
-            Try adjusting your search criteria or selected filters.
+        <div className="border-y border-rule py-10 text-center">
+          <p className="font-serif text-[0.95rem] text-ink">
+            No exercises match.
+          </p>
+          <p className="mt-1 text-[11px] text-ink-label">
+            Try a different search, week or status.
           </p>
         </div>
       )}
@@ -310,167 +253,92 @@ export default function CourseList() {
   );
 }
 
-function ShortProblemCard({
-  id,
-  name,
-  description,
-  week,
-  status,
-  language,
-  difficulty,
-  tags,
-}: ShortProblem) {
+const ROW_STATUS = {
+  completed: { label: "✓ Done", labelClass: "text-success", action: "Review" },
+  "in-progress": {
+    label: "Started",
+    labelClass: "text-brass",
+    action: "Resume",
+  },
+  pending: { label: "", labelClass: "text-ink-label", action: "Start" },
+} as const;
+
+function LessonRow({ id, name, description, week, status }: ShortProblem) {
   const posthog = usePostHog();
-  const difficultyStyles = {
-    Easy: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/15",
-    Medium: "text-amber-600 dark:text-amber-400 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/15",
-    Hard: "text-rose-600 dark:text-rose-400 bg-rose-500/5 dark:bg-rose-500/10 border-rose-500/15",
-  };
-
-  // Per-status visual language
-  const statusStyles = {
-    completed: {
-      Icon: CheckCircle2,
-      label: "Completed",
-      iconClass: "text-palm",
-      pill: "bg-palm/10 text-palm border-palm/20",
-      card: "border-line bg-white/70 dark:bg-white/[0.02]",
-      cta: "bg-sand dark:bg-white/10 text-sea-ink hover:bg-sand/80 dark:hover:bg-white/20 border-transparent",
-      ctaLabel: "Review",
-    },
-    "in-progress": {
-      Icon: PlayCircle,
-      label: "In progress",
-      iconClass: "text-lagoon",
-      pill: "bg-lagoon/10 text-lagoon border-lagoon/20",
-      card: "border-lagoon/20 bg-lagoon/[0.01] dark:bg-lagoon/[0.02] shadow-sm",
-      cta: "bg-lagoon text-white hover:bg-lagoon-deep border-transparent",
-      ctaLabel: "Resume",
-    },
-    pending: {
-      Icon: Circle,
-      label: "Not started",
-      iconClass: "text-sea-ink-soft/40",
-      pill: "bg-sand dark:bg-white/5 text-sea-ink-soft border-line",
-      card: "border-line bg-white/70 dark:bg-white/[0.02]",
-      cta: "bg-sand dark:bg-white/10 text-sea-ink hover:bg-sand/80 dark:hover:bg-white/20 border-transparent",
-      ctaLabel: "Start",
-    },
-  } as const;
-
-  const s = statusStyles[status];
-  const StatusIcon = s.Icon;
+  const s = ROW_STATUS[status];
+  const primary = status === "in-progress";
 
   return (
-    <div
-      className={cn(
-        "feature-card relative overflow-hidden rounded-xl border p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all",
-        s.card,
-        status === "completed" && "opacity-[0.95]"
-      )}
-    >
-      {/* Left side: status icon, title, details */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="shrink-0" title={s.label}>
-          <StatusIcon
-            className={cn("size-4", s.iconClass, status === "in-progress" && "animate-pulse")}
-          />
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3
-              className={cn(
-                "font-semibold text-xs truncate",
-                status === "completed" ? "text-sea-ink-soft" : "text-sea-ink"
-              )}
-            >
-              {name}
-            </h3>
-            {/* Status pill */}
+    <li className="group flex items-center gap-4 border-b border-rule py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className="truncate font-serif text-[15px] text-ink">
+            {name}
+          </span>
+          <span className="min-w-6 flex-1 self-center border-b border-dotted border-rule-strong" />
+          {s.label && (
             <span
               className={cn(
-                "inline-flex items-center gap-1 border text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded",
-                s.pill
-            )}
+                "shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]",
+                s.labelClass,
+              )}
             >
               {s.label}
             </span>
-            <span className="bg-sand dark:bg-white/5 text-sea-ink-soft border border-line text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0">
-              W{week}
-            </span>
-            <span
-              className={cn(
-                "border text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0",
-                difficultyStyles[difficulty]
-              )}
-            >
-              {difficulty}
-            </span>
-          </div>
-          <p className="text-[11px] text-sea-ink-soft truncate mt-0.5 max-w-[320px] md:max-w-[420px]">
-            {description}
-          </p>
-        </div>
-      </div>
-
-      {/* Right side: language, tags, solve link */}
-      <div className="flex items-center gap-3 justify-between sm:justify-end w-full sm:w-auto shrink-0 border-t sm:border-t-0 border-line/30 pt-2 sm:pt-0">
-        <div className="hidden md:flex flex-wrap gap-1">
-          {tags.slice(0, 2).map((tag) => (
-            <span
-              key={tag}
-              className="text-[9px] font-medium text-sea-ink-soft bg-sand/30 border border-line/60 px-1.5 py-0.5 rounded"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <span className="text-[10px] font-medium text-sea-ink-soft bg-sand/50 dark:bg-white/5 px-2 py-0.5 rounded border border-line">
-          {language}
-        </span>
-
-        <Link
-          to="/course"
-          search={{ problemId: id }}
-          onClick={() =>
-            posthog.capture("problem_started", {
-              problem_id: id,
-              problem_name: name,
-              week,
-              difficulty,
-              action:
-                status === "completed" ? "review" : status === "in-progress" ? "resume" : "start",
-            })
-          }
-          className={cn(
-            "text-xs font-semibold px-3 py-1 rounded-full border text-center transition-all flex items-center gap-1 cursor-pointer select-none active:scale-95",
-            s.cta
           )}
-        >
-          {s.ctaLabel}
-        </Link>
+        </div>
+        <p className="mt-0.5 truncate text-[11px] text-ink-label">
+          {plain(description)}
+        </p>
       </div>
-    </div>
+
+      <Link
+        to="/course"
+        search={{ problemId: id }}
+        onClick={() =>
+          posthog.capture("problem_started", {
+            problem_id: id,
+            problem_name: name,
+            week,
+            action:
+              status === "completed"
+                ? "review"
+                : status === "in-progress"
+                  ? "resume"
+                  : "start",
+          })
+        }
+        aria-label={`${s.action} ${name}`}
+        className={cn(
+          "flex h-7 w-[72px] shrink-0 items-center justify-center rounded-[2px] border text-[11px] font-semibold tracking-[0.02em] transition-colors select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+          primary
+            ? "border-brass-fill bg-brass-fill text-on-brass hover:opacity-90"
+            : "border-rule-strong text-brass hover:bg-surface-raised",
+        )}
+      >
+        {s.action}
+      </Link>
+    </li>
   );
 }
 
-// Deprecated original function kept for absolute backward compatibility
-export function ShortProblem({
-  name,
-  description,
-  week,
-  status,
-  language,
-}: Omit<ShortProblem, "id" | "difficulty" | "tags">) {
+export function SyllabusSkeleton() {
+  const bar = "rounded bg-rule-strong animate-pulse";
   return (
-    <div className="border border-line rounded-lg p-3 bg-white">
-      <h1 className="font-bold text-lg">{name}</h1>
-      <p className="text-sm">{description}</p>
-      <p className="text-xs text-sea-ink-soft">Week: {week}</p>
-      <p className="text-xs font-medium">Status: {status}</p>
-      <p className="text-xs text-lagoon-deep">Language: {language}</p>
+    <div aria-hidden="true">
+      <div className={`mb-3 h-2.5 w-16 ${bar}`} />
+      <div className={`mb-3 h-7 w-64 ${bar}`} />
+      <div className={`mb-8 h-4 w-full max-w-md ${bar}`} />
+      <div className="mb-8 h-24 border-y border-rule-strong" />
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-4 border-b border-rule py-4"
+        >
+          <div className={`h-4 flex-1 ${bar}`} />
+          <div className="h-7 w-[72px] rounded-[2px] border border-rule-strong" />
+        </div>
+      ))}
     </div>
   );
 }
