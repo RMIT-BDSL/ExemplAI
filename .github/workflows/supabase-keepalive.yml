@@ -1,0 +1,34 @@
+name: Supabase Keep-Alive
+
+# Free-tier Supabase projects pause after a week without activity; a daily
+# REST request keeps the LangGraph checkpointer database awake.
+on:
+  schedule:
+    - cron: '0 3 * * *' # daily at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Call REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_ANON_KEY secrets must be set"
+            exit 1
+          fi
+          # Any 2xx/4xx means the project answered; 5xx (incl. 540 paused) fails.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/")
+          echo "Supabase responded with HTTP $status"
+          [ "$status" -lt 500 ]
