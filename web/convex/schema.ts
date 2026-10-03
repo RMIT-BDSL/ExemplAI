@@ -80,6 +80,15 @@ export default defineSchema({
     // count against the cap; round_failed_submits earns them. Reset together.
     round_started_at: v.optional(v.number()),
     round_failed_submits: v.optional(v.number()),
+    // Activity timestamps for the admin student view (convex/students.ts).
+    // Rows from before these existed fall back to _creationTime.
+    updated_at: v.optional(v.number()),
+    last_submit_at: v.optional(v.number()),
+    completed_at: v.optional(v.number()),
+    // KC mastery just before this lesson's first graded Submit (BKT prior when
+    // the student had none), so admins can relate mastery to first-try passes
+    // without the circularity of the post-update value.
+    mastery_before: v.optional(v.number()),
   })
     // "give me everything this student has worked on" (render their list)
     .index("by_user", ["userId"])

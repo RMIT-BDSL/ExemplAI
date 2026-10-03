@@ -114,6 +114,7 @@ async def _record_code_execution(
                     current = initial_mastery(kc)
                 new_mastery = update_mastery(current, passed, kc)
                 mutation_args["probMastery"] = new_mastery
+                mutation_args["priorMastery"] = current
                 mutation_args["knowledgeComponent"] = kc
                 mutation_args["mastered"] = is_mastered(new_mastery)
 

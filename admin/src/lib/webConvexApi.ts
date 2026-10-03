@@ -166,6 +166,20 @@ export type PublicApiType = {
       any
     >;
   };
+  students: {
+    listStudents: FunctionReference<
+      "query",
+      "public",
+      Record<string, never>,
+      any
+    >;
+    getStudent: FunctionReference<
+      "query",
+      "public",
+      { userId: Id<"users"> },
+      any
+    >;
+  };
   lessons: {
     createLesson: FunctionReference<
       "mutation",

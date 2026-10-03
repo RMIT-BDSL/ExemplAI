@@ -19,6 +19,7 @@ import type * as invitationCodes from "../invitationCodes.js";
 import type * as lessons from "../lessons.js";
 import type * as releaseNotes from "../releaseNotes.js";
 import type * as seed from "../seed.js";
+import type * as students from "../students.js";
 import type * as validators from "../validators.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   lessons: typeof lessons;
   releaseNotes: typeof releaseNotes;
   seed: typeof seed;
+  students: typeof students;
   validators: typeof validators;
 }>;
 

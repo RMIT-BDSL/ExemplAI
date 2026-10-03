@@ -227,13 +227,20 @@ export const setLessonStatus = authenticatedMutation({
       return { success: true };
     }
 
+    const now = Date.now();
+    const completedAt =
+      args.status === "completed" && existing?.status !== "completed"
+        ? { completed_at: now }
+        : {};
     if (existing) {
-      await ctx.db.patch(existing._id, { status: args.status });
+      await ctx.db.patch(existing._id, { status: args.status, updated_at: now, ...completedAt });
     } else {
       await ctx.db.insert("lessonProgress", {
         userId: user._id,
         lessonId: args.lessonId,
         status: args.status,
+        updated_at: now,
+        ...completedAt,
       });
     }
 
@@ -253,6 +260,8 @@ export const recordCodeExecution = authenticatedMutation({
     actionType: v.union(v.literal("run"), v.literal("submit")),
     // Server-computed mastery after first Submit; omit on run / re-submit.
     probMastery: v.optional(v.number()),
+    // Mastery the server updated from (stored value or BKT prior).
+    priorMastery: v.optional(v.number()),
     knowledgeComponent: v.optional(v.string()),
     // Server-computed: probMastery reached the BKT mastery threshold.
     mastered: v.optional(v.boolean()),
@@ -296,10 +305,10 @@ export const recordCodeExecution = authenticatedMutation({
     let knowledgeComponent: string | undefined;
     let mastered: boolean | undefined;
 
+    const now = Date.now();
     if (shouldRecordBkt) {
       knowledgeComponent = args.knowledgeComponent!;
       probMastery = Math.min(1, Math.max(0, args.probMastery!));
-      const now = Date.now();
 
       const masteryRow = await ctx.db
         .query("bktMastery")
@@ -346,12 +355,22 @@ export const recordCodeExecution = authenticatedMutation({
         }
       : {};
 
+    const activityFields = {
+      updated_at: now,
+      ...(args.actionType === "submit" ? { last_submit_at: now } : {}),
+      ...(nextStatus === "completed" && !alreadyCompleted ? { completed_at: now } : {}),
+      ...(shouldRecordBkt && args.priorMastery !== undefined
+        ? { mastery_before: Math.min(1, Math.max(0, args.priorMastery)) }
+        : {}),
+    };
+
     if (existing) {
       await ctx.db.patch(existing._id, {
         status: nextStatus,
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
         ...failureFields,
+        ...activityFields,
       });
     } else {
       await ctx.db.insert("lessonProgress", {
@@ -361,6 +380,7 @@ export const recordCodeExecution = authenticatedMutation({
         has_run: true,
         ...(bktRecorded ? { bkt_recorded: true } : {}),
         ...failureFields,
+        ...activityFields,
       });
     }
 
