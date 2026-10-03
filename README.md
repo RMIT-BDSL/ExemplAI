@@ -1,30 +1,129 @@
-# ExemplAI: BKT-Driven Adaptive Example-Based Learning AI Tutor
+<div align="center">
 
-ExemplAI is an adaptive programming tutoring system designed to optimize cognitive load and enhance learning outcomes using Example-Based Learning (EBL). It dynamically selects and scaffolds code examples based on the student's current mastery level.
+# ExemplAI
+
+**A BKT-driven adaptive tutor that teaches programming through worked examples.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python 3.13](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
+![TanStack Start](https://img.shields.io/badge/frontend-TanStack%20Start-FF4154)
+![Convex](https://img.shields.io/badge/data-Convex-EE342F)
+![LangGraph](https://img.shields.io/badge/agents-LangGraph-1C3C3C)
+
+[Architecture](Macro_System_Architecture.md) · [Agent Spec](LangGraph_BKT_Architecture_Spec.md) · [Roadmap](TODO.md) · [Changelog](CHANGELOG.md)
+
+</div>
 
 ---
-## ToDo List
-Our major items still to accomplish are [listed here](TODO.md).
 
-## 📖 Some Documentation
-Explore the documentation below (Mermaid diagrams should load automatically):
+## Overview
 
-* **[Macro System Architecture](Macro_System_Architecture.md)**: 
-  Explains the overall research objectives, participant experimental workflow (A/B testing), the 4-layer system design (UI, Data, LangGraph, and Safety), and a mockup of the Split-Pane interface.
-  
-* **[LangGraph & BKT Architecture Specification](LangGraph_BKT_Architecture_Spec.md)**: 
-  Contains the detailed LangGraph agent state machine, deterministic BKT routing edge definitions, system prompts for all scaffolding modalities (Complete, Faded, and Erroneous examples), and the Pydantic-enforced Dean Validation Gate logic.
+ExemplAI is a research platform from the **Blockchain Datascience Lab @ RMIT** that studies how
+Example-Based Learning (EBL) affects novice programmers. Students solve Python exercises in a
+split-pane workspace: an editor on the left, an AI tutor on the right. The tutor tracks each
+student's mastery with **Bayesian Knowledge Tracing (BKT)** and picks the kind of example that
+fits their current level, keeping cognitive load low for beginners and challenge high for
+advanced students.
 
----
+## Features
 
-## 🛠️ High-Level Architecture
-Organise the system into some Layers:
+- **Adaptive scaffolding.** BKT mastery routes every student to the right example type:
 
-1. **Layer 1: Frontend UI**: A Next.js-based Split-Pane interface separating the coding space (left pane) from the AI Tutor chat (right pane).
-2. **Layer 2: Data**: Tracks student mastery probabilities (`probMastery`) using a Bayesian Knowledge Tracing (BKT) engine and logs events to Supabase.
-3. **Layer 3: Orchestration**: A LangGraph state machine that routes students based on their BKT mastery:
-   * **Novice (`probMastery < 0.3`)**: Receives **Complete Examples** of analog problems to reduce cognitive load.
-   * **Intermediate (`0.3 <= probMastery <= 0.7`)**: Receives **Faded Examples** (partially completed code blocks) to encourage active learning.
-   * **Expert (`probMastery > 0.7`)**: Receives **Erroneous Examples** (subtly buggy code challenges) to foster deep error detection.
-   * **Control**:  If not in the experimental group, need to serve the students a control version. TBD whether this is random between Complete / Faded / Erroneous, or a standard LLM chat interface. We need more participants for the randomised approach; however the standard LLM interface is easier.
-4. **Layer 4: Safety & Guardrails**: A **Dean Agent** that audits and validates every LLM response before sending it to the student, preventing direct answers or code leaks.
+  | Mastery (`probMastery`) | Student level | Example served |
+  |---|---|---|
+  | `< 0.3` | Novice | **Complete**: a fully worked analog problem |
+  | `0.3 – 0.7` | Intermediate | **Faded**: partially completed code with blanks |
+  | `> 0.7` | Expert | **Erroneous**: subtly buggy code to debug |
+
+- **A/B experiment support.** Students in the control group get a plain, generic chat tutor instead.
+- **Dean validation gate.** A separate agent checks every tutor response before the student sees it, blocking direct answers and solution leaks.
+- **Sandboxed code execution.** Student code runs in Judge0 against visible and hidden test cases.
+- **Curriculum.** A 12-week Python course built from the CSEDM 2019 dataset, plus original exercises.
+
+## Architecture
+
+| Layer | Responsibility | Technology |
+|---|---|---|
+| **1 · Frontend** | Split-pane workspace (editor + tutor chat), admin dashboard | TanStack Start, React, Tailwind, Cloudflare Workers |
+| **2 · Data** | Courses, lessons, progress, BKT mastery, chat history, auth | Convex, Better Auth, Supabase (agent checkpoints) |
+| **3 · Orchestration** | BKT-routed state machine producing Complete / Faded / Erroneous examples | FastAPI, LangGraph, pyBKT |
+| **4 · Safety** | Dean Agent that validates every response | LangGraph, Pydantic |
+
+See the [Macro System Architecture](Macro_System_Architecture.md) for the experiment workflow and
+UI mockup, and the [LangGraph & BKT Specification](LangGraph_BKT_Architecture_Spec.md) for the
+agent graph, routing edges and system prompts.
+
+## Repository Structure
+
+```
+.
+├── web/        # Student-facing app (TanStack Start + Convex backend functions)
+├── admin/      # Admin dashboard (SolidJS)
+├── server/     # FastAPI service: LangGraph agents, BKT engine, Judge0 integration
+├── data/       # CSEDM 2019 dataset and BKT parameter fitting
+└── .github/    # CI/CD: Cloudflare deploys, releases, Supabase keep-alive
+```
+
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 22+ and [pnpm](https://pnpm.io/)
+- [Python](https://www.python.org/) 3.13+ and [uv](https://docs.astral.sh/uv/)
+- A [Convex](https://convex.dev/) account, an OpenAI API key, and a Judge0 endpoint
+
+### 1. Backend (`server/`)
+
+```bash
+cd server
+cp .env.example .env      # fill in Judge0, OpenAI, Convex and database settings
+uv sync
+uv run fastapi dev main.py
+```
+
+### 2. Web app (`web/`)
+
+```bash
+cd web
+cp .env.example .env.local   # set BETTER_AUTH_SECRET and VITE_BACKEND_URL
+pnpm install
+npx convex dev               # links a Convex deployment and pushes functions
+pnpm seed                    # loads the course and lessons
+pnpm dev                     # http://localhost:3000
+```
+
+### Running Tests
+
+```bash
+cd web && pnpm test                        # Vitest
+cd server && uv run --with pytest pytest   # BKT engine tests
+```
+
+## Deployment
+
+The web and admin apps deploy to Cloudflare Workers through GitHub Actions:
+
+| Trigger | Environment |
+|---|---|
+| Pull request to `main` / `dev` | Preview |
+| Push to `dev` | Development |
+| Merge to `main` (after the automated release) | Production |
+
+### Supabase Keep-Alive
+
+Free-tier Supabase projects pause after a week of inactivity, so
+[`supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml) pings the REST API daily at
+03:00 UTC. It needs the `SUPABASE_URL` and `SUPABASE_ANON_KEY` repository secrets.
+
+> [!WARNING]
+> GitHub disables scheduled workflows in public repos after **60 days without a commit** to the
+> default branch. Any commit to `main` resets this; the daily run itself does not. If it gets
+> disabled, re-enable it under **Actions → Supabase Keep-Alive → Enable workflow**.
+
+## Roadmap
+
+Open work items are tracked in [TODO.md](TODO.md).
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 Blockchain Datascience Lab @ RMIT.
