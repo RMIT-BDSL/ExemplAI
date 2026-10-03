@@ -1,3 +1,8 @@
+## [0.9.1] - 2026-10-03
+
+### ⚙️ Miscellaneous Tasks
+
+- Add daily Supabase keep-alive ping
 ## [0.9.0] - 2026-07-30
 
 ### 🚀 Features
@@ -155,12 +160,9 @@
 
 ### 🐛 Bug Fixes
 
+- Ci not working
 - Remove unused failing steps from release workflow
 ## [0.8.1] - 2026-07-16
-
-### 🐛 Bug Fixes
-
-- Ci not working
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -197,6 +199,10 @@
 ### 🐛 Bug Fixes
 
 - Workflows scripts
+
+### ⚙️ Miscellaneous Tasks
+
+- Add new package requirements
 ## [0.6.1] - 2026-06-29
 
 ### ⚙️ Miscellaneous Tasks
@@ -207,10 +213,6 @@
 ### 🚀 Features
 
 - Cloudflare deploy on pull request and on push to main (#18)
-
-### ⚙️ Miscellaneous Tasks
-
-- Add new package requirements
 ## [0.5.0] - 2026-06-28
 
 ### 🚀 Features
@@ -260,28 +262,28 @@
 - Add tracking to generated folder
 ## [0.2.1] - 2026-06-27
 
+### 🚀 Features
+
+- Initial posthog observability
+- Configure telemetry for data collection
+- *(server)* Initial sentry implementation for observability
+- *(server)* Count student code execution number
+
 ### ⚙️ Miscellaneous Tasks
 
+- Stop logging client side
 - Ignore node_modules and dist at any depth
 ## [0.2.0] - 2026-06-23
 
 ### 🚀 Features
 
-- Configure telemetry for data collection
-- *(server)* Initial sentry implementation for observability
-- *(server)* Count student code execution number
 - Add rapidapi support for judge0
 - *(server)* Improve Judge0 code execution service with FastAPI and rate limiting
 
 ### ⚙️ Miscellaneous Tasks
 
-- Stop logging client side
 - Add validation for empty configuration
 ## [0.1.6] - 2026-06-21
-
-### 🚀 Features
-
-- Initial posthog observability
 
 ### 🐛 Bug Fixes
 
