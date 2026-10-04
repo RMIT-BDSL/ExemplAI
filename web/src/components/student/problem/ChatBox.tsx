@@ -1,11 +1,12 @@
 import { useMutation, useQuery } from "convex/react";
 import { Send, Sparkles } from "lucide-react";
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { sendChatMessage } from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import RunnableCodeBlock from "./RunnableCodeBlock";
 // Types for Chat
 export interface Message {
   id: string;
@@ -20,7 +21,11 @@ function timeOf(d: Date) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Code in tutor messages is read-only: the tutor is chat-only (no Run, no scratchpad).
+// Fences the student can edit and run in place: Python, or untagged (the
+// course is Python-only). Others (text, output, …) stay read-only.
+const RUNNABLE_LANGUAGES = new Set(["python", "py", "python3"]);
+
+// Read-only code, e.g. a block of expected output.
 function CodeBlock({ code }: { code: string }) {
   return (
     <pre className="chat-code chat-code-wrap editorial-scroll my-2 max-h-80 rounded-[4px] border border-rule-strong !bg-surface-page">
@@ -28,6 +33,36 @@ function CodeBlock({ code }: { code: string }) {
     </pre>
   );
 }
+
+// Module-level so the renderers keep their identity across re-renders;
+// otherwise every new message would remount each RunnableCodeBlock and
+// wipe the student's edits and output.
+const markdownComponents: Components = {
+  // Unwrap <pre> so the CodeBlock isn't nested in another <pre>.
+  pre(props) {
+    return <>{props.children}</>;
+  },
+  code(props) {
+    const { children, className, ...rest } = props;
+    const raw = String(children ?? "");
+    const lang = /language-(\w+)/.exec(className || "")?.[1];
+    // react-markdown v10 dropped the `inline` prop: a fence with a
+    // language tag or any multi-line snippet is a block.
+    if (lang || raw.includes("\n")) {
+      const code = raw.replace(/\n$/, "");
+      return !lang || RUNNABLE_LANGUAGES.has(lang.toLowerCase()) ? (
+        <RunnableCodeBlock code={code} />
+      ) : (
+        <CodeBlock code={code} />
+      );
+    }
+    return (
+      <code className={className} {...rest}>
+        {children}
+      </code>
+    );
+  },
+};
 
 // 1. One turn. Tutor turns read as marginal prose (serif, no bubble), with a
 // generic "Example" label when the reply delivered an example; the kind of
@@ -57,31 +92,7 @@ export function MessageBubble({ message }: { message: Message }) {
         </span>
       </div>
       <div className="prose max-w-none text-ink-chat prose-p:my-1.5 first:prose-p:mt-0 last:prose-p:mb-0 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-pre:my-2">
-        <ReactMarkdown
-          components={{
-            // Unwrap <pre> so the CodeBlock isn't nested in another <pre>.
-            pre(props) {
-              return <>{props.children}</>;
-            },
-            code(props) {
-              const { children, className, ...rest } = props;
-              const raw = String(children ?? "");
-              // react-markdown v10 dropped the `inline` prop: a fence with a
-              // language tag or any multi-line snippet is a block.
-              if (
-                /language-(\w+)/.test(className || "") ||
-                raw.includes("\n")
-              ) {
-                return <CodeBlock code={raw.replace(/\n$/, "")} />;
-              }
-              return (
-                <code className={className} {...rest}>
-                  {children}
-                </code>
-              );
-            },
-          }}
-        >
+        <ReactMarkdown components={markdownComponents}>
           {message.content}
         </ReactMarkdown>
       </div>
