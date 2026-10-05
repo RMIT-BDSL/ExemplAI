@@ -193,6 +193,7 @@ function Course() {
   // starts every lesson fresh from its starter code.
   const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runShortcutRef = useRef<() => void>(() => {});
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
@@ -398,8 +399,8 @@ function Course() {
   };
 
   // Ctrl+Enter (Cmd+Enter on Mac) in the editor runs the code, like the Run
-  // button. A ref keeps the shortcut pointing at the latest state/lesson.
-  const runShortcutRef = useRef<() => void>(() => {});
+  // button. The ref (declared above the early returns) keeps the shortcut
+  // pointing at the latest state/lesson.
   runShortcutRef.current = () => {
     if (!isRunning && !isSubmitting) handleExecute("run");
   };

@@ -207,7 +207,7 @@ export interface ChatInputProps {
   onSendMessage: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  /** The ✦ example control inside the bar (Get help / New example), once help has started. */
+  /** The ✦ example button beside the input (Get help / New example), once help has started. */
   example?: {
     label: string;
     enabled: boolean;
@@ -246,8 +246,8 @@ export function ChatInput({
 
   const canSend = !!text.trim() && !disabled;
   return (
-    <form onSubmit={handleSubmit} className={BAR}>
-      <div className="flex h-8 flex-1 items-center gap-1 rounded-[2px] border border-rule bg-surface-raised pl-3 pr-1 focus-within:border-brass">
+    <form onSubmit={handleSubmit} className={cn(BAR, "gap-2")}>
+      <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-[2px] border border-rule bg-surface-raised pl-3 pr-1 focus-within:border-brass">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -258,35 +258,6 @@ export function ChatInput({
           rows={1}
           className="h-full min-w-0 flex-1 resize-none select-text bg-transparent py-[7px] font-sans text-xs leading-[16px] text-ink outline-none placeholder:text-ink-label disabled:cursor-not-allowed"
         />
-        {example && (
-          <>
-            <button
-              type="button"
-              onClick={example.onClick}
-              disabled={!example.enabled}
-              aria-label={example.label}
-              aria-describedby={example.hint ? hintId : undefined}
-              title={
-                example.enabled
-                  ? example.label
-                  : (example.hint ?? example.label)
-              }
-              className={cn(
-                "grid size-6 shrink-0 place-items-center rounded-[2px] transition-colors select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
-                example.enabled
-                  ? "text-brass hover:bg-surface-hover cursor-pointer"
-                  : "text-ink-faint cursor-not-allowed",
-              )}
-            >
-              <Sparkles className="size-3.5" />
-            </button>
-            {example.hint && (
-              <span id={hintId} className="sr-only">
-                {example.hint}
-              </span>
-            )}
-          </>
-        )}
         <button
           type="submit"
           disabled={!canSend}
@@ -301,6 +272,35 @@ export function ChatInput({
           <Send className="size-3" />
         </button>
       </div>
+      {example && (
+        <>
+          <button
+            type="button"
+            onClick={example.onClick}
+            disabled={!example.enabled}
+            aria-label={example.label}
+            aria-describedby={example.hint ? hintId : undefined}
+            title={
+              example.enabled ? example.label : (example.hint ?? example.label)
+            }
+            // Same outline style as the editor's Run button.
+            className={cn(
+              "flex h-8 shrink-0 items-center gap-1.5 rounded-[2px] border border-rule-strong px-3 text-[11px] font-medium tracking-[0.02em] transition-colors select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+              example.enabled
+                ? "text-brass hover:bg-surface-raised cursor-pointer"
+                : "text-ink-faint cursor-not-allowed",
+            )}
+          >
+            <Sparkles className="size-3.5" />
+            Example
+          </button>
+          {example.hint && (
+            <span id={hintId} className="sr-only">
+              {example.hint}
+            </span>
+          )}
+        </>
+      )}
     </form>
   );
 }
@@ -633,7 +633,7 @@ export default function ChatBox({
       </div>
 
       {/* One bar, three states: locked (before a failed Submit) → Get help button →
-          chat, with ✦ for the next example inside the bar. Same triggers and limits as before. */}
+          chat, with the ✦ Example button beside the input. Same triggers and limits as before. */}
       {!helpStarted && !isTyping && canGetHelp ? (
         <GetHelpBar
           onClick={() => requestExample("get_help")}
@@ -648,10 +648,9 @@ export default function ChatBox({
               ? "The tutor is replying…"
               : !helpStarted
                 ? (exampleStatus ?? "The chat opens after you press Get help")
-                : // One line fits the bar; the full sentence is the ✦ tooltip.
-                  exhausted
-                  ? "Examples used up for this lesson."
-                  : (exampleStatus ?? undefined)
+                : // Once help starts the bar always reads as a chat; why the
+                  // Example button is unavailable is its tooltip.
+                  undefined
           }
           example={
             helpStarted && !isTyping
