@@ -106,7 +106,7 @@ export default function CodeEditor({
         )}
 
         {/* Footer: Console · Run (unscored) · Submit, which becomes Next lesson after a pass */}
-        <div className="flex h-[52px] flex-shrink-0 select-none items-center justify-between border-t border-rule-strong bg-surface-void px-6">
+        <div className="flex h-[52px] flex-shrink-0 select-none items-center justify-between border-t border-rule-strong bg-surface-void px-6 [&_button]:h-8">
           <button
             type="button"
             onClick={() => setIsConsoleOpen(!isConsoleOpen)}

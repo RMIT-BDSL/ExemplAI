@@ -105,13 +105,21 @@ export function MessageBubble({ message }: { message: Message }) {
 }
 
 // Progress while the tutor works, from the server's step events.
-const AGENT_NODES = ["complete_example_node", "faded_example_node", "erroneous_example_node", "control_agent_node"];
+const AGENT_NODES = [
+  "complete_example_node",
+  "faded_example_node",
+  "erroneous_example_node",
+  "control_agent_node",
+];
 
 function TutorProgress({ steps }: { steps: string[] }) {
   const [seconds, setSeconds] = React.useState(0);
   React.useEffect(() => {
     const started = Date.now();
-    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    const timer = setInterval(
+      () => setSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
     return () => clearInterval(timer);
   }, []);
 
@@ -124,16 +132,28 @@ function TutorProgress({ steps }: { steps: string[] }) {
   const rows = [
     { label: "Reading your message", done: read },
     // Done once a draft has been written since the Dean's last check.
-    { label: retrying ? "Improving the reply" : "Writing a reply", done: lastDraft > lastCheck },
+    {
+      label: retrying ? "Improving the reply" : "Writing a reply",
+      done: lastDraft > lastCheck,
+    },
     { label: "Checking the reply", done: false },
   ];
   const current = rows.findIndex((r) => !r.done);
 
   return (
-    <div className="space-y-1 py-1 font-sans text-xs text-ink-label" role="status" aria-label="The tutor is working">
+    <div
+      className="space-y-1 py-1 font-sans text-xs text-ink-label"
+      role="status"
+      aria-label="The tutor is working"
+    >
       {rows.map((r, i) => (
-        <div key={r.label} className={cn("flex items-center gap-2", i === current && "text-ink")}>
-          <span className="w-3 text-center">{r.done ? "✓" : i === current ? "●" : "○"}</span>
+        <div
+          key={r.label}
+          className={cn("flex items-center gap-2", i === current && "text-ink")}
+        >
+          <span className="w-3 text-center">
+            {r.done ? "✓" : i === current ? "●" : "○"}
+          </span>
           <span>
             {r.label}
             {i === current ? "…" : ""}
@@ -153,7 +173,11 @@ export interface MessageFeedProps {
   progress?: string[];
 }
 
-export function MessageFeed({ messages, isTyping, progress = [] }: MessageFeedProps) {
+export function MessageFeed({
+  messages,
+  isTyping,
+  progress = [],
+}: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -183,14 +207,28 @@ export interface ChatInputProps {
   onSendMessage: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** The ✦ example control inside the bar (Get help / New example), once help has started. */
+  example?: {
+    label: string;
+    enabled: boolean;
+    /** Why it's unavailable (tooltip + screen-reader text). */
+    hint?: string | null;
+    onClick: () => void;
+  };
 }
+
+// Same 52px bar and 32px control height as the editor footer, so the two line up.
+const BAR =
+  "flex h-[52px] flex-shrink-0 items-center border-t border-rule-strong bg-surface-void px-6";
 
 export function ChatInput({
   onSendMessage,
   disabled,
   placeholder,
+  example,
 }: ChatInputProps) {
   const [text, setText] = React.useState("");
+  const hintId = React.useId();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,8 +246,8 @@ export function ChatInput({
 
   const canSend = !!text.trim() && !disabled;
   return (
-    <form onSubmit={handleSubmit} className="bg-surface-void px-6 pb-3 pt-1">
-      <div className="flex items-end gap-2 rounded-[2px] border border-rule bg-surface-raised py-1.5 pl-3.5 pr-1.5 focus-within:border-rule-strong">
+    <form onSubmit={handleSubmit} className={BAR}>
+      <div className="flex h-8 flex-1 items-center gap-1 rounded-[2px] border border-rule bg-surface-raised pl-3 pr-1 focus-within:border-brass">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -218,14 +256,43 @@ export function ChatInput({
           aria-label="Message the tutor"
           disabled={disabled}
           rows={1}
-          className="max-h-24 flex-1 resize-none select-text bg-transparent py-1 font-sans text-xs leading-relaxed text-ink outline-none placeholder:text-ink-label disabled:cursor-not-allowed"
+          className="h-full min-w-0 flex-1 resize-none select-text bg-transparent py-[7px] font-sans text-xs leading-[16px] text-ink outline-none placeholder:text-ink-label disabled:cursor-not-allowed"
         />
+        {example && (
+          <>
+            <button
+              type="button"
+              onClick={example.onClick}
+              disabled={!example.enabled}
+              aria-label={example.label}
+              aria-describedby={example.hint ? hintId : undefined}
+              title={
+                example.enabled
+                  ? example.label
+                  : (example.hint ?? example.label)
+              }
+              className={cn(
+                "grid size-6 shrink-0 place-items-center rounded-[2px] transition-colors select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+                example.enabled
+                  ? "text-brass hover:bg-surface-hover cursor-pointer"
+                  : "text-ink-faint cursor-not-allowed",
+              )}
+            >
+              <Sparkles className="size-3.5" />
+            </button>
+            {example.hint && (
+              <span id={hintId} className="sr-only">
+                {example.hint}
+              </span>
+            )}
+          </>
+        )}
         <button
           type="submit"
           disabled={!canSend}
           aria-label="Send"
           className={cn(
-            "grid size-7 shrink-0 place-items-center rounded-[2px] transition-opacity select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+            "grid size-6 shrink-0 place-items-center rounded-[2px] transition-opacity select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
             canSend
               ? "bg-brass-fill text-on-brass hover:opacity-90 cursor-pointer"
               : "bg-surface-hover text-ink-faint cursor-not-allowed",
@@ -235,6 +302,29 @@ export function ChatInput({
         </button>
       </div>
     </form>
+  );
+}
+
+/** Before help starts, after a failed Submit: the whole bar is the Get help button. */
+export function GetHelpBar({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className={BAR}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="flex h-8 flex-1 items-center justify-center gap-2 rounded-[2px] border border-brass-fill bg-brass-fill text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity select-none hover:opacity-90 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
+      >
+        <Sparkles className="size-3.5" />
+        Get help
+      </button>
+    </div>
   );
 }
 
@@ -300,7 +390,10 @@ export default function ChatBox({
   const allowance = useQuery(
     api.examples.getExampleAllowance,
     convexLessonId
-      ? { lessonId: convexLessonId, ...(chatId ? { chatId: chatId as Id<"chats"> } : {}) }
+      ? {
+          lessonId: convexLessonId,
+          ...(chatId ? { chatId: chatId as Id<"chats"> } : {}),
+        }
       : "skip",
   );
   const used = allowance?.used ?? 0;
@@ -319,7 +412,7 @@ export default function ChatBox({
           content:
             earned > 0
               ? "Your solution didn't pass yet. Press **Get help** and I'll show you an example to help you with this problem."
-              : "Hi, I'm your AI learning assistant. Submit your solution first. If it doesn't pass, you can get help from me here.",
+              : "I'm your tutor. Submit your solution first. If it doesn't pass, you can get help here.",
           timestamp: new Date(),
         },
       ];
@@ -532,44 +625,47 @@ export default function ChatBox({
           !helpStarted && !isTyping && "opacity-60",
         )}
       >
-        <MessageFeed messages={messages} isTyping={isTyping} progress={progress} />
+        <MessageFeed
+          messages={messages}
+          isTyping={isTyping}
+          progress={progress}
+        />
       </div>
 
-      {/* Help: one button (Get help starts a round after a failed Submit; New example continues it)
-          and at most one plain line. Hidden while the tutor replies and once the lesson's examples are used. */}
-      {!isTyping && (
-        <div className="flex flex-wrap items-center gap-3 border-t border-rule-strong bg-surface-void px-6 py-3">
-          {!exhausted && (
-            <button
-              type="button"
-              onClick={() => requestExample(exampleTrigger)}
-              disabled={!exampleEnabled}
-              className={cn(
-                "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-3 text-[11px] font-semibold tracking-[0.02em] transition-opacity select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
-                exampleEnabled
-                  ? "border-brass-fill bg-brass-fill text-on-brass hover:opacity-90 cursor-pointer"
-                  : "border-rule-strong bg-transparent text-ink-faint cursor-not-allowed",
-              )}
-            >
-              <Sparkles className="size-3.5" />
-              {exampleTrigger === "get_help" ? "Get help" : "New example"}
-            </button>
-          )}
-          {exampleStatus && (
-            <span className="text-[11px] leading-snug text-ink-label">
-              {exampleStatus}
-            </span>
-          )}
-        </div>
+      {/* One bar, three states: locked (before a failed Submit) → Get help button →
+          chat, with ✦ for the next example inside the bar. Same triggers and limits as before. */}
+      {!helpStarted && !isTyping && canGetHelp ? (
+        <GetHelpBar
+          onClick={() => requestExample("get_help")}
+          disabled={!exampleEnabled}
+        />
+      ) : (
+        <ChatInput
+          onSendMessage={(text) => handleSendMessage(text)}
+          disabled={!helpStarted || isTyping || !chatId || !convexLessonId}
+          placeholder={
+            isTyping
+              ? "The tutor is replying…"
+              : !helpStarted
+                ? (exampleStatus ?? "The chat opens after you press Get help")
+                : // One line fits the bar; the full sentence is the ✦ tooltip.
+                  exhausted
+                  ? "Examples used up for this lesson."
+                  : (exampleStatus ?? undefined)
+          }
+          example={
+            helpStarted && !isTyping
+              ? {
+                  label:
+                    exampleTrigger === "get_help" ? "Get help" : "New example",
+                  enabled: exampleEnabled && !exhausted,
+                  hint: exampleStatus,
+                  onClick: () => requestExample(exampleTrigger),
+                }
+              : undefined
+          }
+        />
       )}
-
-      <ChatInput
-        onSendMessage={(text) => handleSendMessage(text)}
-        disabled={!helpStarted || isTyping || !chatId || !convexLessonId}
-        placeholder={
-          helpStarted ? undefined : "The chat opens after you press Get help"
-        }
-      />
     </div>
   );
 }
