@@ -399,7 +399,6 @@ export default function ChatBox({
   const used = allowance?.used ?? 0;
   const remaining = allowance?.remaining ?? 0;
   const exhausted = allowance?.exhausted ?? false;
-  const earned = allowance?.earned ?? 0;
 
   // Map Convex messages to the local Message format
   const messages: Message[] = React.useMemo(() => {
@@ -410,7 +409,7 @@ export default function ChatBox({
           id: "welcome",
           sender: "assistant",
           content:
-            earned > 0
+            remaining > 0
               ? "Your solution didn't pass yet. Press **Get help** and I'll show you an example to help you with this problem."
               : "I'm your tutor. Submit your solution first. If it doesn't pass, you can get help here.",
           timestamp: new Date(),
@@ -435,7 +434,7 @@ export default function ChatBox({
       });
     }
     return result;
-  }, [dbMessages, localError, earned]);
+  }, [dbMessages, localError, remaining]);
 
   // Track how many assistant messages Convex currently holds so a failed POST
   // /chat can tell whether the reply landed anyway.
@@ -603,8 +602,12 @@ export default function ChatBox({
     const allowed = trigger === "get_help" ? canGetHelp : canNewExample;
     if (!allowed || isTyping) return;
     onExampleRequested?.(trigger, used);
+    // In a fresh chat the button reads Get help even when it fetches the
+    // lesson's next example, so the student's turn says so too.
     handleSendMessage(
-      trigger === "get_help" ? GET_HELP_MESSAGE : NEW_EXAMPLE_MESSAGE,
+      trigger === "get_help" || !helpStarted
+        ? GET_HELP_MESSAGE
+        : NEW_EXAMPLE_MESSAGE,
       trigger,
     );
   };
@@ -634,9 +637,12 @@ export default function ChatBox({
 
       {/* One bar, three states: locked (before a failed Submit) → Get help button →
           chat, with the ✦ Example button beside the input. Same triggers and limits as before. */}
-      {!helpStarted && !isTyping && canGetHelp ? (
+      {/* Each lesson visit opens a fresh chat, but examples count per lesson: if
+          Get help was used on an earlier visit, this chat's Get help bar fetches
+          the next earned example (new_example) instead. */}
+      {!helpStarted && !isTyping && (canGetHelp || canNewExample) ? (
         <GetHelpBar
-          onClick={() => requestExample("get_help")}
+          onClick={() => requestExample(exampleTrigger)}
           disabled={!exampleEnabled}
         />
       ) : (
