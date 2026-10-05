@@ -811,7 +811,7 @@ const csedmUnseededProblems: SeedProblem[] = [
     // NEW
     tag: "csedm",
     problem_name: "reduceToPositive",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `reduceToPositive(l)` that takes a list of numbers and returns a new list containing only the numbers greater than 0, in their original order.",
@@ -828,7 +828,7 @@ const csedmUnseededProblems: SeedProblem[] = [
     // NEW: Even-length rule inferred from 2016 solutions; confirm against DataShop.
     tag: "csedm",
     problem_name: "middleElement",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `middleElement(l)` that takes a non-empty list and returns its middle element. If the list has an even length, return the element just after the middle (the one at index len(l) // 2).",
@@ -845,7 +845,7 @@ const csedmUnseededProblems: SeedProblem[] = [
     // NEW
     tag: "csedm",
     problem_name: "secondHalf",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `secondHalf(l)` that returns a new list with the second half of `l`. If the list has an odd length, include the middle element.",
@@ -862,7 +862,7 @@ const csedmUnseededProblems: SeedProblem[] = [
     // NEW: Uses nested loops and a set; placed in Collections rather than Advanced Loops because it needs lists.
     tag: "csedm",
     problem_name: "listOfLists",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `listOfLists(l)` that takes a list of lists of numbers and returns a sorted list of every distinct number that appears in any of the inner lists.",
@@ -877,7 +877,8 @@ const csedmUnseededProblems: SeedProblem[] = [
   },
 ];
 
-// ExemplAI-authored lessons (tag "exemplai") so that weeks 1, 5, 6, 8 and 9 have
+// ExemplAI-authored lessons (tag "exemplai") so that the Intro, Loops, Advanced
+// Loops, Functions and Collections topics have
 // 7 lessons each: BKT grades only the first Submit per lesson, and 7 lets a
 // student reach mastery (0.95) even after one fail at any point. Each lesson
 // uses only Python features taught up to its week (server/ai/syllabus.py).
@@ -1046,7 +1047,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "greet",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a function `greet(name, greeting=\"Hello\")` that returns a greeting such as 'Hello, Ana!'. The `greeting` parameter is optional and defaults to \"Hello\".",
@@ -1061,7 +1062,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "power",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a function `power(base, exponent=2)` that returns `base` raised to `exponent`. If no exponent is given, it squares the number.",
@@ -1077,7 +1078,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "countEvens",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a helper function `isEven(n)` that returns True if `n` is even, then use it in `countEvens(a, b)`, which returns how many even numbers there are from `a` to `b` (inclusive).",
@@ -1093,7 +1094,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "maxOfThree",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a helper function `maxOfTwo(x, y)` that returns the larger of two numbers, then use it in `maxOfThree(a, b, c)`, which returns the largest of three numbers. Don't use the built-in max().",
@@ -1109,7 +1110,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "describeTemperature",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a helper function `toFahrenheit(celsius)` that returns celsius * 9 / 5 + 32, then use it in `describeTemperature(celsius)`, which returns 'hot' if the temperature is at least 86\u00b0F, 'cold' if it is below 50\u00b0F, and 'mild' otherwise.",
@@ -1126,7 +1127,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "safeDivide",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a function `safeDivide(a, b)` that returns `a` divided by `b`, or the string 'undefined' if `b` is 0. Make sure every path through your function returns a value.",
@@ -1142,7 +1143,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "compoundInterest",
-    week: 8,
+    week: 7,
     knowledge_component: "functions",
     topic: "Functions",
     problem_description: "Write a function `compoundInterest(principal, rate, years=1)` that returns the balance after `years` years when `principal` grows by `rate` percent each year, rounded to 2 decimal places. `years` is optional and defaults to 1.",
@@ -1158,7 +1159,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "mostCommonWord",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `mostCommonWord(sentence)` that returns the word that appears most often in `sentence` (words are separated by spaces). If several words tie, return the one that appears first. Use a dictionary to count the words.",
@@ -1174,7 +1175,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "uniqueCount",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `uniqueCount(values)` that takes a list and returns how many different values it contains. Use a set.",
@@ -1190,7 +1191,7 @@ const exemplaiProblems: SeedProblem[] = [
   {
     tag: "exemplai",
     problem_name: "minMax",
-    week: 9,
+    week: 8,
     knowledge_component: "collections",
     topic: "Collections",
     problem_description: "Write a function `minMax(values)` that takes a non-empty list of numbers and returns a tuple (smallest, largest).",

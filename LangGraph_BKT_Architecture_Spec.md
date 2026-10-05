@@ -389,7 +389,7 @@ input through their changed code, line by line.
 - If they point to the wrong line: Ask them to trace the failing input through the \
 code, and narrow down the area (for example "look at the condition") without naming \
 the line.
-- Suggest they test a fix themselves by opening the code in the scratchpad and running it.
+- Suggest they test a fix themselves by editing the example's code in the chat and pressing Run.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and how it makes the failing input work.
 - If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \

@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-# (topic, week, features introduced) in teaching order; week 7 has no class.
+# (topic, week, features introduced) in teaching order; week 10 has no class
+# (Christmas break). Week numbers follow the current COSC3104/5 schedule.
 SYLLABUS: list[tuple[str, int, str]] = [
     ("intro_setup", 1, "print(); string and number literals; comments"),
     ("variables_expressions", 2,
@@ -27,13 +28,13 @@ SYLLABUS: list[tuple[str, int, str]] = [
     ("branching", 4, "comparisons; and, or, not; if / elif / else; nested if"),
     ("loops", 5, "for loops with range(); for over a string; while loops; the accumulator pattern"),
     ("advanced_loops", 6, "nested loops; break and continue; loop flags and counters"),
-    ("functions", 8,
+    ("functions", 7,
      "defining your own functions; parameters and default values; return values; "
      "calling one function from another"),
-    ("collections", 9,
+    ("collections", 8,
      "lists and list methods; indexing and slicing lists; tuples; dictionaries; sets; "
      "looping over collections; sorted(); list comprehensions"),
-    ("files", 10, "open(), read, write; with blocks"),
+    ("files", 9, "open(), read, write; with blocks"),
     ("basic_libraries", 11, "import; standard-library modules such as math, random, string, datetime"),
     ("advanced_topics", 12, "any Python feature"),
 ]

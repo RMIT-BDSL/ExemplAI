@@ -153,7 +153,7 @@ except ImportError:
 # as repeated practice of the same underlying skill.
 #
 # KCs are the COSC3104/5 syllabus topics (one per teaching week; no class in
-# week 7) and must match the keys in bktParams.json and the lesson tags in
+# week 10) and must match the keys in bktParams.json and the lesson tags in
 # web/convex/seed.ts. Each problem is placed in the same topic as its seed
 # lesson. Topics with no CSEDM problem (advanced_loops, functions, collections,
 # files, advanced_topics) are not fitted.
