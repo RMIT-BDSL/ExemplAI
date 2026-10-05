@@ -1,14 +1,14 @@
-import Problem, { type LastSubmit, type ProblemData } from "./problem/Problem";
+import Problem, { type ProblemData, type SubmitRecord } from "./problem/Problem";
 
 interface LessonExpositionProps {
   mappedProblem: ProblemData;
-  lastSubmit?: LastSubmit;
+  submitHistory?: SubmitRecord[];
 }
 
 /** Description column: always visible (no collapse), narrows below 1100px, one 24px left edge. */
 export default function LessonExposition({
   mappedProblem,
-  lastSubmit,
+  submitHistory,
 }: LessonExpositionProps) {
   return (
     <div className="flex w-[clamp(240px,32%,340px)] flex-shrink-0 flex-col overflow-hidden border-r border-rule-strong bg-surface-panel min-[1100px]:w-[340px] xl:w-[420px]">
@@ -19,7 +19,7 @@ export default function LessonExposition({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto editorial-scroll">
         <div className="editorial-prose px-6 py-6">
-          <Problem problem={mappedProblem} lastSubmit={lastSubmit} />
+          <Problem problem={mappedProblem} submitHistory={submitHistory} />
         </div>
       </div>
     </div>
