@@ -82,9 +82,13 @@ export default function CodeEditor({
               padding: { top: 12, bottom: 12 },
               roundedSelection: true,
               automaticLayout: true,
+              // Floating scrollbars: hidden until the pointer is over the
+              // editor or it scrolls, thin, no track.
               scrollbar: {
-                vertical: "visible",
-                horizontal: "visible",
+                vertical: "auto",
+                horizontal: "auto",
+                verticalScrollbarSize: 8,
+                horizontalScrollbarSize: 8,
                 useShadows: false,
                 verticalHasArrows: false,
                 horizontalHasArrows: false,

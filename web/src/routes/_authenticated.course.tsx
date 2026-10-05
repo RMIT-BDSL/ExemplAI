@@ -91,6 +91,10 @@ const EDITOR_THEMES = {
       "editorCursor.foreground": "#8a6420",
       "editor.selectionBackground": "#e9dcc0",
       "editor.inactiveSelectionBackground": "#f0e7d4",
+      "scrollbar.shadow": "#00000000",
+      "scrollbarSlider.background": "#d8d2c766",
+      "scrollbarSlider.hoverBackground": "#c9c1b399",
+      "scrollbarSlider.activeBackground": "#b8ae9ebb",
     },
   },
   exemplaiDark: {
@@ -114,6 +118,10 @@ const EDITOR_THEMES = {
       "editorCursor.foreground": "#c29a53",
       "editor.selectionBackground": "#282630",
       "editor.inactiveSelectionBackground": "#1e1d24",
+      "scrollbar.shadow": "#00000000",
+      "scrollbarSlider.background": "#3a384166",
+      "scrollbarSlider.hoverBackground": "#4a485299",
+      "scrollbarSlider.activeBackground": "#5a5862bb",
     },
   },
 } as const;
