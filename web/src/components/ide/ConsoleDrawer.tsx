@@ -31,7 +31,7 @@ const KIND_LABEL: Record<ConsoleRun["kind"], string> = {
 };
 
 function timeOf(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 /**

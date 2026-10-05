@@ -82,6 +82,9 @@ export default function CodeEditor({
               padding: { top: 12, bottom: 12 },
               roundedSelection: true,
               automaticLayout: true,
+              // No empty page below the last line, so the scrollbar only
+              // appears when the code is taller than the editor.
+              scrollBeyondLastLine: false,
               // Floating scrollbars: hidden until the pointer is over the
               // editor or it scrolls, thin, no track.
               scrollbar: {

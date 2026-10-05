@@ -25,7 +25,7 @@ export interface SubmitRecord extends LastSubmit {
 }
 
 function submitTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 /**
@@ -111,7 +111,7 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
               <>
                 <dt className="text-[11px] text-ink-label">Your output</dt>
                 <dd
-                  className={`font-mono break-all whitespace-pre-wrap ${exampleResult.passed ? "text-success" : "text-danger"}`}
+                  className={`font-mono [overflow-wrap:anywhere] whitespace-pre-wrap ${exampleResult.passed ? "text-success" : "text-danger"}`}
                 >
                   {exampleOutput(exampleResult)}
                   <b className="ml-2 font-sans text-[9px] font-semibold tracking-[0.1em]">
@@ -147,7 +147,7 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
                     </div>
                     {/* The example's output on that Submit, as a trace of attempts. */}
                     {s.example && (
-                      <div className="mt-0.5 font-mono text-[11px] text-ink-muted break-all whitespace-pre-wrap">
+                      <div className="mt-0.5 font-mono text-[11px] text-ink-muted [overflow-wrap:anywhere] whitespace-pre-wrap">
                         {exampleOutput(s.example)}
                       </div>
                     )}
