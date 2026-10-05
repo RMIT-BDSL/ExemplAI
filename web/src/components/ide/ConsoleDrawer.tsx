@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { Eraser, Loader2, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 /** One entry in the console log: a Run, or a Submit/request that errored. */
@@ -63,19 +63,22 @@ export default function ConsoleDrawer({
         <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brass">
           Console
         </span>
-        <div className="-mr-1 flex items-center gap-3">
+        <div className="-mr-1 flex items-center gap-1">
           <button
             type="button"
             onClick={onClear}
             disabled={runs.length === 0}
-            className="text-[9px] uppercase tracking-[0.05em] text-ink-label hover:text-brass disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-default"
+            aria-label="Clear console"
+            title="Clear console"
+            className="grid size-6 place-items-center rounded-[2px] text-ink-label hover:text-brass disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-default focus-visible:outline-2 focus-visible:outline-brass"
           >
-            Clear
+            <Eraser className="size-3.5" />
           </button>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close console"
+            title="Close console"
             className="grid size-6 place-items-center rounded-[2px] text-ink-label hover:text-brass transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
           >
             <X className="size-3.5" />
@@ -106,10 +109,20 @@ export default function ConsoleDrawer({
                 {run.stdout.replace(/\n$/, "")}
               </pre>
             )}
-            {run.call && run.returnValue != null && (
+            {run.call && run.returnValue != null && !(run.returnValue === "None" && run.stdout) && (
+              // A None return after printing is the normal case for "print"
+              // exercises (and the grader treats printing and returning the
+              // same), so it's hidden; with no output at all it's explained.
               <pre className="whitespace-pre-wrap break-words">
-                <span className="text-ink-label">{run.call} →</span>{" "}
-                {run.returnValue}
+                {run.returnValue === "None" ? (
+                  <span className="text-ink-label">
+                    {run.call} returned None — it didn't print or return anything
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-ink-label">{run.call} →</span> {run.returnValue}
+                  </>
+                )}
               </pre>
             )}
             {run.stderr && (
