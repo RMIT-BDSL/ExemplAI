@@ -330,8 +330,16 @@ function Course() {
       : undefined,
   };
 
-  function handleEditorMount(editor: any) {
+  // Ctrl+Enter (Cmd+Enter on Mac) in the editor runs the code, like the Run
+  // button. A ref keeps the shortcut pointing at the latest state/lesson.
+  const runShortcutRef = useRef<() => void>(() => {});
+  runShortcutRef.current = () => {
+    if (!isRunning && !isSubmitting) handleExecute("run");
+  };
+
+  function handleEditorMount(editor: any, monaco: any) {
     editorRef.current = editor;
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runShortcutRef.current());
   }
 
   function handleCodeChange(value: string | undefined) {
