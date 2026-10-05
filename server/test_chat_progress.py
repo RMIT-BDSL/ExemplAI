@@ -107,3 +107,59 @@ def test_each_step_logs_its_duration(monkeypatch, caplog):
     for step in ("input_guardrail", "complete_example_node", "dean_validation_node"):
         assert f"step {step}:" in text and " ms" in text
     assert "chat total:" in text and "trigger=get_help" in text
+
+
+def test_a_dean_retry_shows_up_as_extra_steps(monkeypatch):
+    """Dean rejects the first draft, approves the second: the UI sees the agent
+    and the Dean twice (it shows "Improving the reply") and only the second
+    draft is released."""
+    verdicts = [DeanValidationResult(status="rejected", reason="DIRECT_ANSWER_LEAK"),
+                DeanValidationResult(status="approved")]
+    drafts = ["[NEW_EXAMPLE]\nreturn 'Hello World!'", "[NEW_EXAMPLE]\nreturn 'Good morning!'"]
+
+    class RetryLlm(_FakeLlm):
+        def invoke(self, messages):
+            return AIMessage(content=drafts.pop(0))
+
+        def with_structured_output(self, schema):
+            if schema is GuardrailResult:
+                return super().with_structured_output(schema)
+
+            class _S:
+                def invoke(self, messages):
+                    return verdicts.pop(0)
+
+            return _S()
+
+    fake = RetryLlm()
+    monkeypatch.setattr(chat_service, "_convex_client", lambda token: object())
+
+    async def fake_context(client, chat):
+        return ConvexChatContext([{"sender": "user", "content": "Please provide me an example"}], None)
+
+    saved = {}
+
+    async def fake_save(client, chat_id, text, chosen_model, *args, **kwargs):
+        saved.update(text=text, **kwargs)
+
+    async def fake_condition(user_id, chat):
+        return None
+
+    for mod in (guardrail_mod, complete_mod, dean_mod):
+        monkeypatch.setattr(mod, "llm", fake)
+    monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
+    monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
+    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
+    graph = build_tutor_graph().compile(checkpointer=MemorySaver())
+    chat = Chat(user_id=1, chat_id="c", conversation=[], bkt_prob_mastery=0.15, trigger="get_help",
+                original_problem="Write helloWorld() that returns 'Hello World!'")
+
+    async def collect():
+        return [json.loads(e[len("data: "):]) async for e in chat_service.stream_chat(graph, chat, "u", "t")]
+
+    events = asyncio.run(collect())
+    steps = [e["node"] for e in events if e["type"] == "step"]
+    assert steps == ["input_guardrail", "complete_example_node", "dean_validation_node",
+                     "complete_example_node", "dean_validation_node"]
+    assert saved["text"] == "return 'Good morning!'"
+    assert saved["dean_decision"] == "approved_after_retry"

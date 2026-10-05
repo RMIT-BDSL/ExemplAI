@@ -116,14 +116,16 @@ function TutorProgress({ steps }: { steps: string[] }) {
   }, []);
 
   const read = steps.includes("input_guardrail");
-  const wrote = steps.some((s) => AGENT_NODES.includes(s));
-  const checked = steps.includes("dean_validation_node");
-  // The Dean sent the draft back for one more try.
-  const improving = checked && steps.lastIndexOf("dean_validation_node") > Math.max(...AGENT_NODES.map((n) => steps.lastIndexOf(n)));
+  const lastDraft = Math.max(...AGENT_NODES.map((n) => steps.lastIndexOf(n)));
+  const lastCheck = steps.lastIndexOf("dean_validation_node");
+  // While we're still waiting, a finished Dean step means it sent the draft
+  // back for one more try (an approval ends the wait).
+  const retrying = lastCheck >= 0;
   const rows = [
     { label: "Reading your message", done: read },
-    { label: improving ? "Improving the reply" : "Writing a reply", done: wrote && !improving },
-    { label: "Checking the reply", done: checked && !improving },
+    // Done once a draft has been written since the Dean's last check.
+    { label: retrying ? "Improving the reply" : "Writing a reply", done: lastDraft > lastCheck },
+    { label: "Checking the reply", done: false },
   ];
   const current = rows.findIndex((r) => !r.done);
 
