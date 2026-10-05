@@ -95,14 +95,15 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
               {formatCall(problem.functionName, example.input)}
             </dd>
             <dt className="text-[11px] text-ink-label">Expected</dt>
-            <dd className="font-mono text-ink break-all">
+            {/* pre-wrap: outputs can span lines (e.g. "Hello\nWorld"). */}
+            <dd className="font-mono text-ink break-all whitespace-pre-wrap">
               {example.expectedOutput}
             </dd>
             {exampleResult && (
               <>
                 <dt className="text-[11px] text-ink-label">Your output</dt>
                 <dd
-                  className={`font-mono break-all ${exampleResult.passed ? "text-success" : "text-danger"}`}
+                  className={`font-mono break-all whitespace-pre-wrap ${exampleResult.passed ? "text-success" : "text-danger"}`}
                 >
                   {exampleResult.stdout.trim() ||
                     (exampleResult.stderr
