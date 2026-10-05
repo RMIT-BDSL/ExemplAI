@@ -88,13 +88,56 @@ export async function roundExamplesUsed(
   return given.length;
 }
 
-export async function allowanceForChat(ctx: QueryCtx, chat: Doc<"chats">) {
-  const messages = await ctx.db
-    .query("chatMessages")
-    .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
+/**
+ * A fresh chat starts each time a lesson is opened, so a lesson can have
+ * several chats. They are returned oldest first; the last is the current one.
+ */
+export async function lessonChats(ctx: QueryCtx, userId: Id<"users">, lessonId: Id<"questions">) {
+  return await ctx.db
+    .query("chats")
+    .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", lessonId))
     .collect();
-  const progress = await lessonProgressFor(ctx, chat.userId, chat.lessonId);
-  return computeAllowance(messages, progress);
+}
+
+/** Examples given this round across all of a lesson's chats (capped). */
+export async function lessonExamplesUsed(
+  ctx: QueryCtx,
+  chats: Doc<"chats">[],
+  progress: Doc<"lessonProgress"> | null
+) {
+  let used = 0;
+  for (const chat of chats) {
+    used += await roundExamplesUsed(ctx, chat._id, progress);
+    if (used >= EXAMPLE_CAP) return EXAMPLE_CAP;
+  }
+  return used;
+}
+
+/**
+ * The allowance is per lesson (it carries over when the lesson is reopened);
+ * "help started" is per chat, so every fresh chat starts locked until a tutor
+ * reply. `currentChatId` null = no chat open (e.g. openLesson).
+ */
+export async function allowanceForLesson(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  lessonId: Id<"questions">,
+  currentChatId: Id<"chats"> | null
+) {
+  const progress = await lessonProgressFor(ctx, userId, lessonId);
+  const used = await lessonExamplesUsed(ctx, await lessonChats(ctx, userId, lessonId), progress);
+  const reply = currentChatId
+    ? await ctx.db
+        .query("chatMessages")
+        .withIndex("by_chat", (q) => q.eq("chatId", currentChatId))
+        .filter((q) => q.eq(q.field("sender"), "assistant"))
+        .first()
+    : null;
+  return allowanceFrom(used, progress, reply !== null);
+}
+
+export async function allowanceForChat(ctx: QueryCtx, chat: Doc<"chats">) {
+  return await allowanceForLesson(ctx, chat.userId, chat.lessonId, chat._id);
 }
 
 /** Why a button turn isn't allowed right now, or null if it is. */
@@ -113,19 +156,18 @@ export function buttonBlockedReason(
   return null;
 }
 
-// Allowance for the student's chat on a lesson (reactive, for the chat UI).
+// Allowance for the student's current chat on a lesson (reactive, for the chat UI).
 export const getExampleAllowance = authenticatedQuery({
-  args: { lessonId: v.id("questions") },
+  args: { lessonId: v.id("questions"), chatId: v.optional(v.id("chats")) },
   handler: async (ctx, args): Promise<ExampleAllowance> => {
     if (!ctx.customUser) throw new Error("User not found");
     const userId = ctx.customUser._id;
-    const chat = await ctx.db
-      .query("chats")
-      .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", args.lessonId))
-      .unique();
-    const progress = await lessonProgressFor(ctx, userId, args.lessonId);
-    if (!chat) return computeAllowance([], progress);
-    return await allowanceForChat(ctx, chat);
+    let current: Id<"chats"> | null = null;
+    if (args.chatId) {
+      const chat = await ctx.db.get(args.chatId);
+      if (chat && chat.userId === userId && chat.lessonId === args.lessonId) current = chat._id;
+    }
+    return await allowanceForLesson(ctx, userId, args.lessonId, current);
   },
 });
 
@@ -147,11 +189,7 @@ export const openLesson = authenticatedMutation({
     let reset = false;
     const progress = await lessonProgressFor(ctx, user._id, args.lessonId);
     if (progress && user.last_opened_lesson !== undefined) {
-      const chat = await ctx.db
-        .query("chats")
-        .withIndex("by_user_lesson", (q) => q.eq("userId", user._id).eq("lessonId", args.lessonId))
-        .unique();
-      if (chat && (await allowanceForChat(ctx, chat)).exhausted) {
+      if ((await allowanceForLesson(ctx, user._id, args.lessonId, null)).exhausted) {
         await resetRound(ctx, progress);
         reset = true;
       }

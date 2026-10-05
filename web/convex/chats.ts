@@ -2,7 +2,11 @@ import { v } from "convex/values";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
 
-// Get messages for a given lesson chat
+// A fresh chat starts each time a lesson is opened (students only see their
+// current chat; earlier ones stay in the database for research). So a lesson
+// can have several chats; "latest" is the current one.
+
+// Messages of the student's latest chat on a lesson (oldest first).
 export const getMessages = authenticatedQuery({
   args: { lessonId: v.id("questions") },
   handler: async (ctx, args) => {
@@ -12,39 +16,71 @@ export const getMessages = authenticatedQuery({
       .withIndex("by_user_lesson", (q) =>
         q.eq("userId", ctx.customUser._id).eq("lessonId", args.lessonId)
       )
-      .unique();
+      .order("desc")
+      .first();
     if (!chat) return [];
-
-    const messages = await ctx.db
+    return await ctx.db
       .query("chatMessages")
       .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
       .collect();
-      
-    // Sort chronologically (Convex _creationTime is implicit, but collecting usually preserves insertion order. Better to sort explicitly just in case)
-    return messages.sort((a, b) => a._creationTime - b._creationTime);
   },
 });
 
-// Gets the chat ID, creating it if it doesn't exist. Useful for the UI to know the chatId to pass to Python.
+// Messages of one chat (oldest first); only its owner can read them.
+export const getChatMessages = authenticatedQuery({
+  args: { chatId: v.id("chats") },
+  handler: async (ctx, args) => {
+    if (!ctx.customUser) throw new Error("User not found");
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat || chat.userId !== ctx.customUser._id) return [];
+    return await ctx.db
+      .query("chatMessages")
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+      .collect();
+  },
+});
+
+// Opens a fresh chat for a lesson: called each time the lesson is opened.
+// Reuses the latest chat if nothing was said in it yet, so reloads and
+// double-mounts don't pile up empty chats.
+export const startChat = authenticatedMutation({
+  args: { lessonId: v.id("questions") },
+  handler: async (ctx, args) => {
+    if (!ctx.customUser) throw new Error("User not found");
+    const userId = ctx.customUser._id;
+    const latest = await ctx.db
+      .query("chats")
+      .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", args.lessonId))
+      .order("desc")
+      .first();
+    if (latest) {
+      const anyMessage = await ctx.db
+        .query("chatMessages")
+        .withIndex("by_chat", (q) => q.eq("chatId", latest._id))
+        .first();
+      if (!anyMessage) return latest._id;
+    }
+    return await ctx.db.insert("chats", { userId, lessonId: args.lessonId });
+  },
+});
+
+// The student's latest chat on a lesson, created if there is none.
 export const getOrCreateChat = authenticatedMutation({
   args: { lessonId: v.id("questions") },
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
-    let chat = await ctx.db
+    const chat = await ctx.db
       .query("chats")
       .withIndex("by_user_lesson", (q) =>
         q.eq("userId", ctx.customUser._id).eq("lessonId", args.lessonId)
       )
-      .unique();
-      
-    if (!chat) {
-      const chatId = await ctx.db.insert("chats", {
-        userId: ctx.customUser._id,
-        lessonId: args.lessonId,
-      });
-      return chatId;
-    }
-    return chat._id;
+      .order("desc")
+      .first();
+    if (chat) return chat._id;
+    return await ctx.db.insert("chats", {
+      userId: ctx.customUser._id,
+      lessonId: args.lessonId,
+    });
   },
 });
 

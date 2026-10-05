@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { allowanceFrom, roundExamplesUsed } from "./examples";
+import { allowanceFrom, lessonChats, lessonExamplesUsed } from "./examples";
 import { adminQuery, internalMutation } from "./functions";
 import {
   ZERO,
@@ -70,12 +70,15 @@ async function lessonSnapshot(
   progress: Doc<"lessonProgress"> | null,
   mastery: Doc<"bktMastery"> | null,
 ) {
-  const chat = await ctx.db
-    .query("chats")
-    .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", lesson._id))
-    .unique();
-  const used = chat ? await roundExamplesUsed(ctx, chat._id, progress) : 0;
-  const allowance = allowanceFrom(used, progress, chat?.last_reply_at !== undefined);
+  // A fresh chat starts each time the lesson is opened: count examples across
+  // all of them, and show the latest reply / message from any of them.
+  const chats = await lessonChats(ctx, userId, lesson._id);
+  const used = await lessonExamplesUsed(ctx, chats, progress);
+  const chat =
+    chats
+      .filter((c) => c.last_reply_at !== undefined)
+      .sort((a, b) => (b.last_reply_at ?? 0) - (a.last_reply_at ?? 0))[0] ?? null;
+  const allowance = allowanceFrom(used, progress, chat !== null);
 
   return {
     ...lessonInfo(lesson),
@@ -92,7 +95,10 @@ async function lessonSnapshot(
             at: chat.last_reply_at,
           }
         : null,
-    lastMessageAt: chat?.last_message_at ?? null,
+    lastMessageAt: chats.reduce<number | null>(
+      (latest, c) => (c.last_message_at !== undefined && (latest === null || c.last_message_at > latest) ? c.last_message_at : latest),
+      null,
+    ),
   };
 }
 

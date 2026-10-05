@@ -253,20 +253,24 @@ export default function ChatBox({
   // Convex integration
   const convexLessonId = lessonId as Id<"questions"> | undefined;
 
-  // Get or create chat session
+  // A fresh chat each time the lesson is opened: the student only ever sees
+  // this chat; earlier ones stay in Convex for research.
   const [chatId, setChatId] = React.useState<string | null>(null);
-  const getOrCreateChat = useMutation(api.chats.getOrCreateChat);
+  const startChat = useMutation(api.chats.startChat);
   const addMessageMutation = useMutation(api.chats.addMessage);
 
-  // Fetch messages from Convex
+  // Messages of the current chat only (reactive).
   const dbMessages = useQuery(
-    api.chats.getMessages,
-    convexLessonId ? { lessonId: convexLessonId } : "skip",
+    api.chats.getChatMessages,
+    chatId ? { chatId: chatId as Id<"chats"> } : "skip",
   );
-  // Example allowance for this lesson's current round (reactive).
+  // Example allowance: per lesson (carries over when the lesson is reopened);
+  // "help started" is per chat, so a fresh chat starts locked.
   const allowance = useQuery(
     api.examples.getExampleAllowance,
-    convexLessonId ? { lessonId: convexLessonId } : "skip",
+    convexLessonId
+      ? { lessonId: convexLessonId, ...(chatId ? { chatId: chatId as Id<"chats"> } : {}) }
+      : "skip",
   );
   const used = allowance?.used ?? 0;
   const remaining = allowance?.remaining ?? 0;
@@ -368,7 +372,7 @@ export default function ChatBox({
     async function initChat() {
       if (convexLessonId) {
         try {
-          const id = await getOrCreateChat({ lessonId: convexLessonId });
+          const id = await startChat({ lessonId: convexLessonId });
           if (isActive) {
             setChatId(id);
           }
@@ -384,7 +388,7 @@ export default function ChatBox({
     return () => {
       isActive = false;
     };
-  }, [convexLessonId, getOrCreateChat]);
+  }, [convexLessonId, startChat]);
 
   const handleSendMessage = async (text: string, trigger?: ExampleTrigger) => {
     if (!chatId || !convexLessonId) return;

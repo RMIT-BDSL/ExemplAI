@@ -175,15 +175,17 @@ function Course() {
         ? questions[0]
         : null;
 
-  // Autosave (no indicator): edits are written to localStorage shortly after
-  // typing stops, and flushed on lesson change, unmount and page hide.
+  // Autosave (no indicator): edits are written to sessionStorage shortly after
+  // typing stops, and flushed on lesson change, unmount and page hide. Saved
+  // code survives a reload in the same browser session only; a new session
+  // starts every lesson fresh from its starter code.
   const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
     const pending = pendingSaveRef.current;
-    if (pending) localStorage.setItem(pending.key, pending.code);
+    if (pending) sessionStorage.setItem(pending.key, pending.code);
     pendingSaveRef.current = null;
   }
 
@@ -232,7 +234,7 @@ function Course() {
   useEffect(() => {
     if (activeQuestion && problemId) {
       const storageKey = `exemplai_code_${problemId}_${language}`;
-      const savedCode = localStorage.getItem(storageKey);
+      const savedCode = sessionStorage.getItem(storageKey);
 
       if (savedCode) {
         setCodeTemplates((prev) => ({
