@@ -22,6 +22,16 @@ import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
+
+// Shown above a lesson's starter code in the editor (on first load and on
+// Reset). Display only: grading reads the function name from the lesson's
+// starter_code, and a comment doesn't change what the code does.
+const STARTER_HINT = "# replace 'pass' with your function code";
+
+function withStarterHint(starter: string): string {
+  if (!/\bpass\b/.test(starter) || starter.startsWith(STARTER_HINT)) return starter;
+  return `${STARTER_HINT}\n${starter}`;
+}
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
   validateSearch: (search: Record<string, unknown>) => {
@@ -233,7 +243,7 @@ function Course() {
           editorRef.current.setValue(savedCode);
         }
       } else if (activeQuestion.starter_code) {
-        const starter = activeQuestion.starter_code;
+        const starter = withStarterHint(activeQuestion.starter_code);
         setCodeTemplates((prev) => ({
           ...prev,
           [language]: starter,
@@ -339,7 +349,9 @@ function Course() {
   function handleReset() {
     posthog.capture("code_reset", { problem_id: problemId, language });
     const defaultCode =
-      activeQuestion?.starter_code || CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+      (activeQuestion?.starter_code && withStarterHint(activeQuestion.starter_code)) ||
+      CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] ||
+      "";
     setCodeTemplates((prev) => ({
       ...prev,
       [language]: defaultCode,
