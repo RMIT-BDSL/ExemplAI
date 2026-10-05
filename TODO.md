@@ -1,6 +1,6 @@
 # High-level List of Stuff To Do
 
-_Last updated 2026-10-03. Status: testing on dev; everyone is routed to the experimental group on purpose
+_Last updated 2026-10-05. Status: testing on dev; everyone is routed to the experimental group on purpose._
 
 ## Course and design (decided)
 
@@ -30,32 +30,33 @@ _Last updated 2026-10-03. Status: testing on dev; everyone is routed to the expe
 
 ## Now (testing on dev)
 
-* [ ] Redeploy the Python server on Railway from `dev` (confirm which branch Railway tracks).
-* [ ] Reset + reseed the dev Convex database (`pnpm run seed` after clearing the tables).
+* [ ] Redeploy the Python server on Railway from `dev` (confirm which branch Railway tracks); #86 needs it (Dean retry, progress steps, timing logs). Server and Convex must share `CONVEX_BACKEND_SECRET` or Run/Submit results stop being recorded.
+* [ ] Reset + reseed the dev Convex database (`pnpm run seed` after clearing the tables), then run `students:backfillSummaries` for the admin student view.
+* [ ] Review and merge #88 (one tutor bar: Get help → chat).
 * [ ] Review `server/ai/syllabus.py` (features and bug types per topic) against the course guide.
-* [ ] Manual test of the full flow: failed Submit → Get help → chat → New example ×3 → "try another topic" → reset.
-* [ ] Testing view: small admin-only panel (lesson, topic, mastery + band, status, examples used, last reply type).
+* [ ] Manual test of the full flow on exemplai-dev: failed Submit → Get help → chat → New example ×3 → "try another topic" → reset. Also check what's new since 10-03: Dean retry, progress steps, fresh chat per lesson open, Submit history, Run shortcut, resizable columns, console, syllabus opening on the current week.
+* [ ] Check the admin student view (#78, #83) gives what testing needs (lesson, topic, mastery + band, status, examples used, last reply type).
 
 ## Before the pilot
 
 * [ ] Store each student's A/B group in Convex (needed for the control group's plain chat UI and lock).
 * [ ] Dean enforces `<allowed_python>` (currently an agent instruction only).
+* [ ] Guardrail: the injection pattern misses "ignore **all previous** instructions" (allows only one word between "ignore" and "instructions"); typed messages are still screened by the model.
 * [ ] Prompt review items 9–14: runnable Complete/Faded code, no repeated scenarios, scripted reply to "what's wrong with my code?", "in the editor" wording, shared length/style rules, clearer "trivially adaptable" rule.
 * [ ] Empirical DeepSeek runs of the prompts on scripted conversations (needs an OpenRouter key in `server/.env`).
 * [ ] Teaching team reviews the new lessons (tag `exemplai`) and the reconstructed CSEDM descriptions (check against PSLC DataShop dataset 1798).
 
 ## Research analysis
 
-* [ ] Log mastery at the time, group, Dean decision/reason and rejected drafts with each reply (delivered type and PostHog help clicks are already logged).
-* [ ] Dean retries once before the generic fallback.
+* [ ] Log mastery at the time, group and rejected drafts with each reply (already logged: delivered type, Dean decision/reason, PostHog help clicks, and mastery before each lesson's first Submit).
 * [ ] Ethics check: Sentry (IPs, headers) and PostHog events vs. the approval (#2025-29047-30387).
 
 ## Before going live
 
 * [ ] Investigate the failed production deploy.
 * [ ] Fix the Convex test setup (betterAuth not registered in `convexTest`), then re-enable lint and tests in the production deploy.
-* [ ] Security: restrict CORS to our origins; stop students writing their own mastery / failed-Submit counts (`recordCodeExecution`).
-* [ ] Check response times (guardrail + agent + Dean; browser times out at 60 s).
+* [ ] Security: restrict CORS to our origins. (Students can no longer forge lesson results: `recordCodeExecution` needs the backend secret.)
+* [ ] Check response times on dev from the server's timing logs (`step <node>: <ms> ms`, `chat total`); browser times out at 60 s. Buttons already skip the guardrail's model check.
 * [ ] Merge `dev` → `main`, set `OPENROUTER_API_KEY` in production, reseed production.
 * [ ] Staff pilot (also provides data for the BKT refit).
 
