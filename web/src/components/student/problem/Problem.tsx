@@ -62,6 +62,14 @@ function lastLine(text: string): string {
   return lines[lines.length - 1] ?? "";
 }
 
+/** What the student's code gave for the example: output, else the error line. */
+function exampleOutput(result: NonNullable<LastSubmit["example"]>): string {
+  return (
+    result.stdout.trim() ||
+    (result.stderr ? lastLine(result.stderr) : "(nothing returned)")
+  );
+}
+
 export interface ProblemProps {
   problem: ProblemData;
   /** This session's Submits on the lesson, newest first. */
@@ -105,10 +113,7 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
                 <dd
                   className={`font-mono break-all whitespace-pre-wrap ${exampleResult.passed ? "text-success" : "text-danger"}`}
                 >
-                  {exampleResult.stdout.trim() ||
-                    (exampleResult.stderr
-                      ? lastLine(exampleResult.stderr)
-                      : "(nothing returned)")}
+                  {exampleOutput(exampleResult)}
                   <b className="ml-2 font-sans text-[9px] font-semibold tracking-[0.1em]">
                     {exampleResult.passed ? "PASS" : "FAIL"}
                   </b>
@@ -133,12 +138,20 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
               const passedAll = s.total > 0 && s.passed === s.total;
               return (
                 <div key={s.at.getTime() + "-" + i} className="flex items-baseline gap-3">
-                  <span className="w-12 flex-shrink-0 tabular-nums text-ink-label">
+                  <span className="flex-shrink-0 whitespace-nowrap tabular-nums text-ink-label">
                     {submitTime(s.at)}
                   </span>
-                  <span className={passedAll ? "text-success" : "text-danger"}>
-                    {passedAll ? "✓" : "✗"} {s.passed} of {s.total} tests passed
-                  </span>
+                  <div className="min-w-0">
+                    <div className={passedAll ? "text-success" : "text-danger"}>
+                      {passedAll ? "✓" : "✗"} {s.passed} of {s.total} tests passed
+                    </div>
+                    {/* The example's output on that Submit, as a trace of attempts. */}
+                    {s.example && (
+                      <div className="mt-0.5 font-mono text-[11px] text-ink-muted break-all whitespace-pre-wrap">
+                        {exampleOutput(s.example)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
