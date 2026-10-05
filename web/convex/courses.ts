@@ -138,6 +138,8 @@ export const getLessonProgress = authenticatedQuery({
       has_run: row.has_run ?? false,
       bkt_recorded: row.bkt_recorded ?? false,
       failed_submits: row.failed_submits ?? 0,
+      // Last activity, so the syllabus can open the student's current week.
+      updated_at: row.updated_at ?? row._creationTime,
     }));
   },
 });

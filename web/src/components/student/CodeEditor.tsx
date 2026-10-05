@@ -127,6 +127,8 @@ export default function CodeEditor({
               type="button"
               onClick={onRun}
               disabled={isLoading}
+              title="Run (Ctrl+Enter, or ⌘+Enter on Mac)"
+              aria-keyshortcuts="Control+Enter Meta+Enter"
               className="flex h-7 items-center gap-1.5 rounded-[2px] border border-rule-strong bg-transparent px-3 text-[11px] font-medium tracking-[0.02em] text-brass transition-colors hover:bg-surface-raised disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
             >
               {isRunning ? (

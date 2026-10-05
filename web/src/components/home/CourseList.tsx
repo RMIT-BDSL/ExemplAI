@@ -49,9 +49,8 @@ export default function CourseList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
   const [selectedStatus, setSelectedStatus] = useState<Status | "all">("all");
-  const [collapsedWeeks, setCollapsedWeeks] = useState<Record<number, boolean>>(
-    {},
-  );
+  // Weeks the student opened or closed; the rest follow defaultOpenWeek.
+  const [openWeeks, setOpenWeeks] = useState<Record<number, boolean>>({});
 
   const problems: ShortProblem[] = useMemo(() => {
     // lessonId -> status. Lessons absent from the map are "pending".
@@ -73,6 +72,20 @@ export default function CourseList() {
     () => [...new Set(problems.map((p) => p.week))].sort((a, b) => a - b),
     [problems],
   );
+
+  // Only one week starts open: the week of the lesson worked on most
+  // recently, or the first week for a new student.
+  const defaultOpenWeek = useMemo(() => {
+    const weekByLesson = new Map(problems.map((p) => [p.id, p.week]));
+    let latest: { week: number; at: number } | undefined;
+    for (const row of lessonProgress ?? []) {
+      const week = weekByLesson.get(row.lessonId);
+      if (week !== undefined && (!latest || row.updated_at > latest.at)) {
+        latest = { week, at: row.updated_at };
+      }
+    }
+    return latest?.week ?? allWeeks[0];
+  }, [problems, lessonProgress, allWeeks]);
 
   if (questions === undefined) {
     return <SyllabusSkeleton />;
@@ -100,7 +113,9 @@ export default function CourseList() {
     .map(Number)
     .sort((a, b) => a - b);
 
-  const totalDone = problems.filter((p) => p.status === "completed").length;
+  // While searching or filtering, show every matching week open.
+  const filtering =
+    term !== "" || selectedWeek !== "all" || selectedStatus !== "all";
 
   return (
     <div>
@@ -115,9 +130,6 @@ export default function CourseList() {
         <p className="mt-2 font-serif text-[0.95rem] leading-[1.75] text-ink-prose">
           Work through the exercises in order. Each one opens in the workspace,
           where you can run your code, submit it, and ask the tutor for help.
-        </p>
-        <p className="mt-3 text-[11px] text-ink-label">
-          {totalDone} of {problems.length} exercises done
         </p>
       </header>
 
@@ -186,7 +198,9 @@ export default function CourseList() {
       {sortedWeeks.length > 0 ? (
         <div className="space-y-8">
           {sortedWeeks.map((weekNum) => {
-            const isCollapsed = collapsedWeeks[weekNum];
+            const isCollapsed = !(
+              openWeeks[weekNum] ?? (filtering || weekNum === defaultOpenWeek)
+            );
             const weekProblems = problemsByWeek[weekNum];
             const doneCount = weekProblems.filter(
               (p) => p.status === "completed",
@@ -197,10 +211,7 @@ export default function CourseList() {
                 <button
                   type="button"
                   onClick={() =>
-                    setCollapsedWeeks((prev) => ({
-                      ...prev,
-                      [weekNum]: !prev[weekNum],
-                    }))
+                    setOpenWeeks((prev) => ({ ...prev, [weekNum]: isCollapsed }))
                   }
                   aria-expanded={!isCollapsed}
                   className="group mb-2 flex w-full items-center gap-3 text-left cursor-pointer"

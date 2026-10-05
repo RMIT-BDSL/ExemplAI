@@ -15,6 +15,7 @@ const CodeEditor = lazy(() => import("#/components/student/CodeEditor"));
 const SidePanel = lazy(() => import("#/components/student/SidePane"));
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
+import ResizeHandle from "#/components/ide/ResizeHandle";
 import { formatCall, type SubmitRecord } from "#/components/student/problem/Problem";
 import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
@@ -31,6 +32,17 @@ const STARTER_HINT = "# replace 'pass' with your function code";
 function withStarterHint(starter: string): string {
   if (!/\bpass\b/.test(starter) || starter.startsWith(STARTER_HINT)) return starter;
   return `${STARTER_HINT}\n${starter}`;
+}
+
+// Resizable lesson columns (≥1100px): minimum widths so no column gets too small.
+const WIDE_PX = 1100;
+const DESC_MIN = 260;
+const TUTOR_MIN = 300;
+const EDITOR_MIN = 360;
+const LAYOUT_KEY = "exemplai_layout";
+
+function clampWidth(width: number, min: number, max: number) {
+  return Math.round(Math.max(min, Math.min(width, Math.max(min, max))));
 }
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
@@ -266,6 +278,61 @@ function Course() {
     }
   }, [activeQuestionId, language, problemId]);
 
+  // Resizable columns (wide screens only, where all three sit side by side).
+  // Widths are a per-browser convenience; null = the default CSS width.
+  const descRef = useRef<HTMLDivElement | null>(null);
+  const [isWide, setIsWide] = useState(false);
+  const [descWidth, setDescWidth] = useState<number | null>(null);
+  const [tutorWidth, setTutorWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const wide = window.matchMedia(`(min-width: ${WIDE_PX}px)`);
+    const update = () => setIsWide(wide.matches);
+    update();
+    wide.addEventListener("change", update);
+    try {
+      const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "{}");
+      if (typeof saved.desc === "number") setDescWidth(saved.desc);
+      if (typeof saved.tutor === "number") setTutorWidth(saved.tutor);
+    } catch {}
+    return () => wide.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ desc: descWidth, tutor: tutorWidth }));
+    } catch {}
+  }, [descWidth, tutorWidth]);
+
+  // Each side keeps a minimum width, and the editor keeps at least EDITOR_MIN.
+  function dragDescription(clientX: number) {
+    const d = descRef.current?.getBoundingClientRect();
+    const t = tutorRef.current?.getBoundingClientRect();
+    if (!d || !t) return;
+    setDescWidth(clampWidth(clientX - d.left, DESC_MIN, t.left - d.left - EDITOR_MIN));
+  }
+
+  function dragTutor(clientX: number) {
+    const d = descRef.current?.getBoundingClientRect();
+    const t = tutorRef.current?.getBoundingClientRect();
+    if (!d || !t) return;
+    setTutorWidth(clampWidth(t.right - clientX, TUTOR_MIN, t.right - d.right - EDITOR_MIN));
+  }
+
+  // A smaller window can leave the editor too narrow: re-apply the limits.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-clamp on resize only
+  useEffect(() => {
+    if (!isWide) return;
+    const reclamp = () => {
+      const d = descRef.current?.getBoundingClientRect();
+      const t = tutorRef.current?.getBoundingClientRect();
+      if (d && descWidth !== null) dragDescription(d.right);
+      if (t && tutorWidth !== null) dragTutor(t.left);
+    };
+    window.addEventListener("resize", reclamp);
+    return () => window.removeEventListener("resize", reclamp);
+  }, [isWide, descWidth, tutorWidth]);
+
   // Crossing the 1100px breakpoint resets the overlay (pinned ⇄ rail).
   useEffect(() => {
     const narrow = window.matchMedia("(max-width: 1099px)");
@@ -330,8 +397,16 @@ function Course() {
       : undefined,
   };
 
-  function handleEditorMount(editor: any) {
+  // Ctrl+Enter (Cmd+Enter on Mac) in the editor runs the code, like the Run
+  // button. A ref keeps the shortcut pointing at the latest state/lesson.
+  const runShortcutRef = useRef<() => void>(() => {});
+  runShortcutRef.current = () => {
+    if (!isRunning && !isSubmitting) handleExecute("run");
+  };
+
+  function handleEditorMount(editor: any, monaco: any) {
     editorRef.current = editor;
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runShortcutRef.current());
   }
 
   function handleCodeChange(value: string | undefined) {
@@ -515,6 +590,17 @@ function Course() {
           <LessonExposition
             mappedProblem={mappedProblem}
             submitHistory={lessonSubmits}
+            panelRef={descRef}
+            width={isWide && descWidth ? descWidth : undefined}
+          />
+          <ResizeHandle
+            label="Resize description"
+            onDrag={dragDescription}
+            onNudge={(delta) => {
+              const d = descRef.current?.getBoundingClientRect();
+              if (d) dragDescription(d.right + delta);
+            }}
+            onReset={() => setDescWidth(null)}
           />
 
           {/* Editor Panel */}
@@ -589,10 +675,21 @@ function Course() {
             </span>
           </button>
 
+          <ResizeHandle
+            label="Resize tutor"
+            onDrag={dragTutor}
+            onNudge={(delta) => {
+              const t = tutorRef.current?.getBoundingClientRect();
+              if (t) dragTutor(t.left + delta);
+            }}
+            onReset={() => setTutorWidth(null)}
+          />
+
           {/* Tutor panel: pinned at ≥1100px (no hide control), overlay below */}
           <div
             ref={tutorRef}
             id="tutor-panel"
+            style={isWide && tutorWidth ? { width: tutorWidth } : undefined}
             className={cn(
               "absolute inset-y-0 right-0 z-40 w-[min(400px,calc(100%-48px))] flex-col border-l border-rule-strong bg-surface-panel text-ink",
               "min-[1100px]:relative min-[1100px]:inset-auto min-[1100px]:z-auto min-[1100px]:flex min-[1100px]:w-[340px] min-[1100px]:flex-shrink-0 xl:w-[400px]",
