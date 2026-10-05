@@ -18,8 +18,11 @@ Checks depend on the condition and the draft's ``response_type``:
 - experimental, no examples remaining: EXAMPLE_LIMIT (a typed request can't
   get a new example past the allowance, even if the draft is mislabelled).
 A typed request whose draft is labelled new_example with none remaining is
-answered with the limit message without calling the LLM. Sets
-``delivered_response_type`` (what reached the student) for Convex.
+answered with the limit message without calling the LLM. A first rejection
+sends the draft back to the same agent once, with the reason in
+<dean_feedback> (route_after_dean); a second rejection sends the fallback.
+Sets ``delivered_response_type``, ``dean_decision`` and ``dean_reason`` (saved
+with the reply in Convex).
 """
 
 from __future__ import annotations
@@ -34,6 +37,9 @@ from ai.llm import llm
 from ai.nodes.context import NEW_EXAMPLE, recent_history
 
 FALLBACK = "fallback"  # delivered_response_type when the draft is replaced
+
+# What happened at the Dean, saved with the reply (dean_decision).
+APPROVED, APPROVED_AFTER_RETRY, REJECTED, LIMIT = "approved", "approved_after_retry", "rejected", "limit"
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
@@ -68,14 +74,20 @@ lesson ("not limited" if unknown).
 
 <always_check>
 Apply to every draft, in both conditions:
-1. DIRECT_ANSWER_LEAK: the draft hands the student a solution to \
-<original_problem>. Judge it against the whole conversation: reject a draft that \
-supplies the last missing piece of a solution assembled over earlier turns.
-   - experimental: reject code that solves <original_problem>, or an example \
-that could be trivially adapted (renaming, minor restructuring) into a solution.
-   - control: reject a complete working solution to <original_problem> or a \
-fully corrected version of <student_code>. Explaining an error, pointing to \
-where it is, a hint, or a short syntax snippet is allowed.
+1. DIRECT_ANSWER_LEAK: the draft hands the student the answer to \
+<original_problem>. Reject ONLY if the draft:
+   - contains the solution itself: code for the same task that produces the \
+outputs <original_problem> asks for (for example its exact strings or numbers); or
+   - tells the student exactly what to write in their own code (the corrected \
+line or a fully corrected version of <student_code>); or
+   - supplies the last missing piece of a solution assembled over earlier turns \
+(judge against the whole conversation).
+   Explicitly ALLOWED, do not reject: an example of the same concept that uses \
+different values or a different scenario, even if its structure matches the \
+solution; explaining syntax or concepts; saying what kind of error the student \
+has or roughly where it is; a hint. In short exercises (one or two lines) a \
+parallel example will look like the solution; that is expected. Approve it \
+unless it uses the problem's own values.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \
@@ -165,6 +177,9 @@ def dean_validation_node(state: TutorGraphState) -> dict:
         return {
             "messages": [{"role": "ai", "content": limit_message}],
             "delivered_response_type": FALLBACK,
+            "dean_decision": LIMIT,
+            "dean_reason": "EXAMPLE_LIMIT",
+            "dean_retry": False,
         }
 
     dean = llm.with_structured_output(DeanValidationResult)
@@ -172,16 +187,45 @@ def dean_validation_node(state: TutorGraphState) -> dict:
         [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=_dean_input(state))]
     )
 
+    retried = bool(state.get("dean_retried"))
     if result.status == "approved":
-        log.info("dean_validation_node → approved")
+        log.info(f"dean_validation_node → approved{' after retry' if retried else ''}")
         return {
             "messages": [{"role": "ai", "content": draft}],
             "delivered_response_type": state.get("response_type") or NEW_EXAMPLE,
+            "dean_decision": APPROVED_AFTER_RETRY if retried else APPROVED,
+            "dean_reason": state.get("dean_reason", "") if retried else "",
+            "dean_retry": False,
         }
 
-    log.warning(f"dean_validation_node → rejected ({result.reason})")
-    fallback = limit_message if result.reason == "EXAMPLE_LIMIT" else _FALLBACK
+    reason = result.reason or "UNSPECIFIED"
+    log.warning(f"dean_validation_node → rejected ({reason})")
+    if not retried and reason != "EXAMPLE_LIMIT":
+        # One retry: send the draft back to the same agent with the reason.
+        feedback = reason + (f": {result.violation_excerpt}" if result.violation_excerpt else "")
+        return {"dean_retry": True, "dean_retried": True, "dean_feedback": feedback, "dean_reason": reason}
+
+    fallback = limit_message if reason == "EXAMPLE_LIMIT" else _FALLBACK
     return {
         "messages": [{"role": "ai", "content": fallback}],
         "delivered_response_type": FALLBACK,
+        "dean_decision": LIMIT if reason == "EXAMPLE_LIMIT" else REJECTED,
+        "dean_reason": reason,
+        "dean_retry": False,
     }
+
+
+# Agent node for each modality (where a rejected draft is sent for its retry).
+_AGENT_FOR_MODALITY = {
+    "Complete": "complete_example_node",
+    "Faded": "faded_example_node",
+    "Erroneous": "erroneous_example_node",
+    "Control": "control_agent_node",
+}
+
+
+def route_after_dean(state: TutorGraphState) -> str:
+    """After the Dean: back to the same agent for its one retry, else finish."""
+    if state.get("dean_retry"):
+        return _AGENT_FOR_MODALITY.get(state.get("pedagogical_modality", ""), "end")
+    return "end"

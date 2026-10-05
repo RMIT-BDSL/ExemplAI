@@ -13,6 +13,7 @@ Topology (mirrors the target pipeline in CLAUDE.md):
                                       └─ erroneous_example_node ───────┤
                                                                        ↓
                                                   dean_validation_node → END
+                                                  (first rejection: back to the same agent once)
 
 input_guardrail screens input first; experiment_router and orchestrator_router
 are pure Python (no LLM). Every agent draft routes through dean_validation_node —
@@ -28,6 +29,7 @@ from ai.nodes import (
     faded_example_node,
     guardrail_blocked,
     input_guardrail,
+    route_after_dean,
     route_after_guardrail,
 )
 from ai.graph_router import experiment_router, orchestrator_router
@@ -103,6 +105,18 @@ def build_tutor_graph() -> StateGraph:
     graph.add_edge("complete_example_node", "dean_validation_node")
     graph.add_edge("faded_example_node", "dean_validation_node")
     graph.add_edge("erroneous_example_node", "dean_validation_node")
-    graph.add_edge("dean_validation_node", END)
+    # A rejected draft goes back to the same agent once (with the Dean's
+    # reason); otherwise the Dean's message ends the run.
+    graph.add_conditional_edges(
+        "dean_validation_node",
+        route_after_dean,
+        {
+            "complete_example_node": "complete_example_node",
+            "faded_example_node": "faded_example_node",
+            "erroneous_example_node": "erroneous_example_node",
+            "control_agent_node": "control_agent_node",
+            "end": END,
+        },
+    )
 
     return graph

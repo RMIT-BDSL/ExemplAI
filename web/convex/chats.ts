@@ -94,6 +94,8 @@ export const addSystemMessage = authenticatedMutation({
     responseType: v.optional(
       v.union(v.literal("new_example"), v.literal("follow_up"), v.literal("fallback"))
     ),
+    deanDecision: v.optional(v.string()),
+    deanReason: v.optional(v.string()),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -112,6 +114,8 @@ export const addSystemMessage = authenticatedMutation({
       sentBySystem: args.sentBySystem,
       model: args.model,
       ...(args.responseType ? { response_type: args.responseType } : {}),
+      ...(args.deanDecision ? { dean_decision: args.deanDecision } : {}),
+      ...(args.deanReason ? { dean_reason: args.deanReason } : {}),
     });
     return { success: true };
   },

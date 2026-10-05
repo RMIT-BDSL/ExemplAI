@@ -81,6 +81,12 @@ def student_context(state: TutorGraphState, extra: str = "") -> str:
         + (f"<examples_remaining>{remaining}</examples_remaining>\n" if remaining is not None else "")
         + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
         + extra
+        + (
+            "<dean_feedback>\nYour previous draft was not sent to the student because: "
+            f"{state['dean_feedback']}\nWrite a new draft that avoids this problem.\n</dean_feedback>\n"
+            if state.get("dean_feedback")
+            else ""
+        )
         + "The conversation with the student follows; reply to their latest message."
     )
 

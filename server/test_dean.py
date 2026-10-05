@@ -93,7 +93,8 @@ def test_dean_approves_and_forwards_draft(monkeypatch):
     fake = _FakeLlm(verdict=DeanValidationResult(status="approved"))
     monkeypatch.setattr(dean_mod, "llm", fake)
     out = dean_mod.dean_validation_node({**LATER_TURN, "draft_response": "Nice work!", "response_type": FOLLOW_UP})
-    assert out == {"messages": [{"role": "ai", "content": "Nice work!"}], "delivered_response_type": FOLLOW_UP}
+    assert out["messages"] == [{"role": "ai", "content": "Nice work!"}]
+    assert out["delivered_response_type"] == FOLLOW_UP and out["dean_decision"] == "approved"
     system_prompt = fake.calls[0][0].content
     assert "MODALITY_DRIFT" in system_prompt and "control" in system_prompt
 
@@ -101,8 +102,12 @@ def test_dean_approves_and_forwards_draft(monkeypatch):
 def test_dean_rejection_substitutes_fallback(monkeypatch):
     verdict = DeanValidationResult(status="rejected", reason="MODALITY_DRIFT", violation_excerpt="total += x")
     monkeypatch.setattr(dean_mod, "llm", _FakeLlm(verdict=verdict))
-    out = dean_mod.dean_validation_node({**LATER_TURN, "draft_response": "The answer is total += x"})
-    assert out == {"messages": [{"role": "ai", "content": _FALLBACK}], "delivered_response_type": "fallback"}
+    first = dean_mod.dean_validation_node({**LATER_TURN, "draft_response": "The answer is total += x"})
+    assert first["dean_retry"] is True and "messages" not in first  # one retry first
+    assert first["dean_feedback"] == "MODALITY_DRIFT: total += x"
+    second = dean_mod.dean_validation_node({**LATER_TURN, "draft_response": "x", "dean_retried": True})
+    assert second["messages"] == [{"role": "ai", "content": _FALLBACK}]
+    assert second["delivered_response_type"] == "fallback" and second["dean_decision"] == "rejected"
 
 
 def test_faded_agent_labels_and_strips_its_reply(monkeypatch):

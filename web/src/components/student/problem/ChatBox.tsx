@@ -17,8 +17,12 @@ export interface Message {
   responseType?: string;
 }
 
+// Time only for today's messages; older ones also show the date, since each
+// lesson keeps one chat across sessions.
 function timeOf(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (d.toDateString() === new Date().toDateString()) return time;
+  return `${d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`;
 }
 
 // Fences the student can edit and run in place: Python, or untagged (the

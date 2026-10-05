@@ -39,6 +39,8 @@ spoon-feeding the answer.
 <rules>
 - Generate a DIFFERENT but conceptually analogous problem. NEVER generate buggy code \
 for the student's actual <original_problem> — always use a different scenario.
+- NEVER use the exact values, strings or names from <original_problem> in your \
+example: for a short exercise, show the same idea with different values.
 - NEVER directly reference, debug, or fix the student's actual code.
 - Put the bug in the same idea the student's <error_trace> shows they are getting wrong. \
 If only hidden tests failed, use the kind of edge case the concept needs without \

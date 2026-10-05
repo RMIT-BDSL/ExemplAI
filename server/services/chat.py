@@ -72,6 +72,11 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
         "student_code": chat.student_code,
         "error_trace": chat.error_trace,
         "trigger": chat.trigger,
+        # The Dean's one retry starts fresh on every request (state is checkpointed).
+        "dean_retry": False,
+        "dean_retried": False,
+        "dean_feedback": "",
+        "dean_reason": "",
     }
 
 
@@ -223,6 +228,8 @@ async def _save_assistant_message(
     text: str,
     chosen_model: str,
     response_type: Optional[str] = None,
+    dean_decision: Optional[str] = None,
+    dean_reason: Optional[str] = None,
 ) -> None:
     if text and chat_id:
         try:
@@ -238,6 +245,9 @@ async def _save_assistant_message(
                         "model": chosen_model,
                         # What the reply delivered; Convex counts new examples.
                         **({"responseType": response_type} if response_type else {}),
+                        # Why the reply is what it is (research log; see dean_validation).
+                        **({"deanDecision": dean_decision} if dean_decision else {}),
+                        **({"deanReason": dean_reason} if dean_reason else {}),
                         "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
@@ -262,7 +272,10 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
 
         text = _extract_final_message_text(result)
         chosen_model = _determine_chosen_model(result)
-        await _save_assistant_message(client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"))
+        await _save_assistant_message(
+            client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
+            dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
+        )
 
         # Return a small, guaranteed-serializable payload rather than the raw
         # graph state (which carries LangChain message objects and can be large
@@ -307,7 +320,10 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     text = _extract_final_message_text(result)
     chosen_model = _determine_chosen_model(result)
     try:
-        await _save_assistant_message(client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"))
+        await _save_assistant_message(
+            client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
+            dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
+        )
     except Exception as e:
         log.error(f"Message persistence error: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to save assistant message'})}\n\n"

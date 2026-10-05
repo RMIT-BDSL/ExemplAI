@@ -77,7 +77,8 @@ def test_typed_request_over_the_limit_is_answered_without_the_llm(monkeypatch):
     dean = _Dean(DeanValidationResult(status="approved"))
     monkeypatch.setattr(dean_mod, "llm", dean)
     out = dean_mod.dean_validation_node(_typed_state(response_type=NEW_EXAMPLE))
-    assert out == {"messages": [{"role": "ai", "content": "LIMIT MESSAGE"}], "delivered_response_type": "fallback"}
+    assert out["messages"] == [{"role": "ai", "content": "LIMIT MESSAGE"}]
+    assert out["delivered_response_type"] == "fallback" and out["dean_decision"] == "limit"
     assert dean.calls == []
 
 
@@ -103,13 +104,14 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
         async def ainvoke(self, state, config):
             assert state["examples_remaining"] == 1
             return {"messages": [AIMessage(content="example 2")], "delivered_response_type": NEW_EXAMPLE,
+                    "dean_decision": "approved_after_retry", "dean_reason": "DIRECT_ANSWER_LEAK",
                     "guardrail_passed": True, "experiment_condition": "experimental", "bkt_prob_mastery": 0.5}
 
     async def fake_context(client, chat):
         return ConvexChatContext([{"sender": "user", "content": "x"}], _allowance(used=1, earned=2))
 
-    async def fake_save(client, chat_id, text, chosen_model, response_type=None):
-        saved.update(text=text, response_type=response_type)
+    async def fake_save(client, chat_id, text, chosen_model, response_type=None, **dean):
+        saved.update(text=text, response_type=response_type, **dean)
 
     async def fake_condition(user_id, chat):
         return None
@@ -120,7 +122,8 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
     monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
     chat = Chat(user_id=1, chat_id="c", conversation=[], trigger="new_example")
     asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
-    assert saved == {"text": "example 2", "response_type": NEW_EXAMPLE}
+    assert saved == {"text": "example 2", "response_type": NEW_EXAMPLE,
+                     "dean_decision": "approved_after_retry", "dean_reason": "DIRECT_ANSWER_LEAK"}
 
 
 # ── control group: plain chat, Dean checks the answer leak only ───────
