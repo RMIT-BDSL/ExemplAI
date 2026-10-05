@@ -15,13 +15,23 @@ const CodeEditor = lazy(() => import("#/components/student/CodeEditor"));
 const SidePanel = lazy(() => import("#/components/student/SidePane"));
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
-import { formatCall, type LastSubmit } from "#/components/student/problem/Problem";
+import { formatCall, type SubmitRecord } from "#/components/student/problem/Problem";
 import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
+
+// Shown above a lesson's starter code in the editor (on first load and on
+// Reset). Display only: grading reads the function name from the lesson's
+// starter_code, and a comment doesn't change what the code does.
+const STARTER_HINT = "# replace 'pass' with your function code";
+
+function withStarterHint(starter: string): string {
+  if (!/\bpass\b/.test(starter) || starter.startsWith(STARTER_HINT)) return starter;
+  return `${STARTER_HINT}\n${starter}`;
+}
 export const Route = createFileRoute("/_authenticated/course")({
   component: Course,
   validateSearch: (search: Record<string, unknown>) => {
@@ -145,11 +155,10 @@ function Course() {
   const runIdRef = useRef(0);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  // Latest Submit in this session, shown in the Description column. Tagged with
-  // its lesson so a new lesson never shows the previous one's result, even for a frame.
-  const [submitRecord, setSubmitRecord] = useState<(LastSubmit & { lessonId: string }) | undefined>(
-    undefined,
-  );
+  // This session's Submits on the current lesson, newest first, shown in the
+  // Description column. Tagged with their lesson so a new lesson never shows the
+  // previous one's results, even for a frame. Not persisted (cleared on reload).
+  const [submitHistory, setSubmitHistory] = useState<SubmitRecord[]>([]);
   // The tutor is pinned open on wide screens. Below 1100px it collapses to a
   // rail; isTutorOpen then shows it as an overlay (×, Esc or click outside closes).
   const [isTutorOpen, setIsTutorOpen] = useState<boolean>(false);
@@ -166,22 +175,24 @@ function Course() {
         ? questions[0]
         : null;
 
-  // Autosave (no indicator): edits are written to localStorage shortly after
-  // typing stops, and flushed on lesson change, unmount and page hide.
+  // Autosave (no indicator): edits are written to sessionStorage shortly after
+  // typing stops, and flushed on lesson change, unmount and page hide. Saved
+  // code survives a reload in the same browser session only; a new session
+  // starts every lesson fresh from its starter code.
   const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
     const pending = pendingSaveRef.current;
-    if (pending) localStorage.setItem(pending.key, pending.code);
+    if (pending) sessionStorage.setItem(pending.key, pending.code);
     pendingSaveRef.current = null;
   }
 
   const activeQuestionId = activeQuestion?._id;
   const activeProgress = lessonProgress?.find((p: any) => p.lessonId === activeQuestionId);
-  const lastSubmit =
-    submitRecord && submitRecord.lessonId === activeQuestionId ? submitRecord : undefined;
+  const lessonSubmits = submitHistory.filter((s) => s.lessonId === activeQuestionId);
+  const lastSubmit = lessonSubmits[0];
   // Failed Submits on this lesson; the first unlocks Get help in the chat.
   const failedSubmits: number = activeProgress?.failed_submits ?? 0;
 
@@ -205,7 +216,7 @@ function Course() {
   // Submit results are per lesson and per session.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset whenever the lesson changes
   useEffect(() => {
-    setSubmitRecord(undefined);
+    setSubmitHistory([]);
     setRuns([]);
   }, [activeQuestionId]);
 
@@ -223,7 +234,7 @@ function Course() {
   useEffect(() => {
     if (activeQuestion && problemId) {
       const storageKey = `exemplai_code_${problemId}_${language}`;
-      const savedCode = localStorage.getItem(storageKey);
+      const savedCode = sessionStorage.getItem(storageKey);
 
       if (savedCode) {
         setCodeTemplates((prev) => ({
@@ -234,7 +245,7 @@ function Course() {
           editorRef.current.setValue(savedCode);
         }
       } else if (activeQuestion.starter_code) {
-        const starter = activeQuestion.starter_code;
+        const starter = withStarterHint(activeQuestion.starter_code);
         setCodeTemplates((prev) => ({
           ...prev,
           [language]: starter,
@@ -340,7 +351,9 @@ function Course() {
   function handleReset() {
     posthog.capture("code_reset", { problem_id: problemId, language });
     const defaultCode =
-      activeQuestion?.starter_code || CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+      (activeQuestion?.starter_code && withStarterHint(activeQuestion.starter_code)) ||
+      CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] ||
+      "";
     setCodeTemplates((prev) => ({
       ...prev,
       [language]: defaultCode,
@@ -409,15 +422,17 @@ function Course() {
         const results: any[] = data?.test_results ?? [];
         // test_results follow the order of the test cases sent.
         const first = exampleIndex >= 0 ? results[exampleIndex] : undefined;
-        setSubmitRecord({
+        const record: SubmitRecord = {
           lessonId: activeQuestion?._id ?? "",
+          at: new Date(),
           passed: results.filter((r) => r.passed).length,
           total: results.length,
           example:
             first && !first.hidden
               ? { passed: !!first.passed, stdout: first.stdout ?? "", stderr: first.stderr ?? "" }
               : undefined,
-        });
+        };
+        setSubmitHistory((prev) => [record, ...prev]);
         // Submit results live in the Description; the console opens only when
         // the code itself failed (syntax or runtime error), to show the trace.
         const codeError =
@@ -499,7 +514,7 @@ function Course() {
           {/* Description (Problem Panel) */}
           <LessonExposition
             mappedProblem={mappedProblem}
-            lastSubmit={lastSubmit}
+            submitHistory={lessonSubmits}
           />
 
           {/* Editor Panel */}

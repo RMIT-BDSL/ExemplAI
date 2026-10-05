@@ -278,7 +278,13 @@ def input_guardrail(state: TutorGraphState) -> dict:
         log.warning(f"input_guardrail → blocked by rule ({violation_type}, matched='{matched}')")
         return {"guardrail_passed": False, "guardrail_violation": category}
 
-    # ── Tier 2: LLM ──
+    # ── Tier 2: LLM ── skipped for the chat buttons: Get help / New example send
+    # fixed text written by the app, so a model check can only say SAFE and
+    # would just add a model round trip to the wait.
+    if state.get("trigger") in ("get_help", "new_example"):
+        log.info("input_guardrail → passed (button press; rules only)")
+        return {"guardrail_passed": True}
+
     blocked, classification, reason = _check_llm(query)
     if blocked:
         log.warning(f"input_guardrail → blocked by LLM ({classification}: {reason})")

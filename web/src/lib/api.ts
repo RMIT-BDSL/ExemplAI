@@ -80,3 +80,63 @@ export async function scratchpadExecute(
   );
   return response.data;
 }
+
+/**
+ * Like sendChatMessage, but through POST /chat/stream: `onStep` is called with
+ * each graph step as it finishes ("input_guardrail", an agent node,
+ * "dean_validation_node"), so the chat can show real progress while the
+ * student waits. The reply itself still renders from Convex. Rejects on an
+ * HTTP or server error event, so callers keep the same recovery path.
+ */
+export async function streamChatMessage(
+  conversation: ChatMessagePayload[],
+  chatId: string,
+  userId = 1,
+  studentCode = "",
+  trigger: "message" | "get_help" | "new_example" = "message",
+  onStep: (node: string) => void = () => {}
+): Promise<void> {
+  const tokenRes = await authClient.convex.token();
+  const token = tokenRes.data?.token;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000);
+  try {
+    const response = await fetch(`${BACKEND_URL}/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        chat_id: chatId,
+        conversation,
+        student_code: studentCode,
+        trigger,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) throw new Error(`Chat stream failed (${response.status})`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+      for (const raw of events) {
+        const line = raw.trim();
+        if (!line.startsWith("data:")) continue;
+        const event = JSON.parse(line.slice(5).trim());
+        if (event.type === "step") onStep(event.node);
+        else if (event.type === "error") throw new Error(event.message ?? "Chat error");
+        else if (event.type === "done") return;
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}

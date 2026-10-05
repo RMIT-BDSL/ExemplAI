@@ -10,12 +10,22 @@ export interface ProblemData {
   example?: { input: string; expectedOutput: string };
 }
 
-/** Outcome of the latest Submit in this session (cleared on reload / lesson change). */
+/** Outcome of a Submit in this session (cleared on reload / lesson change). */
 export interface LastSubmit {
   passed: number;
   total: number;
   /** The example's own result, when the server returned it (not hidden). */
   example?: { passed: boolean; stdout: string; stderr: string };
+}
+
+/** One Submit in this session's history for the current lesson. */
+export interface SubmitRecord extends LastSubmit {
+  lessonId: string;
+  at: Date;
+}
+
+function submitTime(d: Date) {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -54,14 +64,14 @@ function lastLine(text: string): string {
 
 export interface ProblemProps {
   problem: ProblemData;
-  lastSubmit?: LastSubmit;
+  /** This session's Submits on the lesson, newest first. */
+  submitHistory?: SubmitRecord[];
 }
 
-export default function Problem({ problem, lastSubmit }: ProblemProps) {
+export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
+  const lastSubmit = submitHistory[0];
   const { example } = problem;
   const exampleResult = lastSubmit?.example;
-  const allPassed =
-    lastSubmit !== undefined && lastSubmit.passed === lastSubmit.total;
 
   return (
     <article>
@@ -108,18 +118,30 @@ export default function Problem({ problem, lastSubmit }: ProblemProps) {
         </section>
       )}
 
-      {lastSubmit && (
-        // A div, not a p: .editorial-prose forces serif styling on paragraphs.
+      {submitHistory.length > 0 && (
+        // Divs, not p/ul: .editorial-prose forces serif styling on those.
         <div
           className="mt-4 border-t border-rule pt-4 font-sans text-xs"
           aria-live="polite"
         >
-          <span className="mr-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
-            Last submit
-          </span>
-          <span className={allPassed ? "text-success" : "text-danger"}>
-            {lastSubmit.passed} of {lastSubmit.total} tests passed
-          </span>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
+            Submit history
+          </div>
+          <div className="space-y-1">
+            {submitHistory.map((s, i) => {
+              const passedAll = s.total > 0 && s.passed === s.total;
+              return (
+                <div key={s.at.getTime() + "-" + i} className="flex items-baseline gap-3">
+                  <span className="w-12 flex-shrink-0 tabular-nums text-ink-label">
+                    {submitTime(s.at)}
+                  </span>
+                  <span className={passedAll ? "text-success" : "text-danger"}>
+                    {passedAll ? "✓" : "✗"} {s.passed} of {s.total} tests passed
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </article>

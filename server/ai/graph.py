@@ -13,6 +13,7 @@ Topology (mirrors the target pipeline in CLAUDE.md):
                                       └─ erroneous_example_node ───────┤
                                                                        ↓
                                                   dean_validation_node → END
+                                                  (first rejection: back to the same agent once)
 
 input_guardrail screens input first; experiment_router and orchestrator_router
 are pure Python (no LLM). Every agent draft routes through dean_validation_node —
@@ -28,8 +29,12 @@ from ai.nodes import (
     faded_example_node,
     guardrail_blocked,
     input_guardrail,
+    route_after_dean,
     route_after_guardrail,
 )
+import logging
+import time
+
 from ai.graph_router import experiment_router, orchestrator_router
 from ai.state import TutorGraphState
 from langgraph.graph import START, END, StateGraph
@@ -47,6 +52,23 @@ def experiment_entry(state: TutorGraphState):
     return {}
 
 
+log = logging.getLogger("rich")
+
+
+def _timed(name: str, node):
+    """Log how long a node takes (``step <name>: <ms> ms``), to see where a
+    reply's wait goes (guardrail, agent, Dean)."""
+
+    def run(state: TutorGraphState):
+        start = time.perf_counter()
+        try:
+            return node(state)
+        finally:
+            log.info(f"step {name}: {(time.perf_counter() - start) * 1000:.0f} ms")
+
+    return run
+
+
 def build_tutor_graph() -> StateGraph:
     """Build the ExemplAI tutor graph (uncompiled).
 
@@ -55,15 +77,15 @@ def build_tutor_graph() -> StateGraph:
     """
     graph = StateGraph(TutorGraphState)
 
-    graph.add_node("input_guardrail", input_guardrail)
-    graph.add_node("guardrail_blocked", guardrail_blocked)
-    graph.add_node("experiment_entry", experiment_entry)
-    graph.add_node("orchestrator", orchestrator)
-    graph.add_node("control_agent_node", control_agent_node)
-    graph.add_node("complete_example_node", complete_example_node)
-    graph.add_node("faded_example_node", faded_example_node)
-    graph.add_node("erroneous_example_node", erroneous_example_node)
-    graph.add_node("dean_validation_node", dean_validation_node)
+    graph.add_node("input_guardrail", _timed("input_guardrail", input_guardrail))
+    graph.add_node("guardrail_blocked", _timed("guardrail_blocked", guardrail_blocked))
+    graph.add_node("experiment_entry", _timed("experiment_entry", experiment_entry))
+    graph.add_node("orchestrator", _timed("orchestrator", orchestrator))
+    graph.add_node("control_agent_node", _timed("control_agent_node", control_agent_node))
+    graph.add_node("complete_example_node", _timed("complete_example_node", complete_example_node))
+    graph.add_node("faded_example_node", _timed("faded_example_node", faded_example_node))
+    graph.add_node("erroneous_example_node", _timed("erroneous_example_node", erroneous_example_node))
+    graph.add_node("dean_validation_node", _timed("dean_validation_node", dean_validation_node))
 
     # Input-safety gate runs first.
     graph.add_edge(START, "input_guardrail")
@@ -103,6 +125,18 @@ def build_tutor_graph() -> StateGraph:
     graph.add_edge("complete_example_node", "dean_validation_node")
     graph.add_edge("faded_example_node", "dean_validation_node")
     graph.add_edge("erroneous_example_node", "dean_validation_node")
-    graph.add_edge("dean_validation_node", END)
+    # A rejected draft goes back to the same agent once (with the Dean's
+    # reason); otherwise the Dean's message ends the run.
+    graph.add_conditional_edges(
+        "dean_validation_node",
+        route_after_dean,
+        {
+            "complete_example_node": "complete_example_node",
+            "faded_example_node": "faded_example_node",
+            "erroneous_example_node": "erroneous_example_node",
+            "control_agent_node": "control_agent_node",
+            "end": END,
+        },
+    )
 
     return graph

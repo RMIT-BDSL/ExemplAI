@@ -46,6 +46,13 @@ class TutorGraphState(TypedDict):
     example_limit_message: str        # shown when a typed request would exceed it
     delivered_response_type: str      # set by the Dean: what reached the student
 
+    # ── Internal: Dean decision and one retry (reset each request) ────
+    dean_retry: bool                  # route the draft back to its agent once
+    dean_retried: bool                # the one retry has been used
+    dean_feedback: str                # why the first draft was rejected (agent sees it)
+    dean_decision: str                # approved | approved_after_retry | rejected | limit
+    dean_reason: str                  # check that fired (saved with the reply)
+
     # ── Internal: input-safety gate (input_guardrail writes these) ────
     guardrail_passed: bool
     guardrail_violation: str

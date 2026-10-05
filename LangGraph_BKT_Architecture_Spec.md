@@ -180,6 +180,12 @@ def student_context(state: TutorGraphState, extra: str = "") -> str:
         + (f"<examples_remaining>{remaining}</examples_remaining>\n" if remaining is not None else "")
         + (f"<student_action>\n{action}\n</student_action>\n" if action else "")
         + extra
+        + (
+            "<dean_feedback>\nYour previous draft was not sent to the student because: "
+            f"{state['dean_feedback']}\nWrite a new draft that avoids this problem.\n</dean_feedback>\n"
+            if state.get("dean_feedback")
+            else ""
+        )
         + "The conversation with the student follows; reply to their latest message."
     )
 
@@ -230,6 +236,8 @@ hidden inputs.
 - Use a DIFFERENT domain or scenario so the student CANNOT copy-paste your code as a solution.
 - NEVER directly reference, debug, or fix the student's actual code.
 - NEVER provide code that solves the student's <original_problem>.
+- NEVER use the exact values, strings or names from <original_problem> in your \
+example: for a short exercise, show the same idea with different values.
 - Use only the Python features listed in <allowed_python>; never use a feature \
 from a later topic, even if it would be shorter.
 - Label the steps of the method with short, general comments (for example \
@@ -288,6 +296,8 @@ themselves.
 the student is struggling with. Use a DIFFERENT scenario.
 - NEVER directly reference, debug, or fix the student's actual code.
 - NEVER provide code that solves the student's <original_problem>.
+- NEVER use the exact values, strings or names from <original_problem> in your \
+example: for a short exercise, show the same idea with different values.
 - Use only the Python features listed in <allowed_python>; never use a feature \
 from a later topic, even if it would be shorter.
 - The blanks MUST target the exact conceptual gap revealed by the student's <error_trace>. \
@@ -359,6 +369,8 @@ spoon-feeding the answer.
 <rules>
 - Generate a DIFFERENT but conceptually analogous problem. NEVER generate buggy code \
 for the student's actual <original_problem> — always use a different scenario.
+- NEVER use the exact values, strings or names from <original_problem> in your \
+example: for a short exercise, show the same idea with different values.
 - NEVER directly reference, debug, or fix the student's actual code.
 - Put the bug in the same idea the student's <error_trace> shows they are getting wrong. \
 If only hidden tests failed, use the kind of edge case the concept needs without \
@@ -460,6 +472,10 @@ Its checks depend on the condition and the draft's `response_type`:
 
 **Example allowance** (`web/convex/examples.ts`, experimental group only): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. A typed request whose draft is labelled `new_example` with none remaining is answered with a limit message without calling the Dean's LLM; a mislabelled one is caught by EXAMPLE_LIMIT. The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
 
+**Short exercises.** The answer-leak rule is narrow on purpose: reject only the solution itself (code producing the outputs the problem asks for, e.g. its exact strings or numbers), the exact line the student should write, or the last missing piece of a solution built up over earlier turns. An example of the same concept with different values is allowed even when its structure matches the solution — in one- or two-line exercises that is unavoidable. The example agents are told never to use the problem's own values, strings or names.
+
+**One retry.** On a first rejection (other than EXAMPLE_LIMIT) the Dean sends the draft back to the same agent with the reason in `<dean_feedback>`; the agent writes one new draft. Only a second rejection sends the generic fallback. The Dean's decision (`approved`, `approved_after_retry`, `rejected`, `limit`) and reason are saved with the reply in Convex (`chatMessages.dean_decision`, `dean_reason`).
+
 *Always-checks (both conditions):* DIRECT_ANSWER_LEAK (judged against the recent conversation, so an answer pieced together over several turns is caught), INAPPROPRIATE_CONTENT, HALLUCINATED_CODE. For control, a "leak" is a complete working solution or a fully corrected version of the student's code; explanations, hints and short syntax snippets are allowed. The example checks (MODALITY_VIOLATION, MODALITY_DRIFT, EXAMPLE_LIMIT) are experimental only, since control gives no examples.
 
 **Structured Output Schema:**
@@ -490,14 +506,20 @@ lesson ("not limited" if unknown).
 
 <always_check>
 Apply to every draft, in both conditions:
-1. DIRECT_ANSWER_LEAK: the draft hands the student a solution to \
-<original_problem>. Judge it against the whole conversation: reject a draft that \
-supplies the last missing piece of a solution assembled over earlier turns.
-   - experimental: reject code that solves <original_problem>, or an example \
-that could be trivially adapted (renaming, minor restructuring) into a solution.
-   - control: reject a complete working solution to <original_problem> or a \
-fully corrected version of <student_code>. Explaining an error, pointing to \
-where it is, a hint, or a short syntax snippet is allowed.
+1. DIRECT_ANSWER_LEAK: the draft hands the student the answer to \
+<original_problem>. Reject ONLY if the draft:
+   - contains the solution itself: code for the same task that produces the \
+outputs <original_problem> asks for (for example its exact strings or numbers); or
+   - tells the student exactly what to write in their own code (the corrected \
+line or a fully corrected version of <student_code>); or
+   - supplies the last missing piece of a solution assembled over earlier turns \
+(judge against the whole conversation).
+   Explicitly ALLOWED, do not reject: an example of the same concept that uses \
+different values or a different scenario, even if its structure matches the \
+solution; explaining syntax or concepts; saying what kind of error the student \
+has or roughly where it is; a hint. In short exercises (one or two lines) a \
+parallel example will look like the solution; that is expected. Approve it \
+unless it uses the problem's own values.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \

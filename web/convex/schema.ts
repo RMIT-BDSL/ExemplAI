@@ -188,6 +188,10 @@ export default defineSchema({
     response_type: v.optional(
       v.union(v.literal("new_example"), v.literal("follow_up"), v.literal("fallback"))
     ),
+    // Tutor turns: the Dean's decision (approved / approved_after_retry /
+    // rejected / limit) and the check that fired, for analysis and testing.
+    dean_decision: v.optional(v.string()),
+    dean_reason: v.optional(v.string()),
   })
     .index("by_chat", ["chatId"])
     // Examples given this round: a bounded range read instead of the whole chat.
