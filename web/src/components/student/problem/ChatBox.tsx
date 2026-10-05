@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { Send, Sparkles } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import { sendChatMessage } from "#/lib/api.ts";
+import { streamChatMessage } from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -104,13 +104,54 @@ export function MessageBubble({ message }: { message: Message }) {
   );
 }
 
+// Progress while the tutor works, from the server's step events.
+const AGENT_NODES = ["complete_example_node", "faded_example_node", "erroneous_example_node", "control_agent_node"];
+
+function TutorProgress({ steps }: { steps: string[] }) {
+  const [seconds, setSeconds] = React.useState(0);
+  React.useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const read = steps.includes("input_guardrail");
+  const wrote = steps.some((s) => AGENT_NODES.includes(s));
+  const checked = steps.includes("dean_validation_node");
+  // The Dean sent the draft back for one more try.
+  const improving = checked && steps.lastIndexOf("dean_validation_node") > Math.max(...AGENT_NODES.map((n) => steps.lastIndexOf(n)));
+  const rows = [
+    { label: "Reading your message", done: read },
+    { label: improving ? "Improving the reply" : "Writing a reply", done: wrote && !improving },
+    { label: "Checking the reply", done: checked && !improving },
+  ];
+  const current = rows.findIndex((r) => !r.done);
+
+  return (
+    <div className="space-y-1 py-1 font-sans text-xs text-ink-label" role="status" aria-label="The tutor is working">
+      {rows.map((r, i) => (
+        <div key={r.label} className={cn("flex items-center gap-2", i === current && "text-ink")}>
+          <span className="w-3 text-center">{r.done ? "✓" : i === current ? "●" : "○"}</span>
+          <span>
+            {r.label}
+            {i === current ? "…" : ""}
+          </span>
+        </div>
+      ))}
+      <div className="pl-5 tabular-nums">{seconds}s</div>
+    </div>
+  );
+}
+
 // 2. Message feed
 export interface MessageFeedProps {
   messages: Message[];
   isTyping?: boolean;
+  /** Graph steps finished so far for the reply being written. */
+  progress?: string[];
 }
 
-export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
+export function MessageFeed({ messages, isTyping, progress = [] }: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -128,21 +169,7 @@ export function MessageFeed({ messages, isTyping }: MessageFeedProps) {
         <MessageBubble key={message.id} message={message} />
       ))}
 
-      {isTyping && (
-        <div
-          className="flex items-center gap-1 py-1"
-          role="status"
-          aria-label="The tutor is typing"
-        >
-          {[0, 150, 300].map((delay) => (
-            <span
-              key={delay}
-              className="size-1.5 animate-bounce rounded-full bg-ink-label"
-              style={{ animationDelay: `${delay}ms` }}
-            />
-          ))}
-        </div>
-      )}
+      {isTyping && <TutorProgress steps={progress} />}
 
       <div ref={bottomRef} />
     </div>
@@ -234,6 +261,8 @@ export default function ChatBox({
   lessonId?: string;
   onExampleRequested?: (trigger: ExampleTrigger, examplesUsed: number) => void;
 }) {
+  // Graph steps finished for the reply being written (from /chat/stream).
+  const [progress, setProgress] = React.useState<string[]>([]);
   const [isTyping, setIsTyping] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
 
@@ -454,12 +483,14 @@ export default function ChatBox({
       // The response body is intentionally unused: the backend persists the
       // assistant reply to Convex and it renders from the reactive `dbMessages`
       // query. This POST just triggers the run.
-      await sendChatMessage(
+      setProgress([]);
+      await streamChatMessage(
         conversationPayload,
         chatId,
         1,
         editorContext,
         trigger ?? "message",
+        (node) => setProgress((prev) => [...prev, node]),
       );
       setIsTyping(false);
     } catch (error) {
@@ -499,7 +530,7 @@ export default function ChatBox({
           !helpStarted && !isTyping && "opacity-60",
         )}
       >
-        <MessageFeed messages={messages} isTyping={isTyping} />
+        <MessageFeed messages={messages} isTyping={isTyping} progress={progress} />
       </div>
 
       {/* Help: one button (Get help starts a round after a failed Submit; New example continues it)

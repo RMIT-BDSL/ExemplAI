@@ -1,4 +1,5 @@
 import asyncio
+import time
 import concurrent.futures
 import json
 import logging
@@ -260,6 +261,7 @@ async def _save_assistant_message(
 
 async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dict:
     """Run the tutor graph to completion and return the final state."""
+    started = time.perf_counter()
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
@@ -281,6 +283,7 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         # graph state (which carries LangChain message objects and can be large
         # or awkward to encode). The client renders the reply from Convex, not
         # from this body, so this only needs to confirm the run happened.
+        log.info(f"chat total: {(time.perf_counter() - started) * 1000:.0f} ms (trigger={chat.trigger})")
         return {
             "messages": [{"type": "ai", "content": text}],
             "chosen_model": chosen_model,
@@ -295,11 +298,28 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         )
 
 
+# Graph steps reported to the chat UI as they finish (progress while waiting).
+_PROGRESS_NODES = {
+    "input_guardrail",
+    "complete_example_node",
+    "faded_example_node",
+    "erroneous_example_node",
+    "control_agent_node",
+    "dean_validation_node",
+}
+
+
+def _sse(event: dict) -> str:
+    return f"data: {json.dumps(event)}\n\n"
+
+
 async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> AsyncGenerator[str, None]:
-    """SSE generator. The Dean validates the WHOLE draft before any token is
-    released, so the graph runs to completion first; we then stream the vetted
-    final message token-by-token. This preserves the research-integrity gate
-    (no unvetted text reaches the student) at the cost of no latency gain."""
+    """SSE generator. Sends a ``step`` event as each graph step finishes
+    (guardrail, agent, Dean), so the UI can show real progress while the
+    student waits. The Dean still validates the WHOLE draft before any text is
+    released: the vetted reply is saved to Convex (which the UI renders) and
+    then streamed as tokens, so no unvetted text reaches the student."""
+    started = time.perf_counter()
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
@@ -308,9 +328,14 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
 
         allowance = None if chat.experiment_condition == "control" else context.allowance
         state = with_allowance(build_initial_state(chat, context.history), allowance)
-        result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
+        config = _thread_config(chat, auth_user_id)
+        async for update in graph.astream(state, config=config, stream_mode="updates"):
+            for node in update:
+                if node in _PROGRESS_NODES:
+                    yield _sse({"type": "step", "node": node})
+        result = (await graph.aget_state(config)).values
     except ChatLocked as e:
-        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        yield _sse({"type": "error", "message": str(e)})
         return
     except Exception as e:
         log.error(f"AI service error: {e}")
@@ -335,4 +360,5 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
         token = part if i == 0 else " " + part
         yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
 
+    log.info(f"chat total: {(time.perf_counter() - started) * 1000:.0f} ms (trigger={chat.trigger})")
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
