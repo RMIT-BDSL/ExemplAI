@@ -52,6 +52,7 @@ class TutorGraphState(TypedDict):
     dean_feedback: str                # why the first draft was rejected (agent sees it)
     dean_decision: str                # approved | approved_after_retry | rejected | limit
     dean_reason: str                  # check that fired (saved with the reply)
+    rejected_drafts: List[dict]       # drafts the Dean turned down: {content, reason, excerpt}
 
     # ── Internal: input-safety gate (input_guardrail writes these) ────
     guardrail_passed: bool

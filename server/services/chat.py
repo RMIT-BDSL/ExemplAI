@@ -68,6 +68,7 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
         "dean_retried": False,
         "dean_feedback": "",
         "dean_reason": "",
+        "rejected_drafts": [],
     }
 
 
@@ -196,6 +197,7 @@ async def _save_assistant_message(
     response_type: Optional[str] = None,
     dean_decision: Optional[str] = None,
     dean_reason: Optional[str] = None,
+    rejected_drafts: Optional[list[dict]] = None,
 ) -> None:
     if text and chat_id:
         try:
@@ -214,6 +216,8 @@ async def _save_assistant_message(
                         # Why the reply is what it is (research log; see dean_validation).
                         **({"deanDecision": dean_decision} if dean_decision else {}),
                         **({"deanReason": dean_reason} if dean_reason else {}),
+                        # Drafts the Dean turned down before this reply (research only).
+                        **({"rejectedDrafts": rejected_drafts} if rejected_drafts else {}),
                         "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
@@ -241,6 +245,7 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         await _save_assistant_message(
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
+            rejected_drafts=result.get("rejected_drafts"),
         )
 
         # Return a small, guaranteed-serializable payload rather than the raw
@@ -311,6 +316,7 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
         await _save_assistant_message(
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
+            rejected_drafts=result.get("rejected_drafts"),
         )
     except Exception as e:
         log.error(f"Message persistence error: {e}")

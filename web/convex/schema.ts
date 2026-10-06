@@ -4,6 +4,13 @@ import { countFields as counts, replyCountFields } from "./studentMetrics";
 
 const experimentCondition = v.union(v.literal("experimental"), v.literal("control"));
 
+// A tutor draft the Dean turned down (server/ai/nodes/dean_validation.py).
+export const rejectedDraft = v.object({
+  content: v.string(),
+  reason: v.string(),
+  excerpt: v.optional(v.string()),
+});
+
 // How a Run or Submit ended (server/services: error_kind / submit_outcome).
 // "ran" = a Run that finished without an error (Runs aren't graded).
 export const attemptOutcome = v.union(
@@ -248,6 +255,10 @@ export default defineSchema({
     // rejected / limit) and the check that fired, for analysis and testing.
     dean_decision: v.optional(v.string()),
     dean_reason: v.optional(v.string()),
+    // Tutor turns: drafts the Dean turned down before this reply, oldest first
+    // (one for approved_after_retry, two when the fallback was sent). Research
+    // only; never shown to the student.
+    rejected_drafts: v.optional(v.array(rejectedDraft)),
   })
     .index("by_chat", ["chatId"])
     // Examples given this round: a bounded range read instead of the whole chat.
