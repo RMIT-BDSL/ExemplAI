@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { ensureCondition } from "./experiment";
 import { rejectedDraft } from "./schema";
@@ -146,6 +147,28 @@ export const addMessage = authenticatedMutation({
   },
 });
 
+/**
+ * Research links stored on a tutor reply: the Submit it followed (the
+ * student's latest Submit on the lesson right now) and their mastery when the
+ * server wrote it. Shared with the dev trial simulation.
+ */
+export async function replyContextFields(
+  ctx: MutationCtx,
+  chat: Doc<"chats">,
+  masteryAtReply: number | undefined,
+) {
+  const submit = await ctx.db
+    .query("codeAttempts")
+    .withIndex("by_user_lesson", (q) => q.eq("userId", chat.userId).eq("lessonId", chat.lessonId))
+    .order("desc")
+    .filter((q) => q.eq(q.field("kind"), "submit"))
+    .first();
+  return {
+    ...(masteryAtReply !== undefined ? { mastery_at_reply: masteryAtReply } : {}),
+    ...(submit ? { responds_to_submit: submit._id } : {}),
+  };
+}
+
 // Add a trusted system/assistant message (backend path)
 export const addSystemMessage = authenticatedMutation({
   args: {
@@ -161,6 +184,8 @@ export const addSystemMessage = authenticatedMutation({
     deanDecision: v.optional(v.string()),
     deanReason: v.optional(v.string()),
     rejectedDrafts: v.optional(v.array(rejectedDraft)),
+    // The student's mastery the server routed on (research log).
+    masteryAtReply: v.optional(v.number()),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -182,6 +207,7 @@ export const addSystemMessage = authenticatedMutation({
       ...(args.deanDecision ? { dean_decision: args.deanDecision } : {}),
       ...(args.deanReason ? { dean_reason: args.deanReason } : {}),
       ...(args.rejectedDrafts?.length ? { rejected_drafts: args.rejectedDrafts } : {}),
+      ...(args.sender === "assistant" ? await replyContextFields(ctx, chat, args.masteryAtReply) : {}),
     });
     return { success: true };
   },

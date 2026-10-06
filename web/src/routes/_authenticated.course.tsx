@@ -21,6 +21,7 @@ import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
+import { useLessonVisit } from "#/lib/useLessonVisit";
 import { api } from "../../convex/_generated/api";
 
 
@@ -251,6 +252,9 @@ function Course() {
       openLesson({ lessonId: activeQuestionId }).catch(() => {});
     }
   }, [tokenIdentifier, activeQuestionId, setLessonStatus, openLesson]);
+
+  // Time on task: a visit per lesson opening, with active time (research log).
+  useLessonVisit(tokenIdentifier ? activeQuestionId : undefined);
 
   useEffect(() => {
     if (activeQuestion && problemId) {

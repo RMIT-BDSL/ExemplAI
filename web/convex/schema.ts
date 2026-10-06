@@ -158,6 +158,20 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_lesson", ["userId", "lessonId"])
     .index("by_lesson", ["lessonId"]),
+  // Time on task: one row per lesson opening. The browser sends a heartbeat
+  // every 30 s with the time the student was active (tab visible, input in the
+  // last minute); the server caps each credit by the wall time since the last
+  // heartbeat (convex/visits.ts). The opening time is _creationTime.
+  lessonVisits: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+    experiment_condition: v.optional(experimentCondition),
+    active_ms: v.number(),
+    heartbeats: v.number(),
+    last_heartbeat_at: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_lesson", ["userId", "lessonId"]),
   // Per-student BKT mastery for a knowledge component (shared across lessons
   // tagged with the same KC). Updated once per lesson on first Submit only.
   // `mastered` is sticky: set the first time prob_mastery reaches the mastery
@@ -255,6 +269,11 @@ export default defineSchema({
     // rejected / limit) and the check that fired, for analysis and testing.
     dean_decision: v.optional(v.string()),
     dean_reason: v.optional(v.string()),
+    // Tutor turns: the student's BKT mastery of the lesson's topic when the
+    // reply was written (it chose the example type), and the Submit the reply
+    // followed (the student's latest Submit on the lesson at that moment).
+    mastery_at_reply: v.optional(v.number()),
+    responds_to_submit: v.optional(v.id("codeAttempts")),
     // Tutor turns: drafts the Dean turned down before this reply, oldest first
     // (one for approved_after_retry, two when the fallback was sent). Research
     // only; never shown to the student.
