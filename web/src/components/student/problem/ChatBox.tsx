@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { Send, Sparkles } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import { streamChatMessage } from "#/lib/api.ts";
+import { CHAT_TIMEOUT_MS, streamChatMessage } from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -20,7 +20,11 @@ export interface Message {
 // Time only for today's messages; older ones also show the date, since each
 // lesson keeps one chat across sessions.
 function timeOf(d: Date) {
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
   if (d.toDateString() === new Date().toDateString()) return time;
   return `${d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`;
 }
@@ -331,6 +335,8 @@ export function GetHelpBar({
 // The student turn the Get help button adds to the conversation.
 export const GET_HELP_MESSAGE =
   "Please provide me an example to help me with this";
+// Shown when the tutor hasn't replied within the limit.
+const TIMEOUT_MESSAGE = `The tutor didn't reply within ${CHAT_TIMEOUT_MS / 1000} seconds. Please send your message again.`;
 // The student turn the New example button adds.
 export const NEW_EXAMPLE_MESSAGE = "Please show me a different example";
 
@@ -366,6 +372,8 @@ export default function ChatBox({
   const [awaitingReply, setAwaitingReply] = React.useState(false);
   const assistantCountRef = React.useRef(0);
   const replyBaselineRef = React.useRef(0);
+  // When the current message was sent, for the 60s limit.
+  const sentAtRef = React.useRef(0);
   // Stays true from a failed send until its reply lands (or the next send).
   // Outlives `awaitingReply` so a reply that arrives *after* we've shown the
   // timeout error still retracts that error.
@@ -472,19 +480,20 @@ export default function ChatBox({
     }
   }, [assistantCount]);
 
-  // The connection failed and no reply has shown up after a generous grace
-  // period — tentatively surface the error. This timer only starts *after* the
-  // browser request has already died, so it never interrupts an in-flight run;
-  // and a late reply still clears it via the effect above.
+  // The connection failed early: the reply may still land in Convex, so wait
+  // for it, but only until the 60s limit from sending. A late reply still
+  // clears the error via the effect above.
   React.useEffect(() => {
     if (!awaitingReply) return;
+    const left = Math.max(
+      0,
+      CHAT_TIMEOUT_MS - (Date.now() - sentAtRef.current),
+    );
     const timer = setTimeout(() => {
       setAwaitingReply(false);
       setIsTyping(false);
-      setLocalError(
-        "The connection dropped before a reply came back. If nothing appears shortly, please send your message again.",
-      );
-    }, 30000);
+      setLocalError(TIMEOUT_MESSAGE);
+    }, left);
     return () => clearTimeout(timer);
   }, [awaitingReply]);
 
@@ -517,6 +526,7 @@ export default function ChatBox({
     if (!chatId || !convexLessonId) return;
 
     // Optmistically show typing state
+    sentAtRef.current = Date.now();
     setIsTyping(true);
     setLocalError(null);
     expectingReplyRef.current = false;
@@ -594,7 +604,13 @@ export default function ChatBox({
       // hard error (see the `awaitingReply` effects above).
       replyBaselineRef.current = assistantCountRef.current;
       expectingReplyRef.current = true;
-      setAwaitingReply(true);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Hit the 60s limit: say so now.
+        setIsTyping(false);
+        setLocalError(TIMEOUT_MESSAGE);
+      } else {
+        setAwaitingReply(true);
+      }
     }
   };
 

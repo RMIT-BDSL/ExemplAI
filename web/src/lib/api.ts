@@ -81,6 +81,9 @@ export async function scratchpadExecute(
   return response.data;
 }
 
+/** How long the chat waits for the tutor before giving up (also shown to students). */
+export const CHAT_TIMEOUT_MS = 60_000;
+
 /**
  * Like sendChatMessage, but through POST /chat/stream: `onStep` is called with
  * each graph step as it finishes ("input_guardrail", an agent node,
@@ -99,7 +102,7 @@ export async function streamChatMessage(
   const tokenRes = await authClient.convex.token();
   const token = tokenRes.data?.token;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000);
+  const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
   try {
     const response = await fetch(`${BACKEND_URL}/chat/stream`, {
       method: "POST",
