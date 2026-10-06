@@ -39,7 +39,7 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 
 ## Before the pilot
 
-* [ ] Store each student's A/B group in Convex (needed for the control group's plain chat UI and lock).
+* [ ] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).
 * [ ] Dean enforces `<allowed_python>` (currently an agent instruction only).
 * [ ] Guardrail: the injection pattern misses "ignore **all previous** instructions" (allows only one word between "ignore" and "instructions"); typed messages are still screened by the model.
 * [ ] Prompt review items 9–14: runnable Complete/Faded code, no repeated scenarios, scripted reply to "what's wrong with my code?", "in the editor" wording, shared length/style rules, clearer "trivially adaptable" rule.
@@ -49,7 +49,17 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 ## Research analysis
 
 * [ ] Log mastery at the time, group and rejected drafts with each reply (already logged: delivered type, Dean decision/reason, PostHog help clicks, and mastery before each lesson's first Submit).
+* [x] Log every Run and Submit (`codeAttempts`: code snapshot, outcome, test counts, group, mastery before/after the graded Submit, app version).
+* [ ] Consent before open semester use: consent screen at first login; store `consent_at`, `consent_version` and `data_opt_out` on `users`.
+* [ ] Study code per student (for survey forms and a de-identified research export), then the export itself (ProgSnap2-style CSVs).
 * [ ] Ethics check: Sentry (IPs, headers) and PostHog events vs. the approval (#2025-29047-30387).
+
+**PostHog (usage analytics only; research data is in Convex):**
+* [ ] Identify students by Convex user id (later the study code), not email and name (`posthog.identify` in `SignUpForm.tsx`, `SignInForm.tsx`, `_authenticated.tsx`); stop sending email as a property on `magic_link_requested` and `invitation_code_submitted`.
+* [ ] Label every event with the student's group, cohort (invite code) and app version (`posthog.register` once the group is known).
+* [ ] `code_submitted`: `success` only means the code ran without an error; add `tests_passed` / `tests_total` (or rename it).
+* [ ] Check whether session replay is on in the PostHog dashboard (it records students' screens).
+* [ ] Remove the server's unused PostHog setup (`POSTHOG_*` settings, `posthog` dependency); group assignment no longer uses the PostHog flag (#97). Archive the `new-model-test` flag.
 
 ## Before going live
 
@@ -64,6 +74,6 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 
 * [ ] Lessons for Files (week 9, none yet), Basic Libraries (week 11, 2 lessons) and Advanced Topics (week 12, none yet); weeks 1–8 have ≥ 7 each.
 * [ ] Keep solution code and hidden tests out of the browser; grade with the lesson from Convex (closes the fake-solution loophole).
-* [ ] Add 1–2 hidden edge-case tests per lesson.
+* [x] Add 1–2 hidden edge-case tests per lesson (#96).
 * [ ] "Check my fix" button that runs a student's Erroneous fix against tests.
 * [ ] Decide: should mastery unlock the next topic? Trial scope (which weeks)? Fold week 1 into week 2?

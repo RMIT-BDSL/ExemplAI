@@ -12,7 +12,12 @@ import {
   authenticatedMutation,
   adminQuery 
 } from "./functions";
+import { attemptOutcome } from "./schema";
 import { courseFields } from "./validators";
+
+// Caps on a codeAttempts row (the server applies the same ones).
+const CODE_SNAPSHOT_CHARS = 20000;
+const ATTEMPT_ERROR_CHARS = 2000;
 
 // ---------------------------------------------------------------------------
 // Course CRUD
@@ -254,6 +259,18 @@ export const recordCodeExecution = authenticatedMutation({
     mastered: v.optional(v.boolean()),
     // Server-built summary of a failed Submit (hidden tests counted only).
     errorTrace: v.optional(v.string()),
+    // The server's half of the codeAttempts row (server/services build_attempt).
+    attempt: v.optional(
+      v.object({
+        code: v.string(),
+        outcome: attemptOutcome,
+        testsPassed: v.optional(v.number()),
+        testsTotal: v.optional(v.number()),
+        hiddenFailed: v.optional(v.number()),
+        errorMessage: v.optional(v.string()),
+        appVersion: v.optional(v.string()),
+      }),
+    ),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -354,6 +371,29 @@ export const recordCodeExecution = authenticatedMutation({
         ? { mastery_before: Math.min(1, Math.max(0, args.priorMastery)) }
         : {}),
     };
+
+    if (args.attempt) {
+      const a = args.attempt;
+      await ctx.db.insert("codeAttempts", {
+        userId: user._id,
+        lessonId: args.lessonId,
+        ...(lesson.knowledge_component ? { knowledge_component: lesson.knowledge_component } : {}),
+        kind: args.actionType,
+        ...(user.experiment_condition ? { experiment_condition: user.experiment_condition } : {}),
+        code: a.code.slice(0, CODE_SNAPSHOT_CHARS),
+        outcome: a.outcome,
+        ...(a.testsPassed !== undefined ? { tests_passed: a.testsPassed } : {}),
+        ...(a.testsTotal !== undefined ? { tests_total: a.testsTotal } : {}),
+        ...(a.hiddenFailed !== undefined ? { hidden_failed: a.hiddenFailed } : {}),
+        ...(a.errorMessage ? { error_message: a.errorMessage.slice(0, ATTEMPT_ERROR_CHARS) } : {}),
+        first_graded: shouldRecordBkt,
+        ...(shouldRecordBkt && args.priorMastery !== undefined
+          ? { mastery_before: Math.min(1, Math.max(0, args.priorMastery)) }
+          : {}),
+        ...(shouldRecordBkt && probMastery !== undefined ? { mastery_after: probMastery } : {}),
+        ...(a.appVersion ? { app_version: a.appVersion } : {}),
+      });
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, {

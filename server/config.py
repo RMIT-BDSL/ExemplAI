@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: SecretStr = SecretStr("")
     POSTHOG_PROJECT_TOKEN: str = ""
     POSTHOG_HOST: str = "https://eu.posthog.com"
+    # Set by Railway on GitHub deploys; tags research records with the build.
+    RAILWAY_GIT_COMMIT_SHA: str = ""
 
 
 # ── Singleton — import this everywhere ────────────────────────────────

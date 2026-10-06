@@ -68,17 +68,78 @@ def summarize_failures(results: list[dict]) -> str:
     return "\n\n".join(entries)[:_ERROR_TRACE_CHARS]
 
 
+# ── Research log: one codeAttempts row per Run / Submit ──────────────
+
+_CODE_SNAPSHOT_CHARS = 20000
+_ATTEMPT_ERROR_CHARS = 2000
+
+
+def app_version() -> str:
+    sha = settings.RAILWAY_GIT_COMMIT_SHA
+    return sha[:7] if sha else "local"
+
+
+def error_kind(status_id: Optional[int], stderr: Optional[str]) -> Optional[str]:
+    """What went wrong in one Judge0 execution, or None if it ran cleanly.
+
+    Python syntax errors come back from Judge0 as a runtime error (NZEC) with
+    a SyntaxError trace, so they're told apart by the trace."""
+    stderr = stderr or ""
+    if status_id in (13, 14, 500):  # Judge0 internal / exec format / unreachable
+        return "service_error"
+    if status_id == 6 or "SyntaxError" in stderr or "IndentationError" in stderr:
+        return "syntax_error"
+    if status_id == 5:
+        return "timeout"
+    if status_id is not None and 7 <= status_id <= 12:
+        return "runtime_error"
+    return None
+
+
+# When several tests fail differently, the attempt is labelled by the first of these.
+_OUTCOME_ORDER = ["service_error", "syntax_error", "timeout", "runtime_error", "wrong_answer"]
+
+
+def submit_outcome(results: list[dict]) -> str:
+    """'passed' if every test passed, else the most basic failure across tests."""
+    failed = [r for r in results if not r.get("passed")]
+    if not failed:
+        return "passed"
+    kinds = {error_kind(r.get("status_id"), r.get("stderr")) or "wrong_answer" for r in failed}
+    return next(k for k in _OUTCOME_ORDER if k in kinds)
+
+
+def build_attempt(code: str, outcome: str, results: Optional[list[dict]] = None,
+                  error_message: Optional[str] = None) -> dict:
+    """The codeAttempts fields the server knows; Convex adds the student's
+    group, topic and mastery in the same transaction (recordCodeExecution)."""
+    attempt: dict = {
+        "code": (code or "")[:_CODE_SNAPSHOT_CHARS],
+        "outcome": outcome,
+        "appVersion": app_version(),
+    }
+    if results is not None:
+        attempt["testsPassed"] = sum(1 for r in results if r.get("passed"))
+        attempt["testsTotal"] = len(results)
+        attempt["hiddenFailed"] = sum(1 for r in results if r.get("hidden") and not r.get("passed"))
+    if error_message:
+        attempt["errorMessage"] = error_message[:_ATTEMPT_ERROR_CHARS]
+    return attempt
+
+
 async def _record_code_execution(
     auth_token: Optional[str],
     lesson_id: Optional[str],
     action_type: str,
     passed: bool,
     error_trace: Optional[str] = None,
+    attempt: Optional[dict] = None,
 ) -> None:
     """After Judge0: set has_run; on first Submit compute BKT in Python and store.
 
     A failed Submit also sends ``error_trace`` (see summarize_failures); Convex
-    counts it and unlocks Get help."""
+    counts it and unlocks Get help. ``attempt`` (build_attempt) is logged as a
+    codeAttempts row."""
     if not auth_token or not lesson_id or not settings.CONVEX_URL:
         return
 
@@ -92,6 +153,8 @@ async def _record_code_execution(
     }
     if action == "submit" and not passed and error_trace:
         mutation_args["errorTrace"] = error_trace
+    if attempt:
+        mutation_args["attempt"] = attempt
 
     try:
         client = _convex_client(auth_token)
@@ -495,8 +558,11 @@ async def execute_code(
     # Run is a single unscored execution (see run_once); only Submit grades.
     if action_type == "run":
         result = await run_once(student_code)
+        status_id = (result.get("status") or {}).get("id")
+        outcome = "ran" if status_id == 3 else (error_kind(status_id, result.get("stderr")) or "runtime_error")
         background_tasks.add_task(
-            _record_code_execution, auth_token, lesson_id, "run", not result["error"], None
+            _record_code_execution, auth_token, lesson_id, "run", not result["error"], None,
+            build_attempt(student_code.code, outcome, error_message=result.get("stderr")),
         )
         return result
 
@@ -650,13 +716,16 @@ async def execute_code(
                 "test_results": sanitized_results
             }
 
+        failure_summary = summarize_failures(results) if result["error"] else None
         background_tasks.add_task(
             _record_code_execution,
             auth_token,
             lesson_id,
             action_type,
             not result["error"],
-            summarize_failures(results) if result["error"] else None,
+            failure_summary,
+            # Hidden tests are only counted here too (summarize_failures).
+            build_attempt(student_code.code, submit_outcome(results), results, failure_summary),
         )
         return result
 
@@ -667,6 +736,8 @@ async def execute_code(
     error_trace = None
     if not passed:
         error_trace = (output.get("stderr") or output.get("compile_output") or "").strip()[:_ERROR_TRACE_CHARS]
+    status_id = (output.get("status") or {}).get("id")
+    outcome = "passed" if passed else (error_kind(status_id, error_trace) or "wrong_answer")
     background_tasks.add_task(
         _record_code_execution,
         auth_token,
@@ -674,6 +745,7 @@ async def execute_code(
         action_type,
         passed,
         error_trace,
+        build_attempt(student_code.code, outcome, error_message=error_trace),
     )
     return output
 
