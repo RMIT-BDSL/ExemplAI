@@ -56,13 +56,10 @@ def _stream(monkeypatch, trigger, history):
     async def fake_save(client, chat_id, text, chosen_model, *args, **kwargs):
         saved["text"] = text
 
-    async def fake_condition(user_id, chat):
-        return None
 
     monkeypatch.setattr(chat_service, "_convex_client", lambda token: object())
     monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
     monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
-    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
     graph = build_tutor_graph().compile(checkpointer=MemorySaver())
     chat = Chat(user_id=1, chat_id="c", conversation=[], bkt_prob_mastery=0.15, trigger=trigger,
                 original_problem="Write helloWorld() that returns 'Hello World!'")
@@ -142,14 +139,11 @@ def test_a_dean_retry_shows_up_as_extra_steps(monkeypatch):
     async def fake_save(client, chat_id, text, chosen_model, *args, **kwargs):
         saved.update(text=text, **kwargs)
 
-    async def fake_condition(user_id, chat):
-        return None
 
     for mod in (guardrail_mod, complete_mod, dean_mod):
         monkeypatch.setattr(mod, "llm", fake)
     monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
     monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
-    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
     graph = build_tutor_graph().compile(checkpointer=MemorySaver())
     chat = Chat(user_id=1, chat_id="c", conversation=[], bkt_prob_mastery=0.15, trigger="get_help",
                 original_problem="Write helloWorld() that returns 'Hello World!'")

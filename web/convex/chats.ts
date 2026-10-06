@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
+import { ensureCondition } from "./experiment";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
 
 // A fresh chat starts each time a lesson is opened (students only see their
@@ -40,14 +41,16 @@ export const getChatMessages = authenticatedQuery({
   },
 });
 
-// Opens a fresh chat for a lesson: called each time the lesson is opened.
-// Reuses the latest chat if nothing was said in it yet, so reloads and
-// double-mounts don't pile up empty chats.
+// Opens a fresh chat for a lesson: called each time the lesson is opened, and
+// again when the testing toggle changes the student's group. Reuses the latest
+// chat if nothing was said in it yet, so reloads and double-mounts don't pile
+// up empty chats. The first lesson a student opens assigns their group.
 export const startChat = authenticatedMutation({
   args: { lessonId: v.id("questions") },
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
     const userId = ctx.customUser._id;
+    const condition = await ensureCondition(ctx, ctx.customUser);
     const latest = await ctx.db
       .query("chats")
       .withIndex("by_user_lesson", (q) => q.eq("userId", userId).eq("lessonId", args.lessonId))
@@ -58,9 +61,18 @@ export const startChat = authenticatedMutation({
         .query("chatMessages")
         .withIndex("by_chat", (q) => q.eq("chatId", latest._id))
         .first();
-      if (!anyMessage) return latest._id;
+      if (!anyMessage) {
+        if (latest.experiment_condition !== condition) {
+          await ctx.db.patch(latest._id, { experiment_condition: condition });
+        }
+        return latest._id;
+      }
     }
-    return await ctx.db.insert("chats", { userId, lessonId: args.lessonId });
+    return await ctx.db.insert("chats", {
+      userId,
+      lessonId: args.lessonId,
+      experiment_condition: condition,
+    });
   },
 });
 
@@ -80,6 +92,7 @@ export const getOrCreateChat = authenticatedMutation({
     return await ctx.db.insert("chats", {
       userId: ctx.customUser._id,
       lessonId: args.lessonId,
+      experiment_condition: await ensureCondition(ctx, ctx.customUser),
     });
   },
 });
@@ -87,6 +100,7 @@ export const getOrCreateChat = authenticatedMutation({
 // Add a message to the chat (user path). `trigger` marks turns created by the
 // Get help / New example buttons, which spend the example allowance
 // (convex/examples.ts); typed messages need the tutor to have replied once.
+// Control chats are a plain chat: no buttons, no lock.
 export const addMessage = authenticatedMutation({
   args: {
     chatId: v.id("chats"),
@@ -100,12 +114,16 @@ export const addMessage = authenticatedMutation({
     if (!chat) throw new Error("Chat not found");
     if (chat.userId !== ctx.customUser._id) throw new Error("Unauthorized");
 
-    const allowance = await allowanceForChat(ctx, chat);
-    if (args.trigger) {
-      const blocked = buttonBlockedReason(args.trigger, allowance);
-      if (blocked) throw new Error(blocked);
-    } else if (!allowance.helpStarted) {
-      throw new Error("Chat unlocks after Get help");
+    if (chat.experiment_condition === "control") {
+      if (args.trigger) throw new Error("The control group has no example buttons");
+    } else {
+      const allowance = await allowanceForChat(ctx, chat);
+      if (args.trigger) {
+        const blocked = buttonBlockedReason(args.trigger, allowance);
+        if (blocked) throw new Error(blocked);
+      } else if (!allowance.helpStarted) {
+        throw new Error("Chat unlocks after Get help");
+      }
     }
 
     await ctx.db.insert("chatMessages", {
@@ -214,6 +232,9 @@ export const getChatContext = authenticatedQuery({
       failed_submits: progress?.failed_submits ?? 0,
       error_trace: progress?.last_error_trace ?? "",
       example_allowance: await allowanceForChat(ctx, chat),
+      // Chats from before groups were stored have none; the server then uses
+      // its default (experimental).
+      experiment_condition: chat.experiment_condition ?? null,
     };
   },
 });
