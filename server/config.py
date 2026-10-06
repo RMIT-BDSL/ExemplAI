@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "deepseek/deepseek-v4-flash-0731"
     OPENROUTER_ENABLED: bool = True
 
+    # ── Chat features ──────────────────────────────────────────────────
+    # Runnable code blocks in the chat (web: VITE_RUNNABLE_CHAT_CODE). Off: the
+    # Erroneous tutor doesn't tell students to edit the example and press Run.
+    RUNNABLE_CHAT_CODE: bool = False
+
     # ── Code execution (Judge0) ────────────────────────────────────────
     JUDGE0_ENDPOINT: str = ""
     JUDGE0_AUTH_KEY: SecretStr = SecretStr("")

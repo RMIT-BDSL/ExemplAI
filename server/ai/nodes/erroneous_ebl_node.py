@@ -24,6 +24,7 @@ from ai.nodes.context import (
     topic_bug_context,
 )
 from ai.state import TutorGraphState
+from config import settings
 
 log = logging.getLogger("rich")
 
@@ -85,10 +86,23 @@ erroneous example using a completely DIFFERENT scenario to prevent pattern-match
 </output_format>"""
 
 
+# The spec's "press Run" line, dropped while runnable chat code is off
+# (settings.RUNNABLE_CHAT_CODE), since there's no Run button to press.
+_RUN_LINE = (
+    "- Suggest they test a fix themselves by editing the example's code in the chat "
+    "and pressing Run.\n"
+)
+assert _RUN_LINE in _SYSTEM_PROMPT
+
+
+def _system_prompt() -> str:
+    return _SYSTEM_PROMPT if settings.RUNNABLE_CHAT_CODE else _SYSTEM_PROMPT.replace(_RUN_LINE, "")
+
+
 def erroneous_example_node(state: TutorGraphState) -> dict:
     log.info("erroneous_example_node")
     messages = [
-        SystemMessage(content=_SYSTEM_PROMPT + RESPONSE_TYPE_INSTRUCTION),
+        SystemMessage(content=_system_prompt() + RESPONSE_TYPE_INSTRUCTION),
         HumanMessage(content=student_context(state, extra=topic_bug_context(state))),
         *conversation(state),
     ]
