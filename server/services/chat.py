@@ -1,6 +1,5 @@
 import asyncio
 import time
-import concurrent.futures
 import json
 import logging
 from typing import AsyncGenerator, NamedTuple, Optional
@@ -8,7 +7,6 @@ from fastapi import HTTPException, status
 from convex import ConvexClient
 from langchain_core.messages import RemoveMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
-from posthog import Posthog
 
 from bkt import initial_mastery
 from config import settings
@@ -17,15 +15,7 @@ from model.chat import Chat
 log = logging.getLogger("rich")
 
 # Centralized timeout constants
-POSTHOG_FLAG_TIMEOUT = 2.0
 CONVEX_OP_TIMEOUT = 5.0
-
-posthog_client = None
-if settings.POSTHOG_PROJECT_TOKEN:
-    try:
-        posthog_client = Posthog(settings.POSTHOG_PROJECT_TOKEN, host=settings.POSTHOG_HOST)
-    except Exception as e:
-        log.warning(f"Failed to initialize PostHog: {e}")
 
 
 def _convex_client(auth_token: str) -> ConvexClient:
@@ -137,32 +127,6 @@ def check_chat_lock(chat: Chat, allowance: Optional[dict]) -> None:
         raise ChatLocked("Chat unlocks after Get help")
 
 
-_posthog_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-
-async def _evaluate_posthog_condition(auth_user_id: str, chat: Chat) -> None:
-    if getattr(chat, "experiment_condition", None):
-        return
-
-    chat.experiment_condition = "control"
-
-    if posthog_client:
-        try:
-            loop = asyncio.get_running_loop()
-            flag = await asyncio.wait_for(
-                loop.run_in_executor(
-                    _posthog_executor,
-                    posthog_client.get_feature_flag,
-                    "new-model-test",
-                    auth_user_id
-                ),
-                timeout=POSTHOG_FLAG_TIMEOUT
-            )
-            if flag == "prompted":
-                chat.experiment_condition = "experimental"
-        except Exception as e:
-            log.warning("PostHog flag evaluation failed: %s", e)
-
-
 class ConvexChatContext(NamedTuple):
     history: Optional[list[dict]]   # None: Convex predates history in getChatContext
     allowance: Optional[dict]       # None: Convex predates the example allowance
@@ -189,8 +153,9 @@ async def _load_convex_context(client: ConvexClient, chat: Chat) -> ConvexChatCo
                 if mastery is None:
                     mastery = initial_mastery(chat.current_knowledge_component or None)
                 chat.bkt_prob_mastery = mastery
-                if context.get("experiment_condition"):
-                    chat.experiment_condition = context.get("experiment_condition")
+                # The group stored in Convex (convex/experiment.ts); the browser's
+                # value is ignored. Chats from before groups were stored have none.
+                chat.experiment_condition = context.get("experiment_condition") or "experimental"
                 if "error_trace" in context:
                     chat.error_trace = context["error_trace"] or ""
                 return ConvexChatContext(context.get("messages"), context.get("example_allowance"))
@@ -265,7 +230,6 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
-        await _evaluate_posthog_condition(auth_user_id, chat)  # before the lock: control isn't locked
         check_chat_lock(chat, context.allowance)
 
         allowance = None if chat.experiment_condition == "control" else context.allowance
@@ -323,7 +287,6 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
     try:
         client = _convex_client(auth_token)
         context = await _load_convex_context(client, chat)
-        await _evaluate_posthog_condition(auth_user_id, chat)  # before the lock: control isn't locked
         check_chat_lock(chat, context.allowance)
 
         allowance = None if chat.experiment_condition == "control" else context.allowance

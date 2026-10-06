@@ -17,8 +17,8 @@ class Chat(BaseModel):
     conversation: list[dict]
 
     # ── Tutor graph inputs (read into TutorGraphState) ────────────────
-    # Sticky A/B assignment — must be read from persistent state, not
-    # re-randomized per request (research integrity).
+    # Sticky A/B assignment, overwritten from Convex (the chat's stored group,
+    # convex/experiment.ts); the browser value is ignored.
     experiment_condition: str = "experimental"
 
     # BKT routing input; orchestrator_router routes on this.

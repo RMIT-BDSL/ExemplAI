@@ -113,13 +113,10 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
     async def fake_save(client, chat_id, text, chosen_model, response_type=None, **dean):
         saved.update(text=text, response_type=response_type, **dean)
 
-    async def fake_condition(user_id, chat):
-        return None
 
     monkeypatch.setattr(chat_service, "_convex_client", lambda token: object())
     monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
     monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
-    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
     chat = Chat(user_id=1, chat_id="c", conversation=[], trigger="new_example")
     asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
     assert saved == {"text": "example 2", "response_type": NEW_EXAMPLE,
@@ -131,6 +128,24 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
 def test_control_is_never_locked_or_limited():
     control = Chat(user_id=1, chat_id="c", conversation=[], experiment_condition="control")
     check_chat_lock(control, _allowance(used=0, earned=0))  # typed before any failed Submit: fine
+
+
+class _ContextClient:
+    def __init__(self, condition):
+        self.condition = condition
+
+    def query(self, name, args):
+        return {"messages": [], "experiment_condition": self.condition}
+
+
+@pytest.mark.parametrize("stored, expected", [("control", "control"), ("experimental", "experimental"), (None, "experimental")])
+def test_group_comes_from_convex_not_the_browser(stored, expected):
+    # The browser asks for the other group; Convex's stored group wins, and a
+    # chat with no stored group (from before groups) falls back to experimental.
+    browser = "experimental" if stored == "control" else "control"
+    chat = Chat(user_id=1, chat_id="c", conversation=[], experiment_condition=browser)
+    asyncio.run(chat_service._load_convex_context(_ContextClient(stored), chat))
+    assert chat.experiment_condition == expected
 
 
 def test_control_first_reply_is_not_blocked_by_the_example_limit(monkeypatch):
@@ -167,13 +182,10 @@ def test_control_chat_gets_no_allowance(monkeypatch):
     async def fake_save(*args, **kwargs):
         return None
 
-    async def fake_condition(user_id, chat):
-        return None
 
     monkeypatch.setattr(chat_service, "_convex_client", lambda token: object())
     monkeypatch.setattr(chat_service, "_load_convex_context", fake_context)
     monkeypatch.setattr(chat_service, "_save_assistant_message", fake_save)
-    monkeypatch.setattr(chat_service, "_evaluate_posthog_condition", fake_condition)
     chat = Chat(user_id=1, chat_id="c", conversation=[], experiment_condition="control")
     asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
     assert "examples_remaining" not in seen  # not locked (no 403) and no allowance in the graph

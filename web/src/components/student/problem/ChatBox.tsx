@@ -356,7 +356,8 @@ type ExampleTrigger = "get_help" | "new_example";
 // "Get help" asks the tutor for a first example, after which the student can
 // type. Further examples come from "New example", each earned by another failed
 // Submit, up to the lesson cap (convex/examples.ts). Convex (addMessage) and
-// the server enforce the same rules.
+// the server enforce the same rules. The control group gets a plain chat
+// instead: open from the start, no example buttons (convex/experiment.ts).
 export default function ChatBox({
   editorRef,
   currentCode,
@@ -394,8 +395,19 @@ export default function ChatBox({
   // A fresh chat each time the lesson is opened: the student only ever sees
   // this chat; earlier ones stay in Convex for research.
   const [chatId, setChatId] = React.useState<string | null>(null);
+  // The chat a send belongs to; a reply or error that arrives after the chat
+  // changed (lesson or group switch) is ignored.
+  const chatIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    chatIdRef.current = chatId;
+  }, [chatId]);
   const startChat = useMutation(api.chats.startChat);
   const addMessageMutation = useMutation(api.chats.addMessage);
+
+  // The student's study group (assigned by startChat on their first lesson).
+  const myCondition = useQuery(api.experiment.getMyCondition);
+  const condition = myCondition?.condition ?? null;
+  const isControl = condition === "control";
 
   // Messages of the current chat only (reactive).
   const dbMessages = useQuery(
@@ -425,8 +437,9 @@ export default function ChatBox({
         {
           id: "welcome",
           sender: "assistant",
-          content:
-            remaining > 0
+          content: isControl
+            ? "I'm your tutor. Ask me anything about this lesson."
+            : remaining > 0
               ? "Your solution didn't pass yet. Press **Get help** and I'll show you an example to help you with this problem."
               : "I'm your tutor. Submit your solution first. If it doesn't pass, you can get help here.",
           timestamp: new Date(),
@@ -451,7 +464,7 @@ export default function ChatBox({
       });
     }
     return result;
-  }, [dbMessages, localError, remaining]);
+  }, [dbMessages, localError, remaining, isControl]);
 
   // Track how many assistant messages Convex currently holds so a failed POST
   // /chat can tell whether the reply landed anyway.
@@ -464,10 +477,11 @@ export default function ChatBox({
   }, [assistantCount]);
 
   // Help starts with the tutor's first reply (to Get help); typing unlocks then.
-  const helpStarted = assistantCount > 0;
+  // The control group's chat is open from the start.
+  const helpStarted = isControl || assistantCount > 0;
   // Get help gives a round's first example; New example the rest.
-  const canGetHelp = used === 0 && remaining > 0;
-  const canNewExample = used > 0 && remaining > 0;
+  const canGetHelp = !isControl && used === 0 && remaining > 0;
+  const canNewExample = !isControl && used > 0 && remaining > 0;
   // One plain line about what to do next; counts and limits stay out of view.
   const exampleStatus = exhausted
     ? "You've used this lesson's examples. Try a lesson on another topic, then come back for more."
@@ -508,6 +522,12 @@ export default function ChatBox({
 
   React.useEffect(() => {
     setChatId(null);
+    // A new chat starts clean: no waiting state carried over from the last one.
+    setIsTyping(false);
+    setAwaitingReply(false);
+    setLocalError(null);
+    setProgress([]);
+    expectingReplyRef.current = false;
     let isActive = true;
 
     async function initChat() {
@@ -529,7 +549,9 @@ export default function ChatBox({
     return () => {
       isActive = false;
     };
-  }, [convexLessonId, startChat]);
+    // `condition` too: when the testing toggle changes the group, startChat
+    // opens a chat for the new group.
+  }, [convexLessonId, startChat, condition]);
 
   const handleSendMessage = async (text: string, trigger?: ExampleTrigger) => {
     if (!chatId || !convexLessonId) return;
@@ -603,11 +625,14 @@ export default function ChatBox({
         1,
         editorContext,
         trigger ?? "message",
-        (node) => setProgress((prev) => [...prev, node]),
+        (node) => {
+          if (chatIdRef.current === chatId) setProgress((prev) => [...prev, node]);
+        },
       );
-      setIsTyping(false);
+      if (chatIdRef.current === chatId) setIsTyping(false);
     } catch (error) {
       console.error("Error communicating with chat server:", error);
+      if (chatIdRef.current !== chatId) return;
       if (error instanceof ChatServerError) {
         // The server answered with an error: no reply is coming, so say why now
         // instead of waiting out the limit.
@@ -692,7 +717,7 @@ export default function ChatBox({
                   undefined
           }
           example={
-            helpStarted && !isTyping
+            helpStarted && !isTyping && !isControl
               ? {
                   label:
                     exampleTrigger === "get_help" ? "Get help" : "New example",

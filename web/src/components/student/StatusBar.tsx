@@ -1,6 +1,7 @@
 import { Menu } from "lucide-react";
 import { useState } from "react";
 import ChangelogButton from "#/components/changelog/ChangelogButton";
+import GroupToggle from "#/components/student/GroupToggle";
 import UserStatusButton from "#/components/nav/UserStatusButton";
 
 interface StatusBarProps {
@@ -13,7 +14,8 @@ interface StatusBarProps {
 /**
  * The lesson workspace's only bar (replaces the global navbar on /course):
  * "Week N · Topic" on the left opens the lesson index; the account menu sits
- * on the right and also carries the theme switch and "What's new".
+ * on the right and also carries the theme switch and "What's new". During staff
+ * testing a study-group toggle sits beside it (GroupToggle).
  */
 export default function StatusBar({
   week,
@@ -42,6 +44,7 @@ export default function StatusBar({
       </button>
 
       <div className="flex items-center">
+        <GroupToggle />
         <UserStatusButton
           variant="workspace"
           onWhatsNew={() => setWhatsNewRequest((n) => n + 1)}

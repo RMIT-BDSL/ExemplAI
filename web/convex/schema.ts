@@ -2,6 +2,8 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { countFields as counts, replyCountFields } from "./studentMetrics";
 
+const experimentCondition = v.union(v.literal("experimental"), v.literal("control"));
+
 export default defineSchema({
   course: defineTable({
     course_name: v.string(),
@@ -50,9 +52,21 @@ export default defineSchema({
     // Last lesson the student opened; returning to a lesson from a different
     // one resets that lesson's used-up example allowance (convex/examples.ts).
     last_opened_lesson: v.optional(v.id("questions")),
+    // Study group, assigned once (convex/experiment.ts) the first time the
+    // student opens a lesson. "toggle" = changed with the testing toggle.
+    experiment_condition: v.optional(experimentCondition),
+    condition_assigned_at: v.optional(v.number()),
+    condition_source: v.optional(v.union(v.literal("random"), v.literal("toggle"))),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
+  // Blocked randomization (convex/experiment.ts): the groups still to hand out
+  // in each cohort's current block, so every cohort stays close to 50/50.
+  // A cohort is the invitation code the student signed up with.
+  randomizationBlocks: defineTable({
+    cohort: v.string(),
+    remaining: v.array(experimentCondition),
+  }).index("by_cohort", ["cohort"]),
   userProfiles: defineTable({
     userId: v.id("users"),
     tokenIdentifier: v.optional(v.string()),
@@ -124,6 +138,8 @@ export default defineSchema({
   chats: defineTable({
     userId: v.id("users"),
     lessonId: v.id("questions"),
+    // The student's group when the chat started; one chat never mixes groups.
+    experiment_condition: v.optional(experimentCondition),
     // Summary of chatMessages, kept up to date by convex/triggers.ts so the
     // admin views never read a whole conversation. Missing on chats that
     // predate it until students:backfillSummaries runs.

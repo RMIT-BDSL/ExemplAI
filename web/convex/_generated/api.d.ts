@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
 import type * as courses from "../courses.js";
 import type * as examples from "../examples.js";
+import type * as experiment from "../experiment.js";
 import type * as functions from "../functions.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   courses: typeof courses;
   examples: typeof examples;
+  experiment: typeof experiment;
   functions: typeof functions;
   http: typeof http;
   init: typeof init;
