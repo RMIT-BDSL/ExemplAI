@@ -198,6 +198,7 @@ async def _save_assistant_message(
     dean_decision: Optional[str] = None,
     dean_reason: Optional[str] = None,
     rejected_drafts: Optional[list[dict]] = None,
+    mastery_at_reply: Optional[float] = None,
 ) -> None:
     if text and chat_id:
         try:
@@ -218,6 +219,8 @@ async def _save_assistant_message(
                         **({"deanReason": dean_reason} if dean_reason else {}),
                         # Drafts the Dean turned down before this reply (research only).
                         **({"rejectedDrafts": rejected_drafts} if rejected_drafts else {}),
+                        # The mastery this reply was routed on (research log).
+                        **({"masteryAtReply": mastery_at_reply} if mastery_at_reply is not None else {}),
                         "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
@@ -245,7 +248,7 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
         await _save_assistant_message(
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
-            rejected_drafts=result.get("rejected_drafts"),
+            rejected_drafts=result.get("rejected_drafts"), mastery_at_reply=chat.bkt_prob_mastery,
         )
 
         # Return a small, guaranteed-serializable payload rather than the raw
@@ -316,7 +319,7 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
         await _save_assistant_message(
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
-            rejected_drafts=result.get("rejected_drafts"),
+            rejected_drafts=result.get("rejected_drafts"), mastery_at_reply=chat.bkt_prob_mastery,
         )
     except Exception as e:
         log.error(f"Message persistence error: {e}")

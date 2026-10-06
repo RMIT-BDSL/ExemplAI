@@ -24,6 +24,7 @@ import type * as studentMetrics from "../studentMetrics.js";
 import type * as students from "../students.js";
 import type * as triggers from "../triggers.js";
 import type * as validators from "../validators.js";
+import type * as visits from "../visits.js";
 
 import type {
   ApiFromModules,
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   students: typeof students;
   triggers: typeof triggers;
   validators: typeof validators;
+  visits: typeof visits;
 }>;
 
 /**

@@ -130,6 +130,21 @@ def test_rejected_drafts_are_sent_to_convex():
     assert "rejectedDrafts" not in sent  # nothing rejected: the field is left out
 
 
+def test_mastery_at_reply_is_sent_to_convex():
+    import asyncio
+    import services.chat as chat_service
+
+    sent = {}
+
+    class FakeClient:
+        def mutation(self, name, args):
+            sent.update(args)
+
+    asyncio.run(chat_service._save_assistant_message(FakeClient(), "c", "reply", "faded_example_node",
+                                                     mastery_at_reply=0.42))
+    assert sent["masteryAtReply"] == 0.42
+
+
 def test_leak_rule_allows_examples_with_different_values():
     prompt = dean_mod._SYSTEM_PROMPT
     assert "Reject ONLY if the draft" in prompt
