@@ -87,7 +87,47 @@ def test_approved_first_time_needs_no_retry(monkeypatch):
 def test_retry_state_resets_on_every_request():
     state = build_initial_state(Chat(user_id=1, chat_id="c", conversation=[]), HELP)
     assert state["dean_retried"] is False and state["dean_feedback"] == "" and state["dean_retry"] is False
+    assert state["rejected_drafts"] == []
     assert "<dean_feedback>" not in student_context(state)
+
+
+# ── rejected drafts are kept for research (saved with the reply in Convex) ──
+
+def test_a_retried_reply_keeps_the_rejected_draft(monkeypatch):
+    out, _ = _run(monkeypatch, ["[NEW_EXAMPLE]\nreturn 'Hello World!'", "[NEW_EXAMPLE]\nreturn 'Good morning!'"],
+                  [REJECT, APPROVE])
+    assert out["rejected_drafts"] == [{"content": "return 'Hello World!'", "reason": "DIRECT_ANSWER_LEAK",
+                                       "excerpt": "return 'Hello World!'"}]
+
+
+def test_a_fallback_keeps_both_rejected_drafts(monkeypatch):
+    out, _ = _run(monkeypatch, ["[NEW_EXAMPLE]\na", "[NEW_EXAMPLE]\nb"], [REJECT, REJECT])
+    assert [d["content"] for d in out["rejected_drafts"]] == ["a", "b"]
+
+
+def test_an_approved_reply_has_no_rejected_drafts(monkeypatch):
+    out, _ = _run(monkeypatch, ["[NEW_EXAMPLE]\nreturn 'Good morning!'"], [APPROVE])
+    assert out["rejected_drafts"] == []
+
+
+def test_rejected_drafts_are_sent_to_convex():
+    import asyncio
+    import services.chat as chat_service
+
+    sent = {}
+
+    class FakeClient:
+        def mutation(self, name, args):
+            sent.update(args)
+
+    drafts = [{"content": "a", "reason": "DIRECT_ANSWER_LEAK"}]
+    asyncio.run(chat_service._save_assistant_message(FakeClient(), "c", "reply", "complete_example_node",
+                                                     rejected_drafts=drafts))
+    assert sent["rejectedDrafts"] == drafts
+    sent.clear()
+    asyncio.run(chat_service._save_assistant_message(FakeClient(), "c", "reply", "complete_example_node",
+                                                     rejected_drafts=[]))
+    assert "rejectedDrafts" not in sent  # nothing rejected: the field is left out
 
 
 def test_leak_rule_allows_examples_with_different_values():

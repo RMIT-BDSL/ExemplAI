@@ -1,11 +1,19 @@
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { ensureCondition } from "./experiment";
+import { rejectedDraft } from "./schema";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
 
 // A fresh chat starts each time a lesson is opened (students only see their
 // current chat; earlier ones stay in the database for research). So a lesson
 // can have several chats; "latest" is the current one.
+
+// What a student may see of a message: rejected drafts can hold the very answer
+// the Dean blocked, so they never leave the server.
+export function forStudent({ rejected_drafts: _rejected, ...message }: Doc<"chatMessages">) {
+  return message;
+}
 
 // Messages of the student's latest chat on a lesson (oldest first).
 export const getMessages = authenticatedQuery({
@@ -20,10 +28,11 @@ export const getMessages = authenticatedQuery({
       .order("desc")
       .first();
     if (!chat) return [];
-    return await ctx.db
+    const messages = await ctx.db
       .query("chatMessages")
       .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
       .collect();
+    return messages.map(forStudent);
   },
 });
 
@@ -34,10 +43,11 @@ export const getChatMessages = authenticatedQuery({
     if (!ctx.customUser) throw new Error("User not found");
     const chat = await ctx.db.get(args.chatId);
     if (!chat || chat.userId !== ctx.customUser._id) return [];
-    return await ctx.db
+    const messages = await ctx.db
       .query("chatMessages")
       .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
       .collect();
+    return messages.map(forStudent);
   },
 });
 
@@ -150,6 +160,7 @@ export const addSystemMessage = authenticatedMutation({
     ),
     deanDecision: v.optional(v.string()),
     deanReason: v.optional(v.string()),
+    rejectedDrafts: v.optional(v.array(rejectedDraft)),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -170,6 +181,7 @@ export const addSystemMessage = authenticatedMutation({
       ...(args.responseType ? { response_type: args.responseType } : {}),
       ...(args.deanDecision ? { dean_decision: args.deanDecision } : {}),
       ...(args.deanReason ? { dean_reason: args.deanReason } : {}),
+      ...(args.rejectedDrafts?.length ? { rejected_drafts: args.rejectedDrafts } : {}),
     });
     return { success: true };
   },

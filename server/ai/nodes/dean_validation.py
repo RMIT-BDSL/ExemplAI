@@ -21,8 +21,9 @@ A typed request whose draft is labelled new_example with none remaining is
 answered with the limit message without calling the LLM. A first rejection
 sends the draft back to the same agent once, with the reason in
 <dean_feedback> (route_after_dean); a second rejection sends the fallback.
-Sets ``delivered_response_type``, ``dean_decision`` and ``dean_reason`` (saved
-with the reply in Convex).
+Sets ``delivered_response_type``, ``dean_decision`` and ``dean_reason``, and
+adds each draft it turns down to ``rejected_drafts`` (all saved with the reply
+in Convex, for research; the student never sees them).
 """
 
 from __future__ import annotations
@@ -43,6 +44,17 @@ APPROVED, APPROVED_AFTER_RETRY, REJECTED, LIMIT = "approved", "approved_after_re
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
+
+# Cap on a saved rejected draft (characters).
+_DRAFT_CHARS = 8000
+
+
+def _with_rejected(state: TutorGraphState, draft: str, reason: str, excerpt: Optional[str] = None) -> list[dict]:
+    """The request's rejected drafts so far, plus this one."""
+    entry = {"content": draft[:_DRAFT_CHARS], "reason": reason}
+    if excerpt:
+        entry["excerpt"] = excerpt
+    return [*(state.get("rejected_drafts") or []), entry]
 
 _FALLBACK = (
     "Let me reconsider how to help with this. Could you tell me what part of the "
@@ -180,6 +192,7 @@ def dean_validation_node(state: TutorGraphState) -> dict:
             "dean_decision": LIMIT,
             "dean_reason": "EXAMPLE_LIMIT",
             "dean_retry": False,
+            "rejected_drafts": _with_rejected(state, draft, "EXAMPLE_LIMIT"),
         }
 
     dean = llm.with_structured_output(DeanValidationResult)
@@ -200,10 +213,12 @@ def dean_validation_node(state: TutorGraphState) -> dict:
 
     reason = result.reason or "UNSPECIFIED"
     log.warning(f"dean_validation_node → rejected ({reason})")
+    rejected = _with_rejected(state, draft, reason, result.violation_excerpt)
     if not retried and reason != "EXAMPLE_LIMIT":
         # One retry: send the draft back to the same agent with the reason.
         feedback = reason + (f": {result.violation_excerpt}" if result.violation_excerpt else "")
-        return {"dean_retry": True, "dean_retried": True, "dean_feedback": feedback, "dean_reason": reason}
+        return {"dean_retry": True, "dean_retried": True, "dean_feedback": feedback, "dean_reason": reason,
+                "rejected_drafts": rejected}
 
     fallback = limit_message if reason == "EXAMPLE_LIMIT" else _FALLBACK
     return {
@@ -212,6 +227,7 @@ def dean_validation_node(state: TutorGraphState) -> dict:
         "dean_decision": LIMIT if reason == "EXAMPLE_LIMIT" else REJECTED,
         "dean_reason": reason,
         "dean_retry": False,
+        "rejected_drafts": rejected,
     }
 
 

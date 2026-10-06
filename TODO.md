@@ -48,7 +48,7 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 
 ## Research analysis
 
-* [ ] Log mastery at the time, group and rejected drafts with each reply (already logged: delivered type, Dean decision/reason, PostHog help clicks, and mastery before each lesson's first Submit).
+* [ ] Log mastery at the time with each reply (already logged: delivered type, Dean decision/reason, rejected drafts, the group on each chat, PostHog help clicks, and mastery before each lesson's first Submit).
 * [x] Log every Run and Submit (`codeAttempts`: code snapshot, outcome, test counts, group, mastery before/after the graded Submit, app version).
 * [ ] Consent before open semester use: consent screen at first login; store `consent_at`, `consent_version` and `data_opt_out` on `users`.
 * [ ] Study code per student (for survey forms and a de-identified research export), then the export itself (ProgSnap2-style CSVs).
