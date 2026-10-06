@@ -29,6 +29,10 @@ function timeOf(d: Date) {
   return `${d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`;
 }
 
+// Runnable code blocks (#84) are off unless VITE_RUNNABLE_CHAT_CODE=true at
+// build time; the server's RUNNABLE_CHAT_CODE should match (Erroneous prompt).
+const RUNNABLE_CHAT_CODE = import.meta.env.VITE_RUNNABLE_CHAT_CODE === "true";
+
 // Fences the student can edit and run in place: Python, or untagged (the
 // course is Python-only). Others (text, output, …) stay read-only.
 const RUNNABLE_LANGUAGES = new Set(["python", "py", "python3"]);
@@ -58,7 +62,8 @@ const markdownComponents: Components = {
     // language tag or any multi-line snippet is a block.
     if (lang || raw.includes("\n")) {
       const code = raw.replace(/\n$/, "");
-      return !lang || RUNNABLE_LANGUAGES.has(lang.toLowerCase()) ? (
+      return RUNNABLE_CHAT_CODE &&
+        (!lang || RUNNABLE_LANGUAGES.has(lang.toLowerCase())) ? (
         <RunnableCodeBlock code={code} />
       ) : (
         <CodeBlock code={code} />
