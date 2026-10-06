@@ -82,7 +82,10 @@ export async function scratchpadExecute(
 }
 
 /** How long the chat waits for the tutor before giving up (also shown to students). */
-export const CHAT_TIMEOUT_MS = 60_000;
+export const CHAT_TIMEOUT_MS = 120_000;
+
+/** The tutor server answered, but with an error (bad status or an error event). */
+export class ChatServerError extends Error {}
 
 /**
  * Like sendChatMessage, but through POST /chat/stream: `onStep` is called with
@@ -119,7 +122,13 @@ export async function streamChatMessage(
       }),
       signal: controller.signal,
     });
-    if (!response.ok || !response.body) throw new Error(`Chat stream failed (${response.status})`);
+    if (!response.ok || !response.body) {
+      const detail = await response
+        .json()
+        .then((b) => (typeof b?.detail === "string" ? b.detail : null))
+        .catch(() => null);
+      throw new ChatServerError(detail ?? `Chat stream failed (${response.status})`);
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -135,7 +144,7 @@ export async function streamChatMessage(
         if (!line.startsWith("data:")) continue;
         const event = JSON.parse(line.slice(5).trim());
         if (event.type === "step") onStep(event.node);
-        else if (event.type === "error") throw new Error(event.message ?? "Chat error");
+        else if (event.type === "error") throw new ChatServerError(event.message ?? "Chat error");
         else if (event.type === "done") return;
       }
     }

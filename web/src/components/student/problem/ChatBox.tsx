@@ -2,7 +2,11 @@ import { useMutation, useQuery } from "convex/react";
 import { Send, Sparkles } from "lucide-react";
 import * as React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import { CHAT_TIMEOUT_MS, streamChatMessage } from "#/lib/api.ts";
+import {
+  CHAT_TIMEOUT_MS,
+  ChatServerError,
+  streamChatMessage,
+} from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -377,7 +381,7 @@ export default function ChatBox({
   const [awaitingReply, setAwaitingReply] = React.useState(false);
   const assistantCountRef = React.useRef(0);
   const replyBaselineRef = React.useRef(0);
-  // When the current message was sent, for the 60s limit.
+  // When the current message was sent, for the time limit.
   const sentAtRef = React.useRef(0);
   // Stays true from a failed send until its reply lands (or the next send).
   // Outlives `awaitingReply` so a reply that arrives *after* we've shown the
@@ -486,7 +490,7 @@ export default function ChatBox({
   }, [assistantCount]);
 
   // The connection failed early: the reply may still land in Convex, so wait
-  // for it, but only until the 60s limit from sending. A late reply still
+  // for it, but only until the time limit from sending. A late reply still
   // clears the error via the effect above.
   React.useEffect(() => {
     if (!awaitingReply) return;
@@ -604,13 +608,21 @@ export default function ChatBox({
       setIsTyping(false);
     } catch (error) {
       console.error("Error communicating with chat server:", error);
-      // The connection to POST /chat failed, but the graph may have still run
-      // and saved the reply to Convex. Wait for it to arrive before showing a
-      // hard error (see the `awaitingReply` effects above).
+      if (error instanceof ChatServerError) {
+        // The server answered with an error: no reply is coming, so say why now
+        // instead of waiting out the limit.
+        setIsTyping(false);
+        setLocalError(
+          `The tutor couldn't reply (${error.message}). Please send your message again.`,
+        );
+        return;
+      }
+      // Timed out or the connection dropped. The graph may still have saved a
+      // reply to Convex; a late one clears the message (see the effects above).
       replyBaselineRef.current = assistantCountRef.current;
       expectingReplyRef.current = true;
       if (error instanceof DOMException && error.name === "AbortError") {
-        // Hit the 60s limit: say so now.
+        // Hit the time limit: say so now.
         setIsTyping(false);
         setLocalError(TIMEOUT_MESSAGE);
       } else {
