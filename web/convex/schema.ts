@@ -4,6 +4,18 @@ import { countFields as counts, replyCountFields } from "./studentMetrics";
 
 const experimentCondition = v.union(v.literal("experimental"), v.literal("control"));
 
+// How a Run or Submit ended (server/services: error_kind / submit_outcome).
+// "ran" = a Run that finished without an error (Runs aren't graded).
+export const attemptOutcome = v.union(
+  v.literal("passed"),
+  v.literal("ran"),
+  v.literal("wrong_answer"),
+  v.literal("runtime_error"),
+  v.literal("syntax_error"),
+  v.literal("timeout"),
+  v.literal("service_error"),
+);
+
 export default defineSchema({
   course: defineTable({
     course_name: v.string(),
@@ -111,6 +123,34 @@ export default defineSchema({
     .index("by_lesson", ["lessonId"])
     // exact (student, lesson) lookup for fast upserts
     .index("by_user_lesson", ["userId", "lessonId"]),
+  // Research log: one row per Run and Submit, written by recordCodeExecution
+  // (backend secret only) in the same transaction as progress and BKT, so it
+  // always agrees with them. Hidden tests are counted, never detailed.
+  codeAttempts: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+    knowledge_component: v.optional(v.string()),
+    kind: v.union(v.literal("run"), v.literal("submit")),
+    experiment_condition: v.optional(experimentCondition),
+    // The student's code as sent (capped at 20k characters by the server).
+    code: v.string(),
+    outcome: attemptOutcome,
+    // Submit only.
+    tests_passed: v.optional(v.number()),
+    tests_total: v.optional(v.number()),
+    hidden_failed: v.optional(v.number()),
+    // A failed Submit's summary (as the tutor sees it) or a Run's error trace.
+    error_message: v.optional(v.string()),
+    // The one Submit per lesson that updated BKT, with mastery around it.
+    first_graded: v.boolean(),
+    mastery_before: v.optional(v.number()),
+    mastery_after: v.optional(v.number()),
+    // Deployed server build (short commit), "local" in development.
+    app_version: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_lesson", ["userId", "lessonId"])
+    .index("by_lesson", ["lessonId"]),
   // Per-student BKT mastery for a knowledge component (shared across lessons
   // tagged with the same KC). Updated once per lesson on first Submit only.
   // `mastered` is sticky: set the first time prob_mastery reaches the mastery
