@@ -11,7 +11,11 @@ type SeedProblem = {
   problem_description: string;
   starter_code: string;
   solution_code: string;
-  testCases: { input: string; expectedOutput: string }[];
+  // Hidden tests run on Submit only; students and the tutor see just a count.
+  // Each lesson that takes input ends with 1–2 hidden edge cases (a rule the
+  // visible tests miss, a boundary, or a fresh value), so a first-Submit pass
+  // is stronger evidence for BKT.
+  testCases: { input: string; expectedOutput: string; hidden?: boolean }[];
 };
 
 // Original CSEDM 2019 Problems
@@ -43,6 +47,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "5", expectedOutput: "5.0" },
       { input: "-10", expectedOutput: "-10.0" },
       { input: "0", expectedOutput: "0.0" },
+      { input: "42", expectedOutput: "42.0", hidden: true },
+      { input: "-1", expectedOutput: "-1.0", hidden: true },
     ],
   },
   {
@@ -59,6 +65,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "0", expectedOutput: "0" },
       { input: "-3", expectedOutput: "-6" },
       { input: "2.5", expectedOutput: "5.0" },
+      { input: "-0.5", expectedOutput: "-1.0", hidden: true },
+      { input: "1000", expectedOutput: "2000", hidden: true },
     ],
   },
   {
@@ -75,6 +83,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "5 0", expectedOutput: "1" },
       { input: "10 -1", expectedOutput: "0.1" },
       { input: "-2 2", expectedOutput: "4" },
+      { input: "3 4", expectedOutput: "81", hidden: true },
+      { input: "2 -2", expectedOutput: "0.25", hidden: true },
     ],
   },
   {
@@ -92,6 +102,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "1", expectedOutput: "57.3" },
       { input: "0", expectedOutput: "0.0" },
       { input: "1.5708", expectedOutput: "90.0" },
+      { input: "-1", expectedOutput: "-57.3", hidden: true },
+      { input: "6.283185307179586", expectedOutput: "360.0", hidden: true },
     ],
   },
   {
@@ -108,6 +120,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "15 5", expectedOutput: "0" },
       { input: "2 5", expectedOutput: "2" },
       { input: "100 7", expectedOutput: "2" },
+      { input: "23 4", expectedOutput: "3", hidden: true },
+      { input: "0 4", expectedOutput: "0", hidden: true },
     ],
   },
   {
@@ -124,6 +138,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "25", expectedOutput: "3" },
       { input: "0", expectedOutput: "0" },
       { input: "1", expectedOutput: "1" },
+      { input: "12", expectedOutput: "1", hidden: true },
+      { input: "13", expectedOutput: "2", hidden: true },
     ],
   },
   {
@@ -141,6 +157,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "1234, 3", expectedOutput: "2" },
       { input: "507, 2", expectedOutput: "0" },
       { input: "9, 3", expectedOutput: "0" },
+      { input: "1234, 4", expectedOutput: "1", hidden: true },
+      { input: "0, 1", expectedOutput: "0", hidden: true },
     ],
   },
   {
@@ -159,6 +177,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "12", expectedOutput: "8" },
       { input: "0", expectedOutput: "0" },
       { input: "21", expectedOutput: "24" },
+      { input: "4", expectedOutput: "0", hidden: true },
+      { input: "20", expectedOutput: "16", hidden: true },
     ],
   },
   {
@@ -175,6 +195,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "99", expectedOutput: "True" },
       { input: "9", expectedOutput: "False" },
       { input: "100", expectedOutput: "False" },
+      { input: "55", expectedOutput: "True", hidden: true },
+      { input: "1000", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -190,6 +212,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "9001", expectedOutput: "True" },
       { input: "9000", expectedOutput: "False" },
       { input: "8999", expectedOutput: "False" },
+      { input: "100000", expectedOutput: "True", hidden: true },
+      { input: "-9001", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -207,6 +231,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "25, true", expectedOutput: "False" },
       { input: "18, false", expectedOutput: "False" },
       { input: "21, false", expectedOutput: "True" },
+      { input: "20, false", expectedOutput: "False", hidden: true },
+      { input: "30, true", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -226,6 +252,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "0", expectedOutput: "False" },
       { input: "\"8\"", expectedOutput: "False" },
       { input: "2.5", expectedOutput: "False" },
+      { input: "2", expectedOutput: "True", hidden: true },
+      { input: "4.0", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -243,6 +271,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "1, 0, -9", expectedOutput: "3.0" },
       { input: "-1, 0, 4", expectedOutput: "2.0" },
       { input: "1, 2, 1", expectedOutput: "-1.0" },
+      { input: "-1, 2, 3", expectedOutput: "3.0", hidden: true },
+      { input: "2, -4, -6", expectedOutput: "3.0", hidden: true },
     ],
   },
   {
@@ -261,6 +291,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "\"a\"", expectedOutput: "False" },
       { input: "\" \"", expectedOutput: "False" },
       { input: "\"7\"", expectedOutput: "False" },
+      { input: "\"?\"", expectedOutput: "True", hidden: true },
+      { input: "\"Z\"", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -277,6 +309,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "[\"world\"]", expectedOutput: "wd" },
       { input: "[\"a\"]", expectedOutput: "aa" },
       { input: "[\"ab\"]", expectedOutput: "ab" },
+      { input: "[\"Python\"]", expectedOutput: "Pn", hidden: true },
+      { input: "[\"!\"]", expectedOutput: "!!", hidden: true },
     ],
   },
   {
@@ -293,6 +327,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "\"abc\", \"def\"", expectedOutput: "defabc" },
       { input: "\"Hello\", \"World\"", expectedOutput: "WorldHello" },
       { input: "\"\", \"x\"", expectedOutput: "x" },
+      { input: "\"123\", \"abc\"", expectedOutput: "abc123", hidden: true },
+      { input: "\"x\", \"\"", expectedOutput: "x", hidden: true },
     ],
   },
   {
@@ -309,6 +345,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "[\"banana\"]", expectedOutput: "ananabay" },
       { input: "[\"eat\"]", expectedOutput: "eatyay" },
       { input: "[\"hello\"]", expectedOutput: "ellohay" },
+      { input: "[\"umbrella\"]", expectedOutput: "umbrellayay", hidden: true },
+      { input: "[\"x\"]", expectedOutput: "xay", hidden: true },
     ],
   },
   {
@@ -326,6 +364,8 @@ const csedmProblems: SeedProblem[] = [
       { input: "1", expectedOutput: "1" },
       { input: "12", expectedOutput: "123456789101112" },
       { input: "3", expectedOutput: "123" },
+      { input: "0", expectedOutput: "", hidden: true },
+      { input: "-3", expectedOutput: "", hidden: true },
     ],
   },
 
@@ -359,6 +399,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "5.9", expectedOutput: "5" },
       { input: "-10.1", expectedOutput: "-10" },
       { input: "0.0", expectedOutput: "0" },
+      { input: "-0.9", expectedOutput: "0", hidden: true },
+      { input: "7.99", expectedOutput: "7", hidden: true },
     ],
   },
   {
@@ -375,6 +417,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "0", expectedOutput: "0" },
       { input: "-3", expectedOutput: "-9" },
       { input: "2.5", expectedOutput: "7.5" },
+      { input: "-1.5", expectedOutput: "-4.5", hidden: true },
+      { input: "100", expectedOutput: "300", hidden: true },
     ],
   },
   {
@@ -390,6 +434,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "2 3", expectedOutput: "13" },
       { input: "0 5", expectedOutput: "25" },
       { input: "-2 2", expectedOutput: "8" },
+      { input: "-3 -4", expectedOutput: "25", hidden: true },
+      { input: "1.5 2", expectedOutput: "6.25", hidden: true },
     ],
   },
   {
@@ -405,6 +451,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "180", expectedOutput: "3.1416" },
       { input: "90", expectedOutput: "1.5708" },
       { input: "0", expectedOutput: "0.0" },
+      { input: "45", expectedOutput: "0.7854", hidden: true },
+      { input: "-90", expectedOutput: "-1.5708", hidden: true },
     ],
   },
   {
@@ -420,6 +468,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "10 3", expectedOutput: "1" },
       { input: "15 5", expectedOutput: "0" },
       { input: "8 5", expectedOutput: "3" },
+      { input: "3 8", expectedOutput: "3", hidden: true },
+      { input: "0 4", expectedOutput: "0", hidden: true },
     ],
   },
   {
@@ -436,6 +486,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "17", expectedOutput: "3" },
       { input: "0", expectedOutput: "0" },
       { input: "1", expectedOutput: "1" },
+      { input: "8", expectedOutput: "1", hidden: true },
+      { input: "9", expectedOutput: "2", hidden: true },
     ],
   },
   {
@@ -451,6 +503,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "1234", expectedOutput: "123" },
       { input: "9", expectedOutput: "0" },
       { input: "100", expectedOutput: "10" },
+      { input: "0", expectedOutput: "0", hidden: true },
+      { input: "10", expectedOutput: "1", hidden: true },
     ],
   },
   {
@@ -467,6 +521,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "8", expectedOutput: "10" },
       { input: "15", expectedOutput: "20" },
       { input: "20", expectedOutput: "20" },
+      { input: "5", expectedOutput: "10", hidden: true },
+      { input: "25", expectedOutput: "30", hidden: true },
     ],
   },
   {
@@ -483,6 +539,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "999", expectedOutput: "True" },
       { input: "99", expectedOutput: "False" },
       { input: "1000", expectedOutput: "False" },
+      { input: "500", expectedOutput: "True", hidden: true },
+      { input: "10", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -498,6 +556,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "100", expectedOutput: "True" },
       { input: "105", expectedOutput: "True" },
       { input: "99", expectedOutput: "False" },
+      { input: "99.9", expectedOutput: "False", hidden: true },
+      { input: "100.0", expectedOutput: "True", hidden: true },
     ],
   },
   {
@@ -514,6 +574,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "19", expectedOutput: "True" },
       { input: "17", expectedOutput: "False" },
       { input: "0", expectedOutput: "False" },
+      { input: "65", expectedOutput: "True", hidden: true },
+      { input: "-1", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -531,6 +593,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "0", expectedOutput: "False" },
       { input: "-2", expectedOutput: "False" },
       { input: "3", expectedOutput: "False" },
+      { input: "-99", expectedOutput: "True", hidden: true },
+      { input: "1", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -546,6 +610,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "10", expectedOutput: "1.0" },
       { input: "100", expectedOutput: "2.0" },
       { input: "1", expectedOutput: "0.0" },
+      { input: "1000", expectedOutput: "3.0", hidden: true },
+      { input: "0.1", expectedOutput: "-1.0", hidden: true },
     ],
   },
   {
@@ -562,6 +628,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "[\"e\"]", expectedOutput: "True" },
       { input: "[\"b\"]", expectedOutput: "False" },
       { input: "[\" \"]", expectedOutput: "False" },
+      { input: "[\"A\"]", expectedOutput: "False", hidden: true },
+      { input: "[\"u\"]", expectedOutput: "True", hidden: true },
     ],
   },
   {
@@ -577,6 +645,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "[\"hello\"]", expectedOutput: "hel" },
       { input: "[\"world\"]", expectedOutput: "wor" },
       { input: "[\"abc\"]", expectedOutput: "abc" },
+      { input: "[\"Python\"]", expectedOutput: "Pyt", hidden: true },
+      { input: "[\"a b c\"]", expectedOutput: "a b", hidden: true },
     ],
   },
   {
@@ -592,6 +662,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "[\"abc\"]", expectedOutput: "CBA" },
       { input: "[\"hello\"]", expectedOutput: "OLLEH" },
       { input: "[\"a\"]", expectedOutput: "A" },
+      { input: "[\"Hello World\"]", expectedOutput: "DLROW OLLEH", hidden: true },
+      { input: "[\"ab1!\"]", expectedOutput: "!1BA", hidden: true },
     ],
   },
   {
@@ -607,6 +679,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "[\"apple\"]", expectedOutput: "elppaxyz" },
       { input: "[\"cat\"]", expectedOutput: "tacxyz" },
       { input: "[\"a\"]", expectedOutput: "axyz" },
+      { input: "[\"\"]", expectedOutput: "xyz", hidden: true },
+      { input: "[\"racecar\"]", expectedOutput: "racecarxyz", hidden: true },
     ],
   },
   {
@@ -624,6 +698,8 @@ const csedm2Problems: SeedProblem[] = [
       { input: "1", expectedOutput: "1" },
       { input: "12", expectedOutput: "121110987654321" },
       { input: "3", expectedOutput: "321" },
+      { input: "0", expectedOutput: "", hidden: true },
+      { input: "-2", expectedOutput: "", hidden: true },
     ],
   },
 
@@ -650,6 +726,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "\"dog\", \"concatenate\"", expectedOutput: "False" },
       { input: "5, \"12345\"", expectedOutput: "False" },
       { input: "\"\", \"abc\"", expectedOutput: "True" },
+      { input: "\"abc\", 5", expectedOutput: "False", hidden: true },
+      { input: "\"concatenate\", \"cat\"", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -667,6 +745,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "-1", expectedOutput: "Down" },
       { input: "0", expectedOutput: "No Change" },
       { input: "0.01", expectedOutput: "Up" },
+      { input: "-0.01", expectedOutput: "Down", hidden: true },
+      { input: "0.0", expectedOutput: "No Change", hidden: true },
     ],
   },
   {
@@ -684,6 +764,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "0", expectedOutput: "0.0" },
       { input: "-4", expectedOutput: "Error" },
       { input: "2", expectedOutput: "1.4142135623730951" },
+      { input: "-0.5", expectedOutput: "Error", hidden: true },
+      { input: "2.25", expectedOutput: "1.5", hidden: true },
     ],
   },
   {
@@ -701,6 +783,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "\"007\", false", expectedOutput: "007" },
       { input: "\"-12\", true", expectedOutput: "-12" },
       { input: "\"42\", false", expectedOutput: "42" },
+      { input: "\"0\", true", expectedOutput: "0", hidden: true },
+      { input: "\"-5\", false", expectedOutput: "-5", hidden: true },
     ],
   },
   {
@@ -719,6 +803,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "2", expectedOutput: "True" },
       { input: "1", expectedOutput: "False" },
       { input: "97", expectedOutput: "True" },
+      { input: "4", expectedOutput: "False", hidden: true },
+      { input: "49", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -736,6 +822,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "0", expectedOutput: "0" },
       { input: "9999", expectedOutput: "36" },
       { input: "1050", expectedOutput: "6" },
+      { input: "7", expectedOutput: "7", hidden: true },
+      { input: "909", expectedOutput: "18", hidden: true },
     ],
   },
   {
@@ -753,6 +841,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "\"HeLLO\"", expectedOutput: "True" },
       { input: "\"\"", expectedOutput: "False" },
       { input: "\"123abc\"", expectedOutput: "True" },
+      { input: "\"ABCz\"", expectedOutput: "True", hidden: true },
+      { input: "\"!@# 123\"", expectedOutput: "False", hidden: true },
     ],
   },
   {
@@ -770,6 +860,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "0", expectedOutput: "1" },
       { input: "1", expectedOutput: "1" },
       { input: "10", expectedOutput: "3628800" },
+      { input: "3", expectedOutput: "6", hidden: true },
+      { input: "12", expectedOutput: "479001600", hidden: true },
     ],
   },
   {
@@ -788,6 +880,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "2", expectedOutput: "1" },
       { input: "7", expectedOutput: "13" },
       { input: "10", expectedOutput: "55" },
+      { input: "3", expectedOutput: "2", hidden: true },
+      { input: "20", expectedOutput: "6765", hidden: true },
     ],
   },
   {
@@ -805,6 +899,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "17, 5", expectedOutput: "1" },
       { input: "100, 75", expectedOutput: "25" },
       { input: "7, 7", expectedOutput: "7" },
+      { input: "18, 12", expectedOutput: "6", hidden: true },
+      { input: "48, 180", expectedOutput: "12", hidden: true },
     ],
   },
   {
@@ -822,6 +918,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "[[-1, -2]]", expectedOutput: "[]" },
       { input: "[[4, 5]]", expectedOutput: "[4, 5]" },
       { input: "[[]]", expectedOutput: "[]" },
+      { input: "[[0, 0]]", expectedOutput: "[]", hidden: true },
+      { input: "[[-1, 2.5, 3]]", expectedOutput: "[2.5, 3]", hidden: true },
     ],
   },
   {
@@ -839,6 +937,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "[[5]]", expectedOutput: "5" },
       { input: "[[1, 2, 3, 4]]", expectedOutput: "3" },
       { input: "[[\"a\", \"b\", \"c\"]]", expectedOutput: "b" },
+      { input: "[[1, 2]]", expectedOutput: "2", hidden: true },
+      { input: "[[10, 20, 30, 40, 50]]", expectedOutput: "30", hidden: true },
     ],
   },
   {
@@ -856,6 +956,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "[[1, 2, 3, 4, 5]]", expectedOutput: "[3, 4, 5]" },
       { input: "[[7]]", expectedOutput: "[7]" },
       { input: "[[]]", expectedOutput: "[]" },
+      { input: "[[1, 2]]", expectedOutput: "[2]", hidden: true },
+      { input: "[[1, 2, 3]]", expectedOutput: "[2, 3]", hidden: true },
     ],
   },
   {
@@ -873,6 +975,8 @@ const csedmUnseededProblems: SeedProblem[] = [
       { input: "[[[], [5]]]", expectedOutput: "[5]" },
       { input: "[[]]", expectedOutput: "[]" },
       { input: "[[[2, 2, 2]]]", expectedOutput: "[2]" },
+      { input: "[[[5, -1], [-1, 0]]]", expectedOutput: "[-1, 0, 5]", hidden: true },
+      { input: "[[[], []]]", expectedOutput: "[]", hidden: true },
     ],
   },
 ];
@@ -962,6 +1066,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "\"\"", expectedOutput: "0" },
       { input: "\"rhythm\"", expectedOutput: "0" },
       { input: "\"Education\"", expectedOutput: "5" },
+      { input: "\"AEIOU\"", expectedOutput: "5", hidden: true },
+      { input: "\"xyz\"", expectedOutput: "0", hidden: true },
     ],
   },
   {
@@ -978,6 +1084,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "1", expectedOutput: "0" },
       { input: "16", expectedOutput: "60" },
       { input: "20", expectedOutput: "78" },
+      { input: "15", expectedOutput: "45", hidden: true },
+      { input: "6", expectedOutput: "8", hidden: true },
     ],
   },
   {
@@ -994,6 +1102,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "5", expectedOutput: "4" },
       { input: "1", expectedOutput: "0" },
       { input: "6", expectedOutput: "6" },
+      { input: "2", expectedOutput: "0", hidden: true },
+      { input: "7", expectedOutput: "9", hidden: true },
     ],
   },
   {
@@ -1010,6 +1120,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "\"abca\"", expectedOutput: "a" },
       { input: "\"python\"", expectedOutput: "" },
       { input: "\"aabb\"", expectedOutput: "a" },
+      { input: "\"abba\"", expectedOutput: "a", hidden: true },
+      { input: "\"a\"", expectedOutput: "", hidden: true },
     ],
   },
   {
@@ -1026,6 +1138,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "2", expectedOutput: "1" },
       { input: "1", expectedOutput: "0" },
       { input: "20", expectedOutput: "8" },
+      { input: "4", expectedOutput: "2", hidden: true },
+      { input: "30", expectedOutput: "10", hidden: true },
     ],
   },
   {
@@ -1042,6 +1156,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "16", expectedOutput: "7" },
       { input: "0", expectedOutput: "0" },
       { input: "9875", expectedOutput: "2" },
+      { input: "10", expectedOutput: "1", hidden: true },
+      { input: "99999", expectedOutput: "9", hidden: true },
     ],
   },
   {
@@ -1057,6 +1173,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "\"Ana\"", expectedOutput: "Hello, Ana!" },
       { input: "\"Ana\", \"Hi\"", expectedOutput: "Hi, Ana!" },
       { input: "\"Minh\", \"Xin chao\"", expectedOutput: "Xin chao, Minh!" },
+      { input: "\"Bo\"", expectedOutput: "Hello, Bo!", hidden: true },
+      { input: "\"Lan\", \"Good morning\"", expectedOutput: "Good morning, Lan!", hidden: true },
     ],
   },
   {
@@ -1073,6 +1191,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "2, 5", expectedOutput: "32" },
       { input: "10, 0", expectedOutput: "1" },
       { input: "-4", expectedOutput: "16" },
+      { input: "0", expectedOutput: "0", hidden: true },
+      { input: "2, -1", expectedOutput: "0.5", hidden: true },
     ],
   },
   {
@@ -1089,6 +1209,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "2, 2", expectedOutput: "1" },
       { input: "3, 3", expectedOutput: "0" },
       { input: "0, 6", expectedOutput: "4" },
+      { input: "-3, 3", expectedOutput: "3", hidden: true },
+      { input: "7, 8", expectedOutput: "1", hidden: true },
     ],
   },
   {
@@ -1105,6 +1227,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "-1, -5, -3", expectedOutput: "-1" },
       { input: "4, 4, 2", expectedOutput: "4" },
       { input: "1, 2, 9", expectedOutput: "9" },
+      { input: "9, 3, 1", expectedOutput: "9", hidden: true },
+      { input: "2, 8, 8", expectedOutput: "8", hidden: true },
     ],
   },
   {
@@ -1122,6 +1246,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "20", expectedOutput: "mild" },
       { input: "30", expectedOutput: "hot" },
       { input: "10", expectedOutput: "mild" },
+      { input: "29", expectedOutput: "mild", hidden: true },
+      { input: "-10", expectedOutput: "cold", hidden: true },
     ],
   },
   {
@@ -1138,6 +1264,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "7, 0", expectedOutput: "undefined" },
       { input: "9, 3", expectedOutput: "3.0" },
       { input: "0, 5", expectedOutput: "0.0" },
+      { input: "0, 0", expectedOutput: "undefined", hidden: true },
+      { input: "-9, 2", expectedOutput: "-4.5", hidden: true },
     ],
   },
   {
@@ -1154,6 +1282,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "1000, 5, 2", expectedOutput: "1102.5" },
       { input: "500, 10, 3", expectedOutput: "665.5" },
       { input: "200, 0, 4", expectedOutput: "200.0" },
+      { input: "1000, 5, 0", expectedOutput: "1000.0", hidden: true },
+      { input: "100, 50, 2", expectedOutput: "225.0", hidden: true },
     ],
   },
   {
@@ -1170,6 +1300,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "\"a b b a c\"", expectedOutput: "a" },
       { input: "\"one\"", expectedOutput: "one" },
       { input: "\"x y z y\"", expectedOutput: "y" },
+      { input: "\"b a a b\"", expectedOutput: "b", hidden: true },
+      { input: "\"dog cat cat\"", expectedOutput: "cat", hidden: true },
     ],
   },
   {
@@ -1186,6 +1318,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "[[]]", expectedOutput: "0" },
       { input: "[[\"a\", \"a\", \"b\"]]", expectedOutput: "2" },
       { input: "[[5, 5, 5, 5]]", expectedOutput: "1" },
+      { input: "[[\"a\", \"A\"]]", expectedOutput: "2", hidden: true },
+      { input: "[[0]]", expectedOutput: "1", hidden: true },
     ],
   },
   {
@@ -1202,6 +1336,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "[[5]]", expectedOutput: "(5, 5)" },
       { input: "[[-2, -7]]", expectedOutput: "(-7, -2)" },
       { input: "[[0, 10, 10]]", expectedOutput: "(0, 10)" },
+      { input: "[[10, 3]]", expectedOutput: "(3, 10)", hidden: true },
+      { input: "[[2, 2, 2]]", expectedOutput: "(2, 2)", hidden: true },
     ],
   },
 ];
