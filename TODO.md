@@ -66,6 +66,8 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 * [ ] Investigate the failed production deploy.
 * [ ] Fix the Convex test setup (betterAuth not registered in `convexTest`), then re-enable lint and tests in the production deploy.
 * [ ] Security: restrict CORS to our origins. (Students can no longer forge lesson results: `recordCodeExecution` needs the backend secret.)
+* [ ] Check whether the tutor graph still needs the Postgres checkpointer (`DATABASE_URL`, `server/ai/checkpointer.py`): each request rebuilds the conversation, group, mastery and example allowance from Convex, so the checkpoint may only duplicate Convex. Confirm no state field carries over between turns, then switch to an in-memory checkpointer and drop Postgres.
+* [ ] Remove unused services: Supabase (`server/repository.py`, `SUPABASE_*` settings; nothing imports it) and Langfuse (`LANGFUSE_*` settings; never wired up).
 * [ ] Check response times on dev from the server's timing logs (`step <node>: <ms> ms`, `chat total`); browser times out at 60 s. Buttons already skip the guardrail's model check.
 * [ ] Merge `dev` → `main`, set `OPENROUTER_API_KEY` in production, reseed production.
 * [ ] Staff pilot (also provides data for the BKT refit).
