@@ -142,6 +142,25 @@ def log_config_summary() -> None:
         _is_set(settings.CONVEX_URL),
     )
 
+    # The models and speed settings actually in use (env vars override the
+    # defaults above, e.g. on Railway), so a deploy log shows what runs.
+    if settings.OPENROUTER_ENABLED:
+        log.info(
+            "llm — agent=%s check=%s provider_sort=%s require_parameters=%s "
+            "reasoning(agent/check)=%s/%s max_tokens(agent/check)=%s/%s",
+            settings.OPENROUTER_MODEL or "(empty!)",
+            settings.OPENROUTER_CHECK_MODEL or settings.OPENROUTER_MODEL or "(empty!)",
+            settings.OPENROUTER_PROVIDER_SORT or "openrouter-default",
+            settings.OPENROUTER_REQUIRE_PARAMETERS,
+            settings.OPENROUTER_AGENT_REASONING or "model-default",
+            settings.OPENROUTER_CHECK_REASONING or "model-default",
+            settings.OPENROUTER_AGENT_MAX_TOKENS or "none",
+            settings.OPENROUTER_CHECK_MAX_TOKENS or "none",
+        )
+        if not settings.OPENROUTER_MODEL:
+            log.warning("config — OPENROUTER_MODEL is set but empty; every LLM call will fail. "
+                        "Remove the variable to use the default.")
+
     if not _is_set(settings.OPENAI_API_KEY):
         log.warning("config — OPENAI_API_KEY is not set; LLM calls will fail")
     if settings.OPENROUTER_ENABLED and not _is_set(settings.OPENROUTER_API_KEY):

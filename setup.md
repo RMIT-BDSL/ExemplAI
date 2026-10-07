@@ -55,11 +55,26 @@ The agent uses **OpenRouter** as its LLM route by default. To set it up:
 2. In `server/.env`, set:
    ```
    OPENROUTER_API_KEY=<your key>
-   OPENROUTER_MODEL=            # optional; defaults to deepseek/deepseek-v4-flash-0731
    OPENROUTER_ENABLED=True      # enabled by default
    ```
 3. Restart the server.
 
-The agent routes the OpenRouter model through every node. Set
-`OPENROUTER_ENABLED=False` (and supply `OPENAI_API_KEY`) to fall back to OpenAI —
-no code changes needed.
+Two model roles, with defaults in `server/config.py` chosen by the evaluation in
+`docs/evaluation/2026-10-07-model-latency.md`:
+
+| Role | Used by | Default model | Reasoning |
+|---|---|---|---|
+| agent | example and control agents | `deepseek/deepseek-v4.1-flash` (`OPENROUTER_MODEL`) | `low` (`OPENROUTER_AGENT_REASONING`) |
+| check | input guardrail, Dean | `openai/gpt-oss-120b` (`OPENROUTER_CHECK_MODEL`) | `low` (`OPENROUTER_CHECK_REASONING`) |
+
+Requests go to the fastest providers first (`OPENROUTER_PROVIDER_SORT=throughput`)
+that support structured output (`OPENROUTER_REQUIRE_PARAMETERS=True`).
+
+**Leave these variables unset to use the defaults**, locally and on Railway. A
+variable set in the environment overrides the default, and an empty one
+(`OPENROUTER_MODEL=`) is an empty model name, not the default. At startup the
+server logs the settings in use (`llm — agent=… check=…`), so a deploy log shows
+what actually runs.
+
+Set `OPENROUTER_ENABLED=False` (and supply `OPENAI_API_KEY`) to fall back to
+OpenAI — no code changes needed.
