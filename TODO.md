@@ -1,6 +1,6 @@
 # High-level List of Stuff To Do
 
-_Last updated 2026-10-05. Status: testing on dev; everyone is routed to the experimental group on purpose._
+_Last updated 2026-10-07. Status: testing on dev; each student gets a random, fixed group (#97), with a testing toggle where `CONDITION_TOGGLE=on`._
 
 ## Course and design (decided)
 
@@ -68,7 +68,14 @@ _Last updated 2026-10-05. Status: testing on dev; everyone is routed to the expe
 * [ ] Security: restrict CORS to our origins. (Students can no longer forge lesson results: `recordCodeExecution` needs the backend secret.)
 * [ ] Check whether the tutor graph still needs the Postgres checkpointer (`DATABASE_URL`, `server/ai/checkpointer.py`): each request rebuilds the conversation, group, mastery and example allowance from Convex, so the checkpoint may only duplicate Convex. Confirm no state field carries over between turns, then switch to an in-memory checkpointer and drop Postgres.
 * [ ] Remove unused services: Supabase (`server/repository.py`, `SUPABASE_*` settings; nothing imports it) and Langfuse (`LANGFUSE_*` settings; never wired up).
-* [ ] Check response times on dev from the server's timing logs (`step <node>: <ms> ms`, `chat total`); browser times out at 60 s. Buttons already skip the guardrail's model check.
+* [x] Check response times (#107, [testing outcome](docs/evaluation/2026-10-07-model-latency.md)): Get help went from 38 s median / 79 s p95 to 3.5 s / 8.8 s with V4.1 Flash writing and gpt-oss-120b checking. Confirmed faster on dev.
+
+**Follow-ups from the model evaluation:**
+* [ ] Production timings from the Railway logs (`step <node>: <ms> ms`, `chat total`), to report next to the laptop measurements in the paper; the startup line `llm — agent=… check=…` confirms the models in use.
+* [ ] Blind review pack for an instructor: examples from each setup side by side, setup names hidden (the evaluation's quality checks were automatic only).
+* [ ] About 6% of examples use Python from a later week (e.g. `if` in a week 2–3 example), whatever the model: tighten the example prompts' `<allowed_python>` instructions or have the Dean check it. Some lessons need it themselves (#104).
+* [ ] The gpt-oss-120b guardrail let 1 of 4 prompt injections through ("Ignore all previous instructions…"); the tutor still refused. Add the pattern to the guardrail's rule check.
+* [ ] Railway puts the server to sleep when idle; the first request after a quiet period waits for a cold start (not in the measured times). Turn sleep off for pilot sessions if it shows.
 * [ ] Merge `dev` → `main`, set `OPENROUTER_API_KEY` in production, reseed production.
 * [ ] Staff pilot (also provides data for the BKT refit).
 
