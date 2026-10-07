@@ -20,10 +20,15 @@
 
 ExemplAI is a research platform from the **Blockchain Datascience Lab @ RMIT** that studies how
 Example-Based Learning (EBL) affects novice programmers. Students solve Python exercises in a
-split-pane workspace: an editor on the left, an AI tutor on the right. The tutor tracks each
-student's mastery with **Bayesian Knowledge Tracing (BKT)** and picks the kind of example that
-fits their current level, keeping cognitive load low for beginners and challenge high for
-advanced students.
+three-column workspace: the exercise, a code editor and an AI tutor side by side. The tutor
+tracks each student's mastery with **Bayesian Knowledge Tracing (BKT)** and picks the kind of
+example that fits their current level, keeping cognitive load low for beginners and challenge
+high for advanced students.
+
+![The ExemplAI workspace: the exercise (singlePigLatin) with its example and Submit history on the left, the code editor in the middle, and the tutor's Complete example for an analogous problem on the right](UX-mockup-2.jpg)
+
+*After a Submit that doesn't pass, **Get help** shows a worked example for an analogous problem,
+never the exercise's own solution.*
 
 ## Features
 
@@ -37,6 +42,7 @@ advanced students.
 
 - **A/B experiment support.** Students in the control group get a plain, generic chat tutor instead.
 - **Dean validation gate.** A separate agent checks every tutor response before the student sees it, blocking direct answers and solution leaks.
+- **Fast replies.** A Get help reply takes about 3.5 s (median; 8.8 s at the 95th percentile): DeepSeek V4.1 Flash writes the examples and gpt-oss-120b runs the guardrail and Dean, via OpenRouter. See the [testing outcome](docs/evaluation/2026-10-07-model-latency.md).
 - **Sandboxed code execution.** Student code runs in Judge0 against visible and hidden test cases.
 - **Curriculum.** A 12-week Python course built from the CSEDM 2019 dataset, plus original exercises.
 
