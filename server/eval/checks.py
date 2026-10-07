@@ -141,8 +141,13 @@ def structure_problems(text: str, mode: str, response_type: str | None) -> list[
     return problems
 
 
+# Lines too generic to count as quoting the student (any example may contain them).
+_GENERIC_LINE = re.compile(r"^(return\s+(True|False|None)|else:|pass|break|continue|try:|finally:)$")
+
+
 def quotes_student_code(student_code: str, text: str) -> bool:
-    lines = [l.strip() for l in student_code.splitlines() if len(l.strip()) >= 12 and not l.strip().startswith("def ")]
+    lines = [l.strip() for l in student_code.splitlines()
+             if len(l.strip()) >= 12 and not l.strip().startswith("def ") and not _GENERIC_LINE.match(l.strip())]
     return any(l in (text or "") for l in lines)
 
 

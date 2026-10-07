@@ -7,6 +7,7 @@ OpenRouter setups and scores every reply automatically:
     uv run --with pandas python -m eval.run speed             # time per reply, all setups
     uv run --with pandas python -m eval.run quality           # broader scenarios
     uv run --with pandas python -m eval.run dean              # Dean on planted good/bad drafts
+    uv run --with pandas python -m eval.session --students 20 # a simulated class session (eval/session.py)
     uv run --with pandas python -m eval.report                # tables from eval/out/
 
 Setups live in eval/configs.py (model, provider order, reasoning effort per
