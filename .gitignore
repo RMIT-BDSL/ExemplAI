@@ -14,3 +14,6 @@ CLAUDE.md
 # moon
 .moon/cache
 .moon/docker
+
+# model evaluation output (server/eval)
+server/eval/out/

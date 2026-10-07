@@ -1,19 +1,56 @@
-"""Chat with DeepSeek V4 Flash via OpenRouter (OpenAI-compatible) as llm.
+"""Chat models via OpenRouter (OpenAI-compatible): DeepSeek V4.1 Flash writes the
+replies and gpt-oss-120b checks them, by default.
 
-Accessed through ai.llm.get_llm(). Stays inert — no key is read and no model is
-bound until the selector activates it (see ai/llm/__init__.py, driven by
-settings.OPENROUTER_ENABLED).
+Accessed through ai.llm (``llm`` / ``check_llm``). Stays inert — no key is read
+and no model is bound until the selector activates it (see ai/llm/__init__.py,
+driven by settings.OPENROUTER_ENABLED).
+
+Two roles with their own speed settings (config.py, OPENROUTER_*):
+- "agent": the example and control agents, which write the tutor's replies;
+- "check": the input guardrail and the Dean, which only classify.
 """
+
+from typing import Literal
 
 from langchain_openai import ChatOpenAI
 
 from config import settings
 
+Role = Literal["agent", "check"]
 
-def build_llm() -> ChatOpenAI:
-    """Build the OpenRouter-backed chat model from central settings."""
+
+def request_options(role: Role) -> dict:
+    """OpenRouter request fields for a role: provider routing, reasoning effort
+    and output cap. Sent as extra body fields; max_tokens goes here because
+    ChatOpenAI would send it as max_completion_tokens."""
+    s = settings
+    agent = role == "agent"
+    effort = s.OPENROUTER_AGENT_REASONING if agent else s.OPENROUTER_CHECK_REASONING
+    max_tokens = s.OPENROUTER_AGENT_MAX_TOKENS if agent else s.OPENROUTER_CHECK_MAX_TOKENS
+
+    options: dict = {}
+    provider: dict = {}
+    if s.OPENROUTER_PROVIDER_SORT:
+        provider["sort"] = s.OPENROUTER_PROVIDER_SORT
+    if s.OPENROUTER_REQUIRE_PARAMETERS:
+        provider["require_parameters"] = True
+    if provider:
+        options["provider"] = provider
+    if effort:
+        options["reasoning"] = {"effort": effort}
+    if max_tokens > 0:
+        options["max_tokens"] = max_tokens
+    return options
+
+
+def build_llm(role: Role = "agent") -> ChatOpenAI:
+    """Build the OpenRouter-backed chat model for a role from central settings."""
+    model = settings.OPENROUTER_MODEL
+    if role == "check" and settings.OPENROUTER_CHECK_MODEL:
+        model = settings.OPENROUTER_CHECK_MODEL
     return ChatOpenAI(
-        model=settings.OPENROUTER_MODEL,
+        model=model,
         api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
         base_url="https://openrouter.ai/api/v1",
+        extra_body=request_options(role) or None,
     )
