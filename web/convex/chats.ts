@@ -217,6 +217,23 @@ export const addSystemMessage = authenticatedMutation({
   },
 });
 
+/**
+ * The mastery that picks a lesson's example type (Complete / Faded / Erroneous):
+ * the student's mastery of the topic when they started the lesson, i.e. before
+ * its first, graded Submit (stored as lessonProgress.mastery_before). Help only
+ * comes after a failed Submit, and that failure is BKT's biggest single drop; on
+ * live mastery a student who passed every earlier lesson was pushed back to
+ * Faded at the very moment they asked. The failure still counts from the next
+ * lesson on. Before any Submit on the lesson, live mastery is that same value.
+ * Every topic starts at the BKT prior (0.15) for everyone. Decided 2026-10-07.
+ */
+export function routingMastery(
+  current: number | null,
+  progress: { mastery_before?: number } | null,
+): number | null {
+  return progress?.mastery_before ?? current;
+}
+
 // Most recent turns the tutor sees; older ones stay stored but aren't sent to the LLM.
 const CHAT_HISTORY_LIMIT = 20;
 
@@ -268,7 +285,8 @@ export const getChatContext = authenticatedQuery({
       original_problem: lesson.problem_description || "",
       // unit_test_assertions: unitTestAssertions,
       current_knowledge_component: lesson.knowledge_component || "",
-      bkt_prob_mastery: probMastery,
+      // The mastery the example type is chosen from (routingMastery).
+      bkt_prob_mastery: routingMastery(probMastery, progress),
       // Oldest first, ending with the student's latest message.
       messages: recent.reverse().map((m) => ({ sender: m.sender, content: m.content })),
       failed_submits: progress?.failed_submits ?? 0,

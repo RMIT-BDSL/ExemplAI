@@ -143,11 +143,13 @@ def test_faded_blank_sizing_judging_and_stuck_escape():
     assert "tried the same blank twice without success" in faded
 
 
-def test_erroneous_asks_only_for_a_fix_with_one_topic_bug():
+def test_erroneous_asks_to_find_one_topic_bug_without_giving_it_away():
     _, _, erroneous = _prompts()
     assert "EXACTLY ONE bug" in erroneous and "<topic_bugs>" in erroneous
-    assert "Can you fix it?" in erroneous and "runnable" in erroneous
-    assert "expected output" in erroneous and "actual (wrong) output" in erroneous
+    assert "This code has a bug. Can you find it?" in erroneous and "runnable" in erroneous
+    # The failing input and outputs gave the bug away (eval, 2026-10-07).
+    assert "Do not say which input fails" in erroneous
+    assert "This code fails on" not in erroneous
     assert "After two unsuccessful tries: tell them which line" in erroneous
 
 
