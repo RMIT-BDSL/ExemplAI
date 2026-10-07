@@ -48,10 +48,36 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr = SecretStr("")
     # OpenRouter (OpenAI-compatible) replaces OpenAI as the agent's LLM route.
     # Supply OPENROUTER_API_KEY to use it; OPENROUTER_MODEL defaults to DeepSeek
-    # V4 Flash 0731.
+    # V4.1 Flash (newer, faster and cheaper than V4 Flash 0731).
     OPENROUTER_API_KEY: SecretStr = SecretStr("")
-    OPENROUTER_MODEL: str = "deepseek/deepseek-v4-flash-0731"
+    OPENROUTER_MODEL: str = "deepseek/deepseek-v4.1-flash"
     OPENROUTER_ENABLED: bool = True
+    # Speed settings (ai/llm/openrouter.py). Two roles: "agent" writes the
+    # tutor's replies (example / control agents); "check" is the input
+    # guardrail and the Dean, which only classify.
+    # Provider order: "throughput", "latency" or "price"; "" = OpenRouter's
+    # default, which favours the cheapest (often slowest) providers.
+    OPENROUTER_PROVIDER_SORT: str = "throughput"
+    # Only route to providers that support every parameter sent (the checks
+    # need structured output).
+    OPENROUTER_REQUIRE_PARAMETERS: bool = True
+    # Reasoning effort: none, minimal, low, medium, high, xhigh or max; "" =
+    # the model's default (which may think at length before answering). The
+    # checks include the Dean's answer-leak judgement, so "none" there should
+    # only follow a quality check.
+    OPENROUTER_AGENT_REASONING: str = "low"
+    OPENROUTER_CHECK_REASONING: str = "low"
+    # Output token caps, reasoning included; 0 = no cap. Only a guard against
+    # runaway output: set far above anything measured (server/eval, 2026-10-07:
+    # agents <= 3,600, checks <= 1,800 tokens), because a cap that cuts off the
+    # reasoning loses the whole reply (a 1,000-token check cap did, 3% of replies).
+    OPENROUTER_AGENT_MAX_TOKENS: int = 16384
+    OPENROUTER_CHECK_MAX_TOKENS: int = 8192
+    # A different model for the checks ("" = OPENROUTER_MODEL). gpt-oss-120b
+    # (on fast providers, reasoning low) judged 60 planted drafts as accurately
+    # as the best models, in ~0.6 s against ~1.9 s for V4.1 Flash (server/eval,
+    # 2026-10-07).
+    OPENROUTER_CHECK_MODEL: str = "openai/gpt-oss-120b"
 
     # ── Chat features ──────────────────────────────────────────────────
     # Runnable code blocks in the chat (web: VITE_RUNNABLE_CHAT_CODE). Off: the
@@ -115,6 +141,25 @@ def log_config_summary() -> None:
         _is_set(settings.LANGFUSE_PUBLIC_KEY) and _is_set(settings.LANGFUSE_SECRET_KEY),
         _is_set(settings.CONVEX_URL),
     )
+
+    # The models and speed settings actually in use (env vars override the
+    # defaults above, e.g. on Railway), so a deploy log shows what runs.
+    if settings.OPENROUTER_ENABLED:
+        log.info(
+            "llm — agent=%s check=%s provider_sort=%s require_parameters=%s "
+            "reasoning(agent/check)=%s/%s max_tokens(agent/check)=%s/%s",
+            settings.OPENROUTER_MODEL or "(empty!)",
+            settings.OPENROUTER_CHECK_MODEL or settings.OPENROUTER_MODEL or "(empty!)",
+            settings.OPENROUTER_PROVIDER_SORT or "openrouter-default",
+            settings.OPENROUTER_REQUIRE_PARAMETERS,
+            settings.OPENROUTER_AGENT_REASONING or "model-default",
+            settings.OPENROUTER_CHECK_REASONING or "model-default",
+            settings.OPENROUTER_AGENT_MAX_TOKENS or "none",
+            settings.OPENROUTER_CHECK_MAX_TOKENS or "none",
+        )
+        if not settings.OPENROUTER_MODEL:
+            log.warning("config — OPENROUTER_MODEL is set but empty; every LLM call will fail. "
+                        "Remove the variable to use the default.")
 
     if not _is_set(settings.OPENAI_API_KEY):
         log.warning("config — OPENAI_API_KEY is not set; LLM calls will fail")

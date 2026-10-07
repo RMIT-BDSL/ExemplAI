@@ -34,7 +34,7 @@ from typing import Literal, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from ai.llm import llm
+from ai.llm import check_llm as llm  # the "check" role's speed settings
 from ai.nodes.context import NEW_EXAMPLE, recent_history
 
 FALLBACK = "fallback"  # delivered_response_type when the draft is replaced
@@ -56,9 +56,12 @@ def _with_rejected(state: TutorGraphState, draft: str, reason: str, excerpt: Opt
         entry["excerpt"] = excerpt
     return [*(state.get("rejected_drafts") or []), entry]
 
+# Sent when the Dean rejects both drafts. A fallback doesn't use up an example
+# (only delivered new examples count, web/convex/examples.ts), so the student
+# can simply press the button or ask again.
 _FALLBACK = (
-    "Let me reconsider how to help with this. Could you tell me what part of the "
-    "problem you're stuck on?"
+    "Our example-generating agent is misbehaving: its last attempt didn't pass our "
+    "checks, so I didn't show it to you. Please try again."
 )
 
 

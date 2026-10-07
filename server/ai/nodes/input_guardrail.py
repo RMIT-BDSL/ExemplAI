@@ -39,7 +39,7 @@ from typing import Literal, Optional, cast
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from ai.llm import llm
+from ai.llm import check_llm as llm  # the "check" role's speed settings
 from ai.state import TutorGraphState
 
 log = logging.getLogger("rich")
