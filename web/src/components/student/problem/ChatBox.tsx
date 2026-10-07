@@ -218,8 +218,6 @@ export function MessageFeed({
 // 3. Chat input
 export interface ChatInputProps {
   onSendMessage: (text: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
   /** The ✦ example button beside the input (Get help / New example), once help has started. */
   example?: {
     label: string;
@@ -234,18 +232,13 @@ export interface ChatInputProps {
 const BAR =
   "flex h-[52px] flex-shrink-0 items-center border-t border-rule-strong bg-surface-void px-6";
 
-export function ChatInput({
-  onSendMessage,
-  disabled,
-  placeholder,
-  example,
-}: ChatInputProps) {
+export function ChatInput({ onSendMessage, example }: ChatInputProps) {
   const [text, setText] = React.useState("");
   const hintId = React.useId();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || disabled) return;
+    if (!text.trim()) return;
     onSendMessage(text.trim());
     setText("");
   };
@@ -257,7 +250,7 @@ export function ChatInput({
     }
   };
 
-  const canSend = !!text.trim() && !disabled;
+  const canSend = !!text.trim();
   return (
     <form onSubmit={handleSubmit} className={cn(BAR, "gap-2")}>
       <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-[2px] border border-rule bg-surface-raised pl-3 pr-1 focus-within:border-brass">
@@ -265,11 +258,10 @@ export function ChatInput({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder ?? "Ask the tutor…"}
+          placeholder="Ask the tutor…"
           aria-label="Message the tutor"
-          disabled={disabled}
           rows={1}
-          className="h-full min-w-0 flex-1 resize-none select-text bg-transparent py-[7px] font-sans text-xs leading-[16px] text-ink outline-none placeholder:text-ink-label disabled:cursor-not-allowed"
+          className="h-full min-w-0 flex-1 resize-none select-text bg-transparent py-[7px] font-sans text-xs leading-[16px] text-ink outline-none placeholder:text-ink-label"
         />
         <button
           type="submit"
@@ -315,6 +307,22 @@ export function ChatInput({
         </>
       )}
     </form>
+
+  );
+
+}
+
+/** Where the input would be while the chat is locked: says why, and what to do next. */
+export function LockedBar({ text }: { text: string }) {
+  return (
+    <div className={BAR}>
+      <p
+        className="min-w-0 flex-1 font-sans text-xs leading-4 text-ink-label"
+        role="status"
+      >
+        {text}
+      </p>
+    </div>
   );
 }
 
@@ -703,21 +711,14 @@ export default function ChatBox({
           onClick={() => requestExample(exampleTrigger)}
           disabled={!exampleEnabled}
         />
-      ) : (
+      ) : helpStarted && !isTyping && !!chatId && !!convexLessonId ? (
+        // The input only exists while the student can actually type; locked or
+        // waiting on the tutor, there is no bar. Why the Example button is
+        // unavailable is its tooltip.
         <ChatInput
           onSendMessage={(text) => handleSendMessage(text)}
-          disabled={!helpStarted || isTyping || !chatId || !convexLessonId}
-          placeholder={
-            isTyping
-              ? "The tutor is replying…"
-              : !helpStarted
-                ? (exampleStatus ?? "The chat opens after you press Get help")
-                : // Once help starts the bar always reads as a chat; why the
-                  // Example button is unavailable is its tooltip.
-                  undefined
-          }
           example={
-            helpStarted && !isTyping && !isControl
+            !isControl
               ? {
                   label:
                     exampleTrigger === "get_help" ? "Get help" : "New example",
@@ -728,7 +729,14 @@ export default function ChatBox({
               : undefined
           }
         />
-      )}
+      ) : !helpStarted && !isTyping ? (
+        // Locked for any reason other than the tutor replying (no failed Submit
+        // yet, or this lesson's examples are used up): say why in the bar.
+        <LockedBar
+          text={exampleStatus ?? "The chat opens after you press Get help"}
+        />
+      ) : null}
     </div>
+
   );
 }
