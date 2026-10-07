@@ -163,7 +163,7 @@ export default defineSchema({
     .index("by_lesson", ["lessonId"]),
   // Time on task: one row per lesson opening. The browser sends a heartbeat
   // every 30 s with the time the student was active (tab visible, input in the
-  // last minute); the server caps each credit by the wall time since the last
+  // last 3 minutes); the server caps each credit by the wall time since the last
   // heartbeat (convex/visits.ts). The opening time is _creationTime.
   lessonVisits: defineTable({
     userId: v.id("users"),
