@@ -84,5 +84,8 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 * [ ] Lessons for Files (week 9, none yet), Basic Libraries (week 11, 2 lessons) and Advanced Topics (week 12, none yet); weeks 1–8 have ≥ 7 each.
 * [ ] Keep solution code and hidden tests out of the browser; grade with the lesson from Convex (closes the fake-solution loophole).
 * [x] Add 1–2 hidden edge-case tests per lesson (#96).
+* [ ] Pre/post tests in the app: assessment lessons with the tutor turned off, graded and logged like any Submit (RQ1).
+* [ ] Study code per student, entered on the external survey forms (Paas, NASA-TLX, demographics), so form answers can be linked to the trace.
+* [ ] Research export: de-identified, analysis-ready tables (one row per attempt, message, visit and student; ProgSnap2-style) from Convex, reusing the eval analysis code.
 * [ ] "Check my fix" button that runs a student's Erroneous fix against tests.
 * [ ] Decide: should mastery unlock the next topic? Trial scope (which weeks)? Fold week 1 into week 2?
