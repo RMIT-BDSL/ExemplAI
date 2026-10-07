@@ -1,5 +1,6 @@
 import { zid } from "convex-helpers/server/zod4";
 import { zAdminMutation, zAuthenticatedQuery } from "./functions";
+import { inLessonOrder } from "./lessonAccess";
 import { lessonFields } from "./validators";
 
 // ---------------------------------------------------------------------------
@@ -10,14 +11,16 @@ import { lessonFields } from "./validators";
 // course and carries a week, detail, and test cases.
 // ---------------------------------------------------------------------------
 
-/** Lists every lesson in a course, ordered by week (ascending). */
+/** Lists every lesson in a course, by week and then position. */
 export const listLessonsByCourse = zAuthenticatedQuery({
   args: { course: zid("course") },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("questions")
-      .withIndex("by_course_week", (q) => q.eq("course", args.course))
-      .collect();
+    return inLessonOrder(
+      await ctx.db
+        .query("questions")
+        .withIndex("by_course_week", (q) => q.eq("course", args.course))
+        .collect(),
+    );
   },
 });
 
@@ -52,6 +55,7 @@ export const updateLesson = zAdminMutation({
     id: zid("questions"),
     course: lessonFields.course.optional(),
     week: lessonFields.week.optional(),
+    position: lessonFields.position,
     problem_name: lessonFields.problem_name.optional(),
     problem_description: lessonFields.problem_description.optional(),
     knowledge_component: lessonFields.knowledge_component.optional(),

@@ -3,6 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { ensureCondition } from "./experiment";
+import { canOpenLesson } from "./lessonAccess";
 import { rejectedDraft } from "./schema";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
 
@@ -61,6 +62,9 @@ export const startChat = authenticatedMutation({
   handler: async (ctx, args) => {
     if (!ctx.customUser) throw new Error("User not found");
     const userId = ctx.customUser._id;
+    if (!(await canOpenLesson(ctx, ctx.customUser, args.lessonId, ctx.isAdmin))) {
+      throw new Error("This lesson is locked until the one before it is completed");
+    }
     const condition = await ensureCondition(ctx, ctx.customUser);
     const latest = await ctx.db
       .query("chats")

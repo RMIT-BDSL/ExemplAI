@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, Lock, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 interface LessonIndexProps {
@@ -8,6 +8,8 @@ interface LessonIndexProps {
   questions: any[] | undefined;
   activeQuestionId: string | undefined;
   lessonProgress: any[] | undefined;
+  /** Lessons the student may open; null/undefined = all (convex/lessonAccess.ts). */
+  unlocked: Set<string> | null | undefined;
   /** Side effects to run when a lesson is picked (navigation is handled by the Link). */
   onSelectLesson: (id: string) => void;
 }
@@ -23,6 +25,7 @@ export default function LessonIndex({
   questions,
   activeQuestionId,
   lessonProgress,
+  unlocked,
   onSelectLesson,
 }: LessonIndexProps) {
   const currentRef = useRef<HTMLAnchorElement | null>(null);
@@ -99,6 +102,19 @@ export default function LessonIndex({
                   );
                   const isDone = progress?.status === "completed";
                   const isStarted = progress?.status === "in-progress";
+                  if (unlocked && !unlocked.has(q._id) && !isCurrent) {
+                    return (
+                      <li
+                        key={q._id}
+                        title="Unlocks when you pass the exercise before it, or after 3 submits on it that don't pass"
+                        className="flex items-baseline gap-1.5 py-1.5 font-serif text-[13px] text-ink-label"
+                      >
+                        <span>{q.problem_name}</span>
+                        <span className="min-w-4 flex-1 self-center border-b border-dotted border-rule" />
+                        <Lock className="size-3 self-center" aria-label="Locked" />
+                      </li>
+                    );
+                  }
                   return (
                     <li key={q._id}>
                       <Link

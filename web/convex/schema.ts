@@ -32,6 +32,9 @@ export default defineSchema({
   // fields existed remain valid. `knowledge_component` keys BKT mastery.
   questions: defineTable({
     week: v.number(),
+    // Order within the week (1, 2, ...); students unlock lessons in this order
+    // (convex/lessonAccess.ts). Set by the seed's LESSON_ORDER.
+    position: v.optional(v.number()),
     course: v.id("course"),
     problem_name: v.string(),
     problem_description: v.string(),

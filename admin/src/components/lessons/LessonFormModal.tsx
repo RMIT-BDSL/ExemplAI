@@ -10,6 +10,7 @@ export interface Lesson {
   _creationTime: number;
   course: Id<'course'>;
   week: number;
+  position?: number;
   problem_name: string;
   problem_description: string;
   knowledge_component: string;
@@ -33,6 +34,8 @@ interface Props {
 const LessonFormModal: Component<Props> = (props) => {
   // Lesson Form Signals
   const [week, setWeek] = createSignal(props.editingLesson?.week ?? props.initialWeek);
+  // Order within the week; students unlock lessons in this order.
+  const [position, setPosition] = createSignal<number | undefined>(props.editingLesson?.position);
   const [problemName, setProblemName] = createSignal(props.editingLesson?.problem_name ?? '');
   const [problemDescription, setProblemDescription] = createSignal(props.editingLesson?.problem_description ?? '');
   const [knowledgeComponent, setKnowledgeComponent] = createSignal(
@@ -81,6 +84,7 @@ const LessonFormModal: Component<Props> = (props) => {
     const payload = {
       course: props.courseId,
       week: week(),
+      position: position(),
       problem_name: problemName().trim(),
       problem_description: problemDescription().trim(),
       knowledge_component: knowledgeComponent().trim(),
@@ -148,7 +152,25 @@ const LessonFormModal: Component<Props> = (props) => {
                 </For>
               </select>
             </div>
-            <div class="sm:col-span-3">
+            <div>
+              <label for="lesson_position" class="block font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                Position in week
+              </label>
+              <input
+                id="lesson_position"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="e.g. 3"
+                value={position() ?? ''}
+                onInput={(e) => {
+                  const n = Number.parseInt(e.currentTarget.value, 10);
+                  setPosition(Number.isFinite(n) && n >= 1 ? n : undefined);
+                }}
+                class="mt-2 w-full rounded-md border border-white/10 bg-[#151d2d] px-3 py-2.5 text-sm text-white outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/35 transition"
+              />
+            </div>
+            <div class="sm:col-span-2">
               <label for="lesson_name" class="block font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
                 Lesson / Problem Name
               </label>
