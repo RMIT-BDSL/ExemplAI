@@ -36,41 +36,6 @@ const csedmProblems: SeedProblem[] = [
   },
   {
     tag: "csedm",
-    problem_name: "intToFloat",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `intToFloat(x)` that takes an integer `x` and returns it as a floating point number.",
-    starter_code: "def intToFloat(x):\n    pass",
-    solution_code: "def intToFloat(x):\n    return float(x)",
-    testCases: [
-      { input: "5", expectedOutput: "5.0" },
-      { input: "-10", expectedOutput: "-10.0" },
-      { input: "0", expectedOutput: "0.0" },
-      { input: "42", expectedOutput: "42.0", hidden: true },
-      { input: "-1", expectedOutput: "-1.0", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm",
-    problem_name: "doubleX",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `doubleX(x)` that returns the given number multiplied by 2.",
-    starter_code: "def doubleX(x):\n    pass",
-    solution_code: "def doubleX(x):\n    return x * 2",
-    testCases: [
-      { input: "5", expectedOutput: "10" },
-      { input: "0", expectedOutput: "0" },
-      { input: "-3", expectedOutput: "-6" },
-      { input: "2.5", expectedOutput: "5.0" },
-      { input: "-0.5", expectedOutput: "-1.0", hidden: true },
-      { input: "1000", expectedOutput: "2000", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm",
     problem_name: "raiseToPower",
     week: 2,
     knowledge_component: "variables_expressions",
@@ -88,40 +53,22 @@ const csedmProblems: SeedProblem[] = [
     ],
   },
   {
-    // CORRECTED: Original uses math.degrees; seed used 3.14159. Rounding kept so floating-point output is stable.
+    // REVISED 2026-10-07: pi = 3.14159 like its twin; math isn't taught until week 11.
     tag: "csedm",
     problem_name: "convertToDegrees",
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `convertToDegrees(radians)` that converts an angle from radians to degrees and returns it rounded to 2 decimal places. Use `math.pi` or `math.degrees` (remember to `import math`).",
+    problem_description: "Write a function `convertToDegrees(radians)` that converts an angle from radians to degrees and returns it rounded to 2 decimal places. Assume pi = 3.14159 (formula: degrees = radians * 180 / pi).",
     starter_code: "def convertToDegrees(radians):\n    pass",
-    solution_code: "import math\n\ndef convertToDegrees(radians):\n    return round(math.degrees(radians), 2)",
+    solution_code: "def convertToDegrees(radians):\n    return round(radians * 180 / 3.14159, 2)",
     testCases: [
-      { input: "3.141592653589793", expectedOutput: "180.0" },
+      { input: "3.14159", expectedOutput: "180.0" },
       { input: "1", expectedOutput: "57.3" },
       { input: "0", expectedOutput: "0.0" },
       { input: "1.5708", expectedOutput: "90.0" },
       { input: "-1", expectedOutput: "-57.3", hidden: true },
-      { input: "6.283185307179586", expectedOutput: "360.0", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm",
-    problem_name: "leftoverCandy",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `leftoverCandy(candies, children)` that calculates how many candies are left over if they are divided equally among the children.",
-    starter_code: "def leftoverCandy(candies, children):\n    pass",
-    solution_code: "def leftoverCandy(candies, children):\n    return candies % children",
-    testCases: [
-      { input: "10 3", expectedOutput: "1" },
-      { input: "15 5", expectedOutput: "0" },
-      { input: "2 5", expectedOutput: "2" },
-      { input: "100 7", expectedOutput: "2" },
-      { input: "23 4", expectedOutput: "3", hidden: true },
-      { input: "0 4", expectedOutput: "0", hidden: true },
+      { input: "6.28318", expectedOutput: "360.0", hidden: true },
     ],
   },
   {
@@ -388,41 +335,6 @@ const csedm2Problems: SeedProblem[] = [
   },
   {
     tag: "csedm2",
-    problem_name: "floatToInt",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `floatToInt(x)` that takes a floating point number `x` and returns it as an integer.",
-    starter_code: "def floatToInt(x):\n    pass",
-    solution_code: "def floatToInt(x):\n    return int(x)",
-    testCases: [
-      { input: "5.9", expectedOutput: "5" },
-      { input: "-10.1", expectedOutput: "-10" },
-      { input: "0.0", expectedOutput: "0" },
-      { input: "-0.9", expectedOutput: "0", hidden: true },
-      { input: "7.99", expectedOutput: "7", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm2",
-    problem_name: "tripleX",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `tripleX(x)` that returns the given number multiplied by 3.",
-    starter_code: "def tripleX(x):\n    pass",
-    solution_code: "def tripleX(x):\n    return x * 3",
-    testCases: [
-      { input: "5", expectedOutput: "15" },
-      { input: "0", expectedOutput: "0" },
-      { input: "-3", expectedOutput: "-9" },
-      { input: "2.5", expectedOutput: "7.5" },
-      { input: "-1.5", expectedOutput: "-4.5", hidden: true },
-      { input: "100", expectedOutput: "300", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm2",
     problem_name: "sumOfSquares",
     week: 2,
     knowledge_component: "variables_expressions",
@@ -457,23 +369,6 @@ const csedm2Problems: SeedProblem[] = [
   },
   {
     tag: "csedm2",
-    problem_name: "remainingSlices",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `remainingSlices(slices, people)` that calculates how many pizza slices are left over if they are divided equally among the people.",
-    starter_code: "def remainingSlices(slices, people):\n    pass",
-    solution_code: "def remainingSlices(slices, people):\n    return slices % people",
-    testCases: [
-      { input: "10 3", expectedOutput: "1" },
-      { input: "15 5", expectedOutput: "0" },
-      { input: "8 5", expectedOutput: "3" },
-      { input: "3 8", expectedOutput: "3", hidden: true },
-      { input: "0 4", expectedOutput: "0", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm2",
     problem_name: "howManyVans",
     week: 2,
     knowledge_component: "variables_expressions",
@@ -488,23 +383,6 @@ const csedm2Problems: SeedProblem[] = [
       { input: "1", expectedOutput: "1" },
       { input: "8", expectedOutput: "1", hidden: true },
       { input: "9", expectedOutput: "2", hidden: true },
-    ],
-  },
-  {
-    tag: "csedm2",
-    problem_name: "removeLastDigit",
-    week: 2,
-    knowledge_component: "variables_expressions",
-    topic: "Variables and Expressions",
-    problem_description: "Write a function `removeLastDigit(n)` that returns the integer `n` with its rightmost digit removed. Assume `n` is non-negative.",
-    starter_code: "def removeLastDigit(n):\n    pass",
-    solution_code: "def removeLastDigit(n):\n    return n // 10",
-    testCases: [
-      { input: "1234", expectedOutput: "123" },
-      { input: "9", expectedOutput: "0" },
-      { input: "100", expectedOutput: "10" },
-      { input: "0", expectedOutput: "0", hidden: true },
-      { input: "10", expectedOutput: "1", hidden: true },
     ],
   },
   {
@@ -622,7 +500,8 @@ const csedm2Problems: SeedProblem[] = [
     topic: "String and Formatting",
     problem_description: "Write a function `isVowel(c)` that takes a single character string and returns True if it is a lowercase vowel ('a', 'e', 'i', 'o', 'u'), and False otherwise.",
     starter_code: "def isVowel(c):\n    pass",
-    solution_code: "def isVowel(c):\n    return c in ['a', 'e', 'i', 'o', 'u']",
+    // REVISED 2026-10-07: membership in a string, not a list (lists are week 8).
+    solution_code: "def isVowel(c):\n    return c in 'aeiou'",
     testCases: [
       { input: "[\"a\"]", expectedOutput: "True" },
       { input: "[\"e\"]", expectedOutput: "True" },
@@ -987,6 +866,99 @@ const csedmUnseededProblems: SeedProblem[] = [
 // student reach mastery (0.95) even after one fail at any point. Each lesson
 // uses only Python features taught up to its week (server/ai/syllabus.py).
 const exemplaiProblems: SeedProblem[] = [
+  // Week 2 (added 2026-10-07): harder multi-step lessons, in twin pairs, replacing
+  // the one-line doubleX/tripleX, intToFloat/floatToInt, leftoverCandy/
+  // remainingSlices and removeLastDigit, which nearly everyone passed first try.
+  {
+    tag: "exemplai",
+    problem_name: "averageAsInt",
+    week: 2,
+    knowledge_component: "variables_expressions",
+    topic: "Variables and Expressions",
+    problem_description: "Write a function `averageAsInt(a, b, c)` that returns the average of the three numbers as a whole number, using `int()` so the decimal part is dropped (not rounded). For example, averageAsInt(1, 2, 2) returns 1, because the average is 1.67.",
+    starter_code: "def averageAsInt(a, b, c):\n    pass",
+    solution_code: "def averageAsInt(a, b, c):\n    return int((a + b + c) / 3)",
+    testCases: [
+      { input: "1, 2, 3", expectedOutput: "2" },
+      { input: "1, 2, 2", expectedOutput: "1" },
+      { input: "10, 10, 11", expectedOutput: "10" },
+      { input: "0, 0, 0", expectedOutput: "0" },
+      { input: "100, 50, 1", expectedOutput: "50", hidden: true },
+      { input: "-1, -2, -2", expectedOutput: "-1", hidden: true },
+    ],
+  },
+  {
+    tag: "exemplai",
+    problem_name: "percentAsInt",
+    week: 2,
+    knowledge_component: "variables_expressions",
+    topic: "Variables and Expressions",
+    problem_description: "Write a function `percentAsInt(part, whole)` that returns what percentage `part` is of `whole`, as a whole number with the decimal part dropped (use `int()`). Multiply `part` by 100 before dividing. For example, percentAsInt(1, 3) returns 33.",
+    starter_code: "def percentAsInt(part, whole):\n    pass",
+    solution_code: "def percentAsInt(part, whole):\n    return int(part * 100 / whole)",
+    testCases: [
+      { input: "1, 3", expectedOutput: "33" },
+      { input: "1, 2", expectedOutput: "50" },
+      { input: "2, 3", expectedOutput: "66" },
+      { input: "5, 5", expectedOutput: "100" },
+      { input: "0, 7", expectedOutput: "0", hidden: true },
+      { input: "7, 8", expectedOutput: "87", hidden: true },
+    ],
+  },
+  {
+    tag: "exemplai",
+    problem_name: "removeKthDigit",
+    week: 2,
+    knowledge_component: "variables_expressions",
+    topic: "Variables and Expressions",
+    problem_description: "Write a function `removeKthDigit(x, k)` that takes a non-negative integer `x` and a positive integer `k`, and returns `x` with its k-th digit from the right removed, where k = 1 is the ones digit. For example, removeKthDigit(12345, 2) returns 1235. If `x` has fewer than `k` digits, return `x` unchanged. Use //, % and **.",
+    starter_code: "def removeKthDigit(x, k):\n    pass",
+    solution_code: "def removeKthDigit(x, k):\n    return (x // 10 ** k) * 10 ** (k - 1) + x % 10 ** (k - 1)",
+    testCases: [
+      { input: "12345, 2", expectedOutput: "1235" },
+      { input: "12345, 1", expectedOutput: "1234" },
+      { input: "12345, 5", expectedOutput: "2345" },
+      { input: "507, 2", expectedOutput: "57" },
+      { input: "9, 3", expectedOutput: "9", hidden: true },
+      { input: "1000, 1", expectedOutput: "100", hidden: true },
+    ],
+  },
+  {
+    tag: "exemplai",
+    problem_name: "makeChange",
+    week: 2,
+    knowledge_component: "variables_expressions",
+    topic: "Variables and Expressions",
+    problem_description: "Write a function `makeChange(cents)` that returns the fewest coins needed to make `cents` using 25, 10, 5 and 1 cent coins. For example, makeChange(68) returns 7 (two 25s, one 10, one 5 and three 1s). Work out each coin in turn with // and %.",
+    starter_code: "def makeChange(cents):\n    pass",
+    solution_code: "def makeChange(cents):\n    quarters = cents // 25\n    cents = cents % 25\n    dimes = cents // 10\n    cents = cents % 10\n    nickels = cents // 5\n    pennies = cents % 5\n    return quarters + dimes + nickels + pennies",
+    testCases: [
+      { input: "68", expectedOutput: "7" },
+      { input: "0", expectedOutput: "0" },
+      { input: "25", expectedOutput: "1" },
+      { input: "99", expectedOutput: "9" },
+      { input: "30", expectedOutput: "2", hidden: true },
+      { input: "4", expectedOutput: "4", hidden: true },
+    ],
+  },
+  {
+    tag: "exemplai",
+    problem_name: "countNotes",
+    week: 2,
+    knowledge_component: "variables_expressions",
+    topic: "Variables and Expressions",
+    problem_description: "Write a function `countNotes(amount)` that returns the fewest banknotes needed to pay `amount` dollars using $20, $10, $5 and $1 notes. For example, countNotes(37) returns 5 (one 20, one 10, one 5 and two 1s). Work out each note in turn with // and %.",
+    starter_code: "def countNotes(amount):\n    pass",
+    solution_code: "def countNotes(amount):\n    twenties = amount // 20\n    amount = amount % 20\n    tens = amount // 10\n    amount = amount % 10\n    fives = amount // 5\n    ones = amount % 5\n    return twenties + tens + fives + ones",
+    testCases: [
+      { input: "37", expectedOutput: "5" },
+      { input: "0", expectedOutput: "0" },
+      { input: "20", expectedOutput: "1" },
+      { input: "99", expectedOutput: "10" },
+      { input: "15", expectedOutput: "2", hidden: true },
+      { input: "3", expectedOutput: "3", hidden: true },
+    ],
+  },
   {
     tag: "exemplai",
     problem_name: "favouriteNumber",
@@ -1342,9 +1314,70 @@ const exemplaiProblems: SeedProblem[] = [
   },
 ];
 
+// Order of the lessons within each week (position 1, 2, ...). Students unlock
+// them one at a time in this order (convex/lessonAccess.ts). Drafted from
+// programming progression, to be validated by the course instructors:
+// - simpler ideas before ones that build on them (e.g. slicing before reversing,
+//   one comparison before compound conditions, single loops before nested ones);
+// - twins (a CSEDM problem and its analogous csedm2 / ExemplAI partner) sit next
+//   to each other, so help on the first can be measured on the second.
+// Every seeded lesson must appear here exactly once (seedQuestions checks).
+export const LESSON_ORDER: Record<number, string[]> = {
+  1: ["helloWorld", "helloClass", "courseCode", "favouriteNumber", "approximatePi", "printTwoLines", "printBox"],
+  2: [
+    "convertToDegrees", "convertToRadians",
+    "raiseToPower", "sumOfSquares",
+    "averageAsInt", "percentAsInt",
+    "howManyEggCartons", "howManyVans",
+    "kthDigit", "removeKthDigit",
+    "nearestBusStop", "nearestWaterFountain",
+    "makeChange", "countNotes",
+  ],
+  3: [
+    "backwardsCombine", "reverseAndCapitalize",
+    "firstThree", "firstAndLast",
+    "isVowel", "isPunctuation",
+    "secretCode", "singlePigLatin",
+    "isSubstring",
+  ],
+  4: [
+    "overNineThousand", "boilingPoint",
+    "canVote", "canDrinkAlcohol",
+    "hasTwoDigits", "hasThreeDigits",
+    "isOddNegativeInt", "isEvenPositiveInt",
+    "carefulSquareRoot", "castString", "stockChange",
+  ],
+  5: ["oneToN", "nToOne", "sumMultiples", "countVowels", "anyLowercase", "sumOfDigits", "isPrime"],
+  6: ["factorial", "fibonacci", "gcd", "digitalRoot", "countSameParityPairs", "firstRepeatedChar", "countPrimesUpTo"],
+  7: ["greet", "power", "safeDivide", "compoundInterest", "countEvens", "maxOfThree", "describeTemperature"],
+  8: ["middleElement", "secondHalf", "uniqueCount", "reduceToPositive", "minMax", "listOfLists", "mostCommonWord"],
+  11: ["findLog", "findRoot"],
+};
+
+const ALL_PROBLEMS = [...csedmProblems, ...csedm2Problems, ...csedmUnseededProblems, ...exemplaiProblems];
+
+/** Each lesson's position within its week, checked against the seed. */
+export function lessonPositions(problems: SeedProblem[] = ALL_PROBLEMS) {
+  const positions = new Map<string, number>();
+  for (const [week, names] of Object.entries(LESSON_ORDER)) {
+    names.forEach((name, i) => {
+      if (positions.has(name)) throw new Error(`${name} appears twice in LESSON_ORDER`);
+      const problem = problems.find((p) => p.problem_name === name);
+      if (!problem) throw new Error(`LESSON_ORDER lists ${name}, which isn't seeded`);
+      if (problem.week !== Number(week)) throw new Error(`${name} is week ${problem.week}, listed under ${week}`);
+      positions.set(name, i + 1);
+    });
+  }
+  const missing = problems.filter((p) => !positions.has(p.problem_name)).map((p) => p.problem_name);
+  if (missing.length) throw new Error(`No position in LESSON_ORDER for: ${missing.join(", ")}`);
+  return positions;
+}
+
 // Upsert: creates the course if needed, inserts lessons missing from it and
 // overwrites the content of existing ones (matched by problem_name) so their
-// ids, and any progress pointing at them, are kept.
+// ids, and any progress pointing at them, are kept. Lessons in the course that
+// are no longer seeded are reported (notInSeed), not deleted: clear them with
+// resetCourseData before seeding when that's intended.
 export const seedQuestions = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -1362,16 +1395,13 @@ export const seedQuestions = internalMutation({
       .collect();
     const byName = new Map(current.map((q) => [q.problem_name, q._id]));
 
+    const positions = lessonPositions();
     let insertedCount = 0;
     let updatedCount = 0;
-    for (const problem of [
-      ...csedmProblems,
-      ...csedm2Problems,
-      ...csedmUnseededProblems,
-      ...exemplaiProblems,
-    ]) {
+    for (const problem of ALL_PROBLEMS) {
       const fields = {
         week: problem.week,
+        position: positions.get(problem.problem_name),
         course: courseId,
         problem_name: problem.problem_name,
         problem_description: problem.problem_description,
@@ -1392,12 +1422,14 @@ export const seedQuestions = internalMutation({
       }
     }
 
-    return { success: true, courseId, insertedCount, updatedCount };
+    const seeded = new Set(ALL_PROBLEMS.map((p) => p.problem_name));
+    const notInSeed = current.map((q) => q.problem_name).filter((name) => !seeded.has(name));
+    return { success: true, courseId, insertedCount, updatedCount, notInSeed };
   },
 });
 
 // Wipes every course, lesson and per-lesson activity row (progress, BKT
-// mastery, chats, messages). Users, profiles, invitation codes, auth tables
+// mastery, chats, messages, Run/Submit log, lesson visits). Users, profiles, invitation codes, auth tables
 // and release notes are kept; users only lose their last_opened_lesson
 // pointer, which would otherwise dangle.
 export const resetCourseData = internalMutation({
@@ -1409,6 +1441,8 @@ export const resetCourseData = internalMutation({
       "chats",
       "lessonProgress",
       "bktMastery",
+      "codeAttempts",
+      "lessonVisits",
       "questions",
       "course",
     ] as const) {

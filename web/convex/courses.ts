@@ -13,6 +13,7 @@ import {
   adminQuery 
 } from "./functions";
 import { attemptOutcome } from "./schema";
+import { canOpenLesson, inLessonOrder } from "./lessonAccess";
 import { courseFields } from "./validators";
 
 // Caps on a codeAttempts row (the server applies the same ones).
@@ -88,13 +89,11 @@ export const deleteCourse = zAdminMutation({
   },
 });
 
-// Return the last 100 tasks in a given task list.
+// Every lesson, by week and then position (the order students unlock them in).
 export const getAllCourses = authenticatedQuery({
   args: {},
   handler: async (ctx, _args) => {
-    // take is not 100 - all
-    const questions = await ctx.db.query("questions").withIndex("by_week").order("asc").take(100);
-    return questions;
+    return inLessonOrder(await ctx.db.query("questions").collect());
   },
 });
 
@@ -221,6 +220,10 @@ export const setLessonStatus = authenticatedMutation({
     if (existing?.status === "completed") {
       return { success: true };
     }
+    // A progress row keeps a lesson open, so a locked one can't get one here.
+    if (!existing && !(await canOpenLesson(ctx, user, args.lessonId, ctx.isAdmin))) {
+      throw new Error("This lesson is locked until the one before it is completed");
+    }
 
     const now = Date.now();
     if (existing) {
@@ -293,6 +296,11 @@ export const recordCodeExecution = authenticatedMutation({
         q.eq("userId", user._id).eq("lessonId", args.lessonId),
       )
       .unique();
+
+    // A progress row keeps a lesson open, so a locked one can't get one here.
+    if (!existing && !(await canOpenLesson(ctx, user, args.lessonId, ctx.isAdmin))) {
+      throw new Error("This lesson is locked until the one before it is completed");
+    }
 
     const alreadyCompleted = existing?.status === "completed";
     const nextStatus =

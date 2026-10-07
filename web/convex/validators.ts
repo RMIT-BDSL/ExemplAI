@@ -34,6 +34,8 @@ export const lessonFields = {
   course: zid("course"),
   // Lessons are bucketed into a fixed 12-week program.
   week: z.number().int().min(1).max(12),
+  // Order within the week (1, 2, ...); lessons unlock in this order.
+  position: z.number().int().min(1).optional(),
   problem_name: z.string().min(1, "Problem name is required"),
   problem_description: z.string(),
   // Skill key for BKT, one per syllabus topic (e.g. "loops", "branching").

@@ -1,9 +1,9 @@
 import { usePostHog } from "@posthog/react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { RotateCcw, X } from "lucide-react";
+import { Lock, RotateCcw, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "#/lib/utils.ts";
@@ -164,6 +164,14 @@ function Course() {
       tokenIdentifier ? {} : "skip"
     )
   );
+  // Lessons unlock one at a time within each week (convex/lessonAccess.ts);
+  // null = no locks (admins, or LESSON_LOCKS=off for testing).
+  const { data: unlocked } = useQuery(
+    convexQuery(
+      api.lessonAccess.getUnlockedLessons,
+      tokenIdentifier ? {} : "skip"
+    )
+  );
 
   // Python is the only course language; the editor font size is fixed.
   const language = "python";
@@ -219,6 +227,15 @@ function Course() {
   const failedSubmits: number = activeProgress?.failed_submits ?? 0;
 
   const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
+  const unlockedSet = unlocked ? new Set<string>(unlocked) : unlocked;
+  // Locked until the lesson before it (same week) is completed. The panel
+  // clears itself as soon as that pass is recorded, e.g. after "Next lesson".
+  const isLocked = !!activeQuestionId && !!unlockedSet && !unlockedSet.has(activeQuestionId);
+  const canOpen = unlocked !== undefined && !isLocked;
+  const previousQuestion =
+    currentIndex > 0 && questions && questions[currentIndex - 1]?.week === activeQuestion?.week
+      ? questions[currentIndex - 1]
+      : null;
   const nextQuestion =
     currentIndex !== -1 && questions && currentIndex < questions.length - 1
       ? questions[currentIndex + 1]
@@ -243,7 +260,7 @@ function Course() {
   }, [activeQuestionId]);
 
   useEffect(() => {
-    if (tokenIdentifier && activeQuestionId) {
+    if (tokenIdentifier && activeQuestionId && canOpen) {
       setLessonStatus({
         lessonId: activeQuestionId,
         status: "in-progress",
@@ -251,10 +268,10 @@ function Course() {
       // Coming back from another lesson resets a used-up example allowance.
       openLesson({ lessonId: activeQuestionId }).catch(() => {});
     }
-  }, [tokenIdentifier, activeQuestionId, setLessonStatus, openLesson]);
+  }, [tokenIdentifier, activeQuestionId, canOpen, setLessonStatus, openLesson]);
 
   // Time on task: a visit per lesson opening, with active time (research log).
-  useLessonVisit(tokenIdentifier ? activeQuestionId : undefined);
+  useLessonVisit(tokenIdentifier && canOpen ? activeQuestionId : undefined);
 
   useEffect(() => {
     if (activeQuestion && problemId) {
@@ -596,8 +613,42 @@ function Course() {
             questions={questions}
             activeQuestionId={activeQuestionId}
             lessonProgress={lessonProgress}
+            unlocked={unlockedSet}
             onSelectLesson={handleSelectLesson}
           />
+
+          {isLocked ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+              <Lock className="size-5 text-ink-label" aria-hidden="true" />
+              <p className="font-serif text-[1.1rem] text-ink">
+                {activeQuestion?.problem_name} is locked
+              </p>
+              <p className="max-w-sm text-[12px] leading-relaxed text-ink-label">
+                {previousQuestion ? (
+                  <>
+                    It unlocks when you complete{" "}
+                    <Link
+                      to="/course"
+                      search={{ problemId: previousQuestion._id }}
+                      className="text-brass underline underline-offset-2"
+                    >
+                      {previousQuestion.problem_name}
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "It unlocks when you complete the exercise before it."
+                )}
+              </p>
+              <Link
+                to="/"
+                className="mt-2 text-[10px] uppercase tracking-[0.15em] text-ink-label hover:text-brass transition-colors"
+              >
+                Back to syllabus
+              </Link>
+            </div>
+          ) : (
+          <>
 
           {/* Description (Problem Panel) */}
           <LessonExposition
@@ -737,6 +788,8 @@ function Course() {
               </Suspense>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* Solid Reset Confirmation Modal */}

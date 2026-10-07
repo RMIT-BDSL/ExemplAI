@@ -17,6 +17,7 @@ import type * as functions from "../functions.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
+import type * as lessonAccess from "../lessonAccess.js";
 import type * as lessons from "../lessons.js";
 import type * as releaseNotes from "../releaseNotes.js";
 import type * as seed from "../seed.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   init: typeof init;
   invitationCodes: typeof invitationCodes;
+  lessonAccess: typeof lessonAccess;
   lessons: typeof lessons;
   releaseNotes: typeof releaseNotes;
   seed: typeof seed;
