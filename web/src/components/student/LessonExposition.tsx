@@ -4,6 +4,8 @@ import Problem, { type ProblemData, type SubmitRecord } from "./problem/Problem"
 interface LessonExpositionProps {
   mappedProblem: ProblemData;
   submitHistory?: SubmitRecord[];
+  /** The next lesson, when it's open before this one is passed (after 3 failed Submits). */
+  moveOn?: { name: string; onClick: () => void };
   /** Width set by dragging the column boundary (wide screens); default CSS width when unset. */
   width?: number;
   panelRef?: React.Ref<HTMLDivElement>;
@@ -13,6 +15,7 @@ interface LessonExpositionProps {
 export default function LessonExposition({
   mappedProblem,
   submitHistory,
+  moveOn,
   width,
   panelRef,
 }: LessonExpositionProps) {
@@ -28,7 +31,7 @@ export default function LessonExposition({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto editorial-scroll">
         <div className="editorial-prose px-6 py-6">
-          <Problem problem={mappedProblem} submitHistory={submitHistory} />
+          <Problem problem={mappedProblem} submitHistory={submitHistory} moveOn={moveOn} />
         </div>
       </div>
     </div>

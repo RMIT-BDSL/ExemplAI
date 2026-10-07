@@ -138,9 +138,10 @@ export default function CourseList() {
           Python Programming
         </h1>
         <p className="mt-2 font-serif text-[0.95rem] leading-[1.75] text-ink-prose">
-          Work through the exercises in order: each one unlocks when you
-          complete the one before it. Each opens in the workspace, where you
-          can run your code, submit it, and ask the tutor for help.
+          Work through the exercises in order: each one unlocks when you pass
+          the one before it (or after three tries at it, so you're never
+          stuck). Each opens in the workspace, where you can run your code,
+          submit it, and ask the tutor for help.
         </p>
       </header>
 
@@ -294,7 +295,7 @@ function LessonRow({ id, name, description, week, status, locked }: ShortProblem
     return (
       <li
         className="flex items-center gap-4 border-b border-rule py-3"
-        title="Unlocks when you complete the exercise before it"
+        title="Unlocks when you pass the exercise before it, or after 3 submits on it that don't pass"
       >
         <div className="flex min-w-0 flex-1 items-baseline gap-2">
           <span className="truncate font-serif text-[15px] text-ink-label">{name}</span>

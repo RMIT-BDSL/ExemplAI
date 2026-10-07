@@ -242,6 +242,17 @@ function Course() {
       : null;
 
   const navigate = useNavigate();
+  // After 3 failed Submits the next lesson opens anyway (convex/lessonAccess.ts):
+  // say so, so a stuck student knows they can move on and come back later.
+  const moveOn =
+    unlockedSet &&
+    nextQuestion &&
+    nextQuestion.week === activeQuestion?.week &&
+    unlockedSet.has(nextQuestion._id) &&
+    activeProgress?.status !== "completed"
+      ? nextQuestion
+      : null;
+
   const handleNextLesson = nextQuestion
     ? () => {
         navigate({
@@ -626,7 +637,7 @@ function Course() {
               <p className="max-w-sm text-[12px] leading-relaxed text-ink-label">
                 {previousQuestion ? (
                   <>
-                    It unlocks when you complete{" "}
+                    It unlocks when you pass{" "}
                     <Link
                       to="/course"
                       search={{ problemId: previousQuestion._id }}
@@ -634,10 +645,10 @@ function Course() {
                     >
                       {previousQuestion.problem_name}
                     </Link>
-                    .
+                    , or after three tries at it.
                   </>
                 ) : (
-                  "It unlocks when you complete the exercise before it."
+                  "It unlocks when you pass the exercise before it, or after three tries at it."
                 )}
               </p>
               <Link
@@ -654,6 +665,7 @@ function Course() {
           <LessonExposition
             mappedProblem={mappedProblem}
             submitHistory={lessonSubmits}
+            moveOn={moveOn && handleNextLesson ? { name: moveOn.problem_name, onClick: handleNextLesson } : undefined}
             panelRef={descRef}
             width={isWide && descWidth ? descWidth : undefined}
           />

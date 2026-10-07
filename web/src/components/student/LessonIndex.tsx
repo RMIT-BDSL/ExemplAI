@@ -106,7 +106,7 @@ export default function LessonIndex({
                     return (
                       <li
                         key={q._id}
-                        title="Unlocks when you complete the exercise before it"
+                        title="Unlocks when you pass the exercise before it, or after 3 submits on it that don't pass"
                         className="flex items-baseline gap-1.5 py-1.5 font-serif text-[13px] text-ink-label"
                       >
                         <span>{q.problem_name}</span>

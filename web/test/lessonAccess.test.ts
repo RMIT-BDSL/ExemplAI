@@ -36,6 +36,14 @@ describe("unlocks", () => {
     expect(unlockedLessons(lessons, [done("w1a")]).has("w1c" as Id<"questions">)).toBe(false);
   });
 
+  it("opens the next lesson after 3 failed Submits, so nobody is stuck", () => {
+    const tried = (n: number) => ({ lessonId: "w1a" as Id<"questions">, status: "in-progress" as const, failed_submits: n });
+    expect(unlockedLessons(lessons, [tried(2)]).has("w1b" as Id<"questions">)).toBe(false);
+    expect(unlockedLessons(lessons, [tried(3)]).has("w1b" as Id<"questions">)).toBe(true);
+    // ...but only the next one: w1c still needs w1b passed or tried 3 times
+    expect(unlockedLessons(lessons, [tried(3)]).has("w1c" as Id<"questions">)).toBe(false);
+  });
+
   it("doesn't open the next lesson for a lesson that's only started", () => {
     expect(unlockedLessons(lessons, [started("w1a")]).has("w1b" as Id<"questions">)).toBe(false);
   });

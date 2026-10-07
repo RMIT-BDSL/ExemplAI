@@ -74,9 +74,11 @@ export interface ProblemProps {
   problem: ProblemData;
   /** This session's Submits on the lesson, newest first. */
   submitHistory?: SubmitRecord[];
+  /** The next lesson, open before this one is passed (after 3 failed Submits). */
+  moveOn?: { name: string; onClick: () => void };
 }
 
-export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
+export default function Problem({ problem, submitHistory = [], moveOn }: ProblemProps) {
   const lastSubmit = submitHistory[0];
   const { example } = problem;
   const exampleResult = lastSubmit?.example;
@@ -156,6 +158,23 @@ export default function Problem({ problem, submitHistory = [] }: ProblemProps) {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {moveOn && (
+        <div className="mt-4 border-t border-rule pt-4 font-sans text-xs text-ink-label">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]">Stuck?</div>
+          <div className="text-ink-prose">
+            After three tries, the next exercise is open. You can move on and come back to this one
+            later.
+          </div>
+          <button
+            type="button"
+            onClick={moveOn.onClick}
+            className="mt-2.5 rounded-[2px] border border-rule-strong px-2.5 py-1 text-[11px] font-semibold text-brass hover:bg-surface-raised transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
+          >
+            Go to {moveOn.name} →
+          </button>
         </div>
       )}
     </article>
