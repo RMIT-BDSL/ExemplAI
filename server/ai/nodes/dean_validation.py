@@ -17,8 +17,11 @@ Checks depend on the condition and the draft's ``response_type``:
   or a bug;
 - experimental, no examples remaining: EXAMPLE_LIMIT (a typed request can't
   get a new example past the allowance, even if the draft is mislabelled).
-A typed request whose draft is labelled new_example with none remaining is
-answered with the limit message without calling the LLM. A first rejection
+Typed messages stay with the example already given: new examples come only
+from the Get help and New example buttons. A typed message whose draft is
+labelled new_example goes back to the agent once without calling the LLM
+(TYPED_NEW_EXAMPLE); if the retry is labelled new_example again it is judged
+and delivered as a follow-up (an occasional slip is accepted). A first rejection
 sends the draft back to the same agent once, with the reason in
 <dean_feedback> (route_after_dean); a second rejection sends the fallback.
 Sets ``delivered_response_type``, ``dean_decision`` and ``dean_reason``, and
@@ -35,7 +38,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from ai.llm import check_llm as llm  # the "check" role's speed settings
-from ai.nodes.context import NEW_EXAMPLE, recent_history
+from ai.syllabus import close_analog_allowed
+from ai.nodes.context import FOLLOW_UP, NEW_EXAMPLE, current_example, has_prior_tutor_reply, recent_history
 
 FALLBACK = "fallback"  # delivered_response_type when the draft is replaced
 
@@ -84,6 +88,11 @@ an example or answer already given).
 - examples_remaining: new examples the student may still receive in this \
 lesson ("not limited" if unknown).
 - conversation_history: recent turns in this lesson, oldest first.
+- current_example and student_messages_since_example (experimental \
+follow-ups only): the example now being discussed, in full, and how many \
+messages the student has sent since it (their latest included).
+- close_analog_allowed: true for week-2 formula exercises, where a close \
+analog is allowed.
 - original_problem, student_code, draft_response.
 </inputs>
 
@@ -102,12 +111,16 @@ different values or a different scenario, even if its structure matches the \
 solution; explaining syntax or concepts; saying what kind of error the student \
 has or roughly where it is; a hint. In short exercises (one or two lines) a \
 parallel example will look like the solution; that is expected. Approve it \
-unless it uses the problem's own values.
+unless it uses the problem's own values. When close_analog_allowed is true \
+(week-2 formula exercises), the same kind of calculation in a different setting \
+is expected: reject only if it uses the exercise's own values or names, or its \
+exact formula.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \
-reply discusses it), the deliberate blanks in a Faded example (placeholder \
-lines such as `____` or `# ???: ...` make that code incomplete on purpose), \
+reply discusses it), the deliberate blanks in a Faded example (a placeholder \
+such as `____`, for a whole line or part of one, makes that code incomplete on \
+purpose), \
 and the student's own code quoted back to them.
 </always_check>
 
@@ -127,10 +140,13 @@ Only when experiment_condition is "experimental" and response_type is \
    - Faded: fills in a blank, or reveals the completed code, before the \
 student has correctly completed it themselves. Exception: after the student has \
 tried the same blank twice without success, the tutor may show how to work it \
-out, including its answer.
+out, including its answer. When student_messages_since_example is 2 or more \
+and the student's earlier messages were tries at the blank (or said they were \
+stuck), showing the answer is allowed.
    - Erroneous: reveals where the bug is or how to fix it before the student \
 has fixed it. Exception: after two unsuccessful tries the tutor may name the \
-line with the bug, and after a third it may show the fix.
+line with the bug, and after a third it may show the fix (count the tries with \
+student_messages_since_example).
    - Complete: leaves the parallel example and starts working on \
 <original_problem> itself.
 Answering the student's question, re-explaining, giving feedback on their \
@@ -141,7 +157,10 @@ attempt, or giving a narrower hint is allowed.
 Only when experiment_condition is "experimental" and examples_remaining is 0:
 6. EXAMPLE_LIMIT: the draft presents a new worked example (a new parallel \
 problem with its own code), whatever its response_type says. Discussing, \
-re-explaining or hinting about examples already given is allowed.
+re-explaining or hinting about examples already given is allowed, and so is \
+showing an earlier example's code again (completed, with its blanks filled in, \
+or fixed). Before rejecting, compare with current_example: code for the same \
+problem as current_example is not a new example.
 </example_limit>
 
 <control>
@@ -160,11 +179,26 @@ def _dean_input(state: TutorGraphState) -> str:
         f"<pedagogical_modality>{state.get('pedagogical_modality', '')}</pedagogical_modality>\n"
         f"<response_type>{state.get('response_type') or NEW_EXAMPLE}</response_type>\n"
         f"<examples_remaining>{_examples_remaining_text(state)}</examples_remaining>\n"
+        f"<close_analog_allowed>{str(close_analog_allowed(state.get('current_knowledge_component'))).lower()}</close_analog_allowed>\n"
         f"<conversation_history>\n{recent_history(state)}\n</conversation_history>\n"
-        f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
+        + _current_example_block(state)
+        + f"<original_problem>\n{state.get('original_problem', '')}\n</original_problem>\n"
         f"<student_code>\n{state.get('student_code', '')}\n</student_code>\n"
         f"<draft_response>\n{state.get('draft_response', '')}\n</draft_response>"
     )
+
+
+def _current_example_block(state: TutorGraphState) -> str:
+    """Experimental follow-ups: the example under discussion, untruncated, and the
+    student's messages since it, so the Dean can tell an example shown again from a
+    new one and count the tries before an answer may be shown."""
+    if state.get("experiment_condition") == "control" or state.get("response_type") == NEW_EXAMPLE:
+        return ""
+    example, since = current_example(state)
+    if not example:
+        return ""
+    return (f"<current_example>\n{example}\n</current_example>\n"
+            f"<student_messages_since_example>{since}</student_messages_since_example>\n")
 
 
 def _examples_remaining_text(state: TutorGraphState) -> str:
@@ -172,13 +206,22 @@ def _examples_remaining_text(state: TutorGraphState) -> str:
     return "not limited" if remaining is None else str(remaining)
 
 
-def _over_example_limit(state: TutorGraphState) -> bool:
-    """Experimental: a typed request answered with a new example when none remain."""
+TYPED_NEW_EXAMPLE = "TYPED_NEW_EXAMPLE"
+_TYPED_FEEDBACK = (
+    "The student typed a message, and a typed message never gets a new example. Answer about "
+    "the example already given; if they want another, tell them the New example button gives "
+    "one when it is available (each failed Submit earns one, up to three per lesson)."
+)
+
+
+def _typed_new_example(state: TutorGraphState) -> bool:
+    """Experimental: a typed message, after the tutor's first reply, answered with a draft
+    labelled as a new example."""
     return (
         state.get("experiment_condition") != "control"
         and state.get("trigger", "message") == "message"
         and state.get("response_type") == NEW_EXAMPLE
-        and state.get("examples_remaining") == 0
+        and has_prior_tutor_reply(state)
     )
 
 
@@ -187,16 +230,14 @@ def dean_validation_node(state: TutorGraphState) -> dict:
     draft = state.get("draft_response", "")
     limit_message = state.get("example_limit_message") or _FALLBACK
 
-    if _over_example_limit(state):
-        log.info("dean_validation_node → example limit reached")
-        return {
-            "messages": [{"role": "ai", "content": limit_message}],
-            "delivered_response_type": FALLBACK,
-            "dean_decision": LIMIT,
-            "dean_reason": "EXAMPLE_LIMIT",
-            "dean_retry": False,
-            "rejected_drafts": _with_rejected(state, draft, "EXAMPLE_LIMIT"),
-        }
+    if _typed_new_example(state):
+        if not state.get("dean_retried"):
+            log.info("dean_validation_node → typed message drafted a new example; back to the agent")
+            return {"dean_retry": True, "dean_retried": True, "dean_feedback": _TYPED_FEEDBACK,
+                    "dean_reason": TYPED_NEW_EXAMPLE,
+                    "rejected_drafts": _with_rejected(state, draft, TYPED_NEW_EXAMPLE)}
+        # Labelled a new example again: check and deliver it as a follow-up.
+        state = {**state, "response_type": FOLLOW_UP}
 
     dean = llm.with_structured_output(DeanValidationResult)
     result: DeanValidationResult = dean.invoke(

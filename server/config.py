@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # only follow a quality check.
     OPENROUTER_AGENT_REASONING: str = "low"
     OPENROUTER_CHECK_REASONING: str = "low"
+    # The Faded example agent's own effort ("" = OPENROUTER_AGENT_REASONING).
+    # Medium placed blanks no better than low (75% each, 102 examples per
+    # setting, server/eval, 2026-10-07), so it follows the agent's.
+    OPENROUTER_FADED_REASONING: str = ""
     # Output token caps, reasoning included; 0 = no cap. Only a guard against
     # runaway output: set far above anything measured (server/eval, 2026-10-07:
     # agents <= 3,600, checks <= 1,800 tokens), because a cap that cuts off the
@@ -147,12 +151,13 @@ def log_config_summary() -> None:
     if settings.OPENROUTER_ENABLED:
         log.info(
             "llm — agent=%s check=%s provider_sort=%s require_parameters=%s "
-            "reasoning(agent/check)=%s/%s max_tokens(agent/check)=%s/%s",
+            "reasoning(agent/faded/check)=%s/%s/%s max_tokens(agent/check)=%s/%s",
             settings.OPENROUTER_MODEL or "(empty!)",
             settings.OPENROUTER_CHECK_MODEL or settings.OPENROUTER_MODEL or "(empty!)",
             settings.OPENROUTER_PROVIDER_SORT or "openrouter-default",
             settings.OPENROUTER_REQUIRE_PARAMETERS,
             settings.OPENROUTER_AGENT_REASONING or "model-default",
+            settings.OPENROUTER_FADED_REASONING or settings.OPENROUTER_AGENT_REASONING or "model-default",
             settings.OPENROUTER_CHECK_REASONING or "model-default",
             settings.OPENROUTER_AGENT_MAX_TOKENS or "none",
             settings.OPENROUTER_CHECK_MAX_TOKENS or "none",

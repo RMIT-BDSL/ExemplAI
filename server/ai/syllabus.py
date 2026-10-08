@@ -60,6 +60,17 @@ def allowed_python(knowledge_component: Optional[str]) -> str:
     return "\n".join(lines)
 
 
+# Topics whose exercises are one-line formulas (week 2): an example can hardly
+# use the same step for a different purpose without becoming the answer, so a
+# close analog (the same kind of calculation in a different setting) is allowed
+# and the Dean accepts it (decided 2026-10-08).
+CLOSE_ANALOG_TOPICS = {"variables_expressions"}
+
+
+def close_analog_allowed(knowledge_component: Optional[str]) -> bool:
+    return knowledge_component in CLOSE_ANALOG_TOPICS
+
+
 # Logic bugs an Erroneous example may plant, per topic: the bug must exercise the
 # lesson's own topic (not just loops), and stay within the allowed features.
 TOPIC_BUGS: dict[str, str] = {

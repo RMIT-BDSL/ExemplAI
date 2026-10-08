@@ -16,7 +16,7 @@ import logging
 import re
 
 from ai.state import TutorGraphState
-from ai.syllabus import allowed_python, topic_bugs
+from ai.syllabus import allowed_python, close_analog_allowed, topic_bugs
 
 log = logging.getLogger("rich")
 
@@ -29,12 +29,14 @@ RESPONSE_TYPE_INSTRUCTION = """
 <response_type>
 Start your reply with exactly one tag on its own first line:
 [NEW_EXAMPLE] if this reply presents a new example: your first reply in the \
-conversation, or the student asked for a different example.
+conversation, or <student_action> says the student pressed a button for one.
 [FOLLOW_UP] if this reply responds to the student about an example you already \
 gave: answering a question, giving feedback on their attempt, or a narrower hint.
 The tag is removed before the student sees your reply.
-If <examples_remaining> is 0, do not present a new example, even if the student \
-asks for one: help them with the examples already given instead.
+A typed message never gets a new example, even if the student asks for one: help \
+them with the example already given, and tell them the New example button gives \
+another when it is available (each failed Submit earns one, up to three per \
+lesson).
 </response_type>"""
 
 # Chat-button triggers: always a new example (they spend the example allowance).
@@ -97,6 +99,20 @@ def topic_bug_context(state: TutorGraphState) -> str:
     return f"<topic_bugs>\n{bugs}\n</topic_bugs>\n" if bugs else ""
 
 
+CLOSE_ANALOG = """<close_analog>
+This topic's exercises are one-line formulas, so your example need not have a \
+different purpose: it may be the same kind of calculation in a different setting \
+(different quantities, values and names), as long as the student still has to \
+work out their own formula. Never use the exercise's values, names or exact formula.
+</close_analog>
+"""
+
+
+def close_analog_context(state: TutorGraphState) -> str:
+    """Faded agent, week-2 topics: a close analog is allowed (ai/syllabus.py)."""
+    return CLOSE_ANALOG if close_analog_allowed(state.get("current_knowledge_component")) else ""
+
+
 def conversation(state: TutorGraphState) -> list:
     """The lesson conversation for an agent's LLM call.
 
@@ -114,6 +130,35 @@ def _role(msg) -> str:
 def _content(msg) -> str:
     content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
     return str(content or "")
+
+
+# The chat turns the Get help and New example buttons send (web ChatBox.tsx
+# GET_HELP_MESSAGE, NEW_EXAMPLE_MESSAGE); each starts a new example's block.
+# Only a fallback: Convex marks those turns (state["button_turns"]).
+BUTTON_TURNS = ("Please provide me an example to help me with this", "Please show me a different example")
+
+
+def _is_button_turn(state: TutorGraphState, msgs: list, i: int) -> bool:
+    """A turn created by Get help / New example: from Convex's stored trigger when
+    it is sent (state["button_turns"]), else by the button's text."""
+    if state.get("button_turns") is not None:
+        return i in state["button_turns"]
+    return _role(msgs[i]) == "student" and _content(msgs[i]).strip() in BUTTON_TURNS
+
+
+def current_example(state: TutorGraphState) -> tuple[str, int]:
+    """The tutor reply to the latest button press (the example being discussed)
+    and how many student messages followed it, the latest included.
+    ("", 0) when no example has been given yet."""
+    msgs = list(state.get("messages", []))
+    for i in range(len(msgs) - 1, -1, -1):
+        if _is_button_turn(state, msgs, i):
+            for j in range(i + 1, len(msgs)):
+                if _role(msgs[j]) == "tutor":
+                    after = sum(1 for m in msgs[j + 1:] if _role(m) == "student" and _content(m))
+                    return _content(msgs[j]), after
+            return "", 0
+    return "", 0
 
 
 def has_prior_tutor_reply(state: TutorGraphState) -> bool:

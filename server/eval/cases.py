@@ -15,6 +15,7 @@ os.environ.setdefault("OPENAI_API_KEY", "unused")  # the OpenAI fallback client 
 from services import summarize_failures, wrap_code_with_runner  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "out"
+ATTEMPTS = Path(__file__).resolve().parent / "attempts.json"  # eval/attempts.py
 WEB = Path(__file__).resolve().parents[2] / "web"
 
 GET_HELP = "Please provide me an example to help me with this"   # ChatBox.tsx GET_HELP_MESSAGE
@@ -47,6 +48,11 @@ def load_lessons() -> dict[str, dict]:
         rows = [json.loads(line) for line in proc.stdout.splitlines() if line.startswith("{")]
         cache.write_text(json.dumps({r["problem_name"]: r for r in rows}))
     return json.loads(cache.read_text())
+
+
+def load_attempts() -> dict[str, dict]:
+    """Realistic wrong attempts by lesson ({code, mistake}); empty until eval/attempts.py writes them."""
+    return json.loads(ATTEMPTS.read_text()) if ATTEMPTS.exists() else {}
 
 
 def function_name(lesson: dict) -> str:
@@ -104,7 +110,8 @@ class Case:
     allowance: dict | None = None
 
 
-def base_case(lesson: dict, scenario: str, mastery: float, rep: int = 0) -> Case:
-    code = wrong_code(lesson)
+def base_case(lesson: dict, scenario: str, mastery: float, rep: int = 0, attempt: str | None = None) -> Case:
+    """attempt: the student's code (eval/attempts.json); by default they return the first example's answer."""
+    code = attempt or wrong_code(lesson)
     return Case(id=f"{lesson['problem_name']}:{scenario}:{mastery}:{rep}", lesson=lesson, scenario=scenario,
                 mastery=mastery, student_code=code, error_trace=summarize_failures(run_tests(lesson, code)))

@@ -1,7 +1,8 @@
 """LLM selector — OpenRouter is the agent's LLM route by default.
 
-Exposes ``llm`` (the agents that write replies) and ``check_llm`` (the input
-guardrail and the Dean), which differ only in their OpenRouter speed settings
+Exposes ``llm`` (the agents that write replies), ``faded_llm`` (the Faded
+example agent, which may reason more) and ``check_llm`` (the input guardrail
+and the Dean), which differ only in their OpenRouter speed settings
 (ai/llm/openrouter.py). Both are lazy proxies: the underlying chat model is
 only constructed on first use. That lets the server
 boot even before ``OPENROUTER_API_KEY`` is configured; once a key is present in
@@ -35,4 +36,5 @@ class _LazyLlm:
 
 
 llm = _LazyLlm("agent")
+faded_llm = _LazyLlm("faded")
 check_llm = _LazyLlm("check")

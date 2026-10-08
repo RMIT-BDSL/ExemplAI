@@ -1,0 +1,172 @@
+{
+ "averageAsInt": {
+  "code": "def averageAsInt(a, b, c):\n    return int(a + b + c / 3)",
+  "mistake": "In the step that works out the average, the sum a + b + c is not put in brackets before dividing by 3, so only c is divided by 3.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "backwardsCombine": {
+  "code": "def backwardsCombine(s1, s2):\n    return s1 + s2",
+  "mistake": "In the final step of building the result, the student concatenates the strings in the original order (s1 + s2) instead of putting s2 first.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "boilingPoint": {
+  "code": "def boilingPoint(temp_celsius):\n    if temp_celsius > 100:\n        return True\n    else:\n        return False",
+  "mistake": "The comparison uses > instead of >= in the condition, so the boundary value 100 returns False instead of True.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "canDrinkAlcohol": {
+  "code": "def canDrinkAlcohol(age, isDriving):\n    if age > 21 and not isDriving:\n        return True\n    return False",
+  "mistake": "In the age check of the condition, it uses > 21 instead of >= 21, so a person who is exactly 21 is wrongly refused.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "canVote": {
+  "code": "def canVote(age):\n    if age > 18:\n        return True\n    else:\n        return False",
+  "mistake": "In the comparison step, the student used > instead of >= so age 18 returns False instead of True.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "carefulSquareRoot": {
+  "code": "import math\n\ndef carefulSquareRoot(x):\n    if x <= 0:\n        return 'Error'\n    return math.sqrt(x)",
+  "mistake": "In the check for negative input, the condition uses <= instead of <, so x = 0 wrongly returns 'Error' instead of 0.0.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "castString": {
+  "code": "def castString(s, asNumber):\n    if asNumber:\n        return int(s)",
+  "mistake": "The case where asNumber is False is missing, so the function falls off the end and returns None instead of returning s unchanged.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "convertToDegrees": {
+  "code": "def convertToDegrees(radians):\n    pi = 3.14159\n    whole = int(radians)\n    degrees = whole * 180 / pi\n    return round(degrees, 2)",
+  "mistake": "In the step that applies the formula, it wraps radians in int() before multiplying, which throws away the fractional part of the angle.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "convertToRadians": {
+  "code": "def convertToRadians(degrees):\n    pi = 3.14159\n    radians = degrees * pi // 180\n    return round(radians, 4)",
+  "mistake": "In the division step of the formula (dividing by 180), it uses // (floor division) instead of /, so the decimal part of the result is thrown away.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "countNotes": {
+  "code": "def countNotes(amount):\n    twenties = amount // 20\n    amount = amount % 20\n    tens = amount // 10\n    amount = amount % 10\n    fives = amount // 5\n    ones = amount // 5\n    return twenties + tens + fives + ones",
+  "mistake": "In the last step, working out the $1 notes, it uses amount // 5 instead of amount % 5, so it counts the fives again instead of the leftover ones.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "firstAndLast": {
+  "code": "def firstAndLast(s):\n    first = s[0]\n    last = s[len(s) - 2]\n    return first + last",
+  "mistake": "In the step where the last character is picked, the index len(s) - 2 selects the second-to-last character instead of len(s) - 1.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "firstThree": {
+  "code": "def firstThree(s):\n    return s[1:4]",
+  "mistake": "In the slicing step, the student started the slice at index 1 instead of 0, thinking indexing begins at 1, so s[1:4] returns characters two to four instead of the first three.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "hasThreeDigits": {
+  "code": "def hasThreeDigits(n):\n    if n > 100 and n <= 999:\n        return True\n    else:\n        return False",
+  "mistake": "In the comparison step, the student wrote n > 100 instead of n >= 100, so the boundary value 100 wrongly returns False.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "hasTwoDigits": {
+  "code": "def hasTwoDigits(n):\n    if n > 10 and n <= 99:\n        return True\n    else:\n        return False",
+  "mistake": "In the condition that checks the lower boundary, it uses n > 10 instead of n >= 10, so 10 (which has two digits) wrongly returns False.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "howManyEggCartons": {
+  "code": "def howManyEggCartons(eggs):\n    cartons = eggs + 11 // 12\n    return cartons",
+  "mistake": "In the rounding-up formula step, the brackets around (eggs + 11) are missing, so 11 // 12 is evaluated first (giving 0) and the function just returns eggs.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "howManyVans": {
+  "code": "def howManyVans(people):\n    vans = people // 8 + 1\n    return vans",
+  "mistake": "In the rounding-up step, the student adds 1 to the floored quotient (people // 8 + 1), which overcounts when people is an exact multiple of 8 (e.g. 16 gives 3, and 0 gives 1).",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "isEvenPositiveInt": {
+  "code": "def isEvenPositiveInt(x):\n    if type(x) != int:\n        return False\n    return x >= 0 and x % 2 == 0",
+  "mistake": "In the final condition check, the student used x >= 0 instead of x > 0, so 0 is wrongly treated as positive and the function returns True for 0.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "isOddNegativeInt": {
+  "code": "def isOddNegativeInt(n):\n    if n < 0 or n % 2 != 0:\n        return True\n    else:\n        return False",
+  "mistake": "In the step that combines the two conditions (negative and odd), the student used `or` instead of `and`, so any negative number or any odd number returns True.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "isPunctuation": {
+  "code": "import string\n\ndef isPunctuation(c):\n    return string.punctuation in c",
+  "mistake": "In the final membership check, the operands of `in` are swapped, so it tests whether the whole punctuation string is inside the character instead of whether the character is inside `string.punctuation`.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "isSubstring": {
+  "code": "def isSubstring(s, t):\n    if type(s) != str or type(t) != str:\n        return False\n    return t.find(s) > 0",
+  "mistake": "In the final check, it tests t.find(s) > 0 instead of >= 0, so a match at index 0 (such as the empty string in \"abc\") is wrongly treated as not found.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "isVowel": {
+  "code": "def isVowel(c):\n    return c in 'AEIOU'\n",
+  "mistake": "In the membership check, it tests the character against the uppercase vowels 'AEIOU', so a lowercase vowel such as 'a' is not found.",
+  "model": "hand-written (week-3 Python)"
+ },
+ "kthDigit": {
+  "code": "def kthDigit(x, k):\n    shifted = x / 10 ** (k - 1)\n    return shifted % 10",
+  "mistake": "In the step that drops the digits to the right of the k-th one, it divides with / instead of //, so the result keeps a decimal part and the final % 10 returns a float like 2.34 instead of the digit.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "makeChange": {
+  "code": "def makeChange(cents):\n    quarters = cents // 25\n    cents = cents // 25\n    dimes = cents // 10\n    cents = cents % 10\n    nickels = cents // 5\n    pennies = cents % 5\n    return quarters + dimes + nickels + pennies",
+  "mistake": "In the step that works out the cents left after the quarters, it uses // instead of %, so cents becomes the number of quarters rather than the remainder.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "nearestBusStop": {
+  "code": "def nearestBusStop(street):\n    stops = (street + 4) // 8\n    return stops * 8",
+  "mistake": "In the step where the offset is added before dividing by 8, it adds 4 instead of 3, so a street exactly halfway between two stops rounds up instead of down.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "nearestWaterFountain": {
+  "code": "def nearestWaterFountain(position):\n    return position + 5 // 10 * 10",
+  "mistake": "In the step that adds 5 before dividing by 10 to round to the nearest fountain, the brackets around position + 5 are missing, so 5 // 10 * 10 is evaluated first (giving 0) and the function just returns position.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "overNineThousand": {
+  "code": "def overNineThousand(power_level):\n    if power_level >= 9000:\n        return True\n    else:\n        return False",
+  "mistake": "The comparison uses >= instead of > in the condition, so the boundary case 9000 wrongly returns True instead of False.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "percentAsInt": {
+  "code": "def percentAsInt(part, whole):\n    ratio = int(part / whole)\n    return ratio * 100",
+  "mistake": "Converting to int too early: int() is applied to part / whole before multiplying by 100, so the fraction is truncated to 0 and the result is 0 instead of the percentage.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "raiseToPower": {
+  "code": "def raiseToPower(base, exponent):\n    result = int(base ** exponent)\n    return result",
+  "mistake": "In the step where the power is computed, the result is wrapped in int(), which truncates a fractional answer like 0.1 to 0 when the exponent is negative.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "removeKthDigit": {
+  "code": "def removeKthDigit(x, k):\n    left = x // 10 ** k * 10 ** (k - 1)\n    right = x % 10 ** k - 1\n    return left + right",
+  "mistake": "In the step that extracts the digits to the right of the removed digit, the brackets around k - 1 are missing, so x % 10 ** k - 1 takes x % 10 ** k and then subtracts 1 instead of using 10 ** (k - 1).",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "reverseAndCapitalize": {
+  "code": "def reverseAndCapitalize(s):\n    return s[:-1].upper()\n",
+  "mistake": "In the reversing step, it slices s[:-1] (which drops the last character) instead of s[::-1], so the string is never reversed.",
+  "model": "hand-written (week-3 Python)"
+ },
+ "secretCode": {
+  "code": "def secretCode(word):\n    reversed_word = word[::-1]\n    return 'xyz' + reversed_word",
+  "mistake": "In the final concatenation step, the student put 'xyz' before the reversed word instead of appending it to the end.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "singlePigLatin": {
+  "code": "def singlePigLatin(word):\n    vowels = 'aeiou'\n    if word[0] in vowels:\n        return word + 'yay'\n    else:\n        return word[0] + word[1:] + 'ay'",
+  "mistake": "In the consonant branch, the student concatenates word[0] before word[1:] instead of moving the first letter to the end, so the word comes back unchanged with 'ay' appended.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "stockChange": {
+  "code": "def stockChange(percentChange):\n    if percentChange >= 0:\n        return 'Up'\n    elif percentChange < 0:\n        return 'Down'\n    else:\n        return 'No Change'",
+  "mistake": "In the first condition of the if/elif/else, it uses >= instead of > for the 'Up' check, so a change of 0 returns 'Up' and never reaches the 'No Change' case.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "sumOfSquares": {
+  "code": "def sumOfSquares(a, b):\n    return a + b ** 2",
+  "mistake": "In the step where the expression is built, only b is squared because a is added unsquared, so the formula is not the sum of both squares.",
+  "model": "anthropic/claude-sonnet-5.5"
+ }
+}

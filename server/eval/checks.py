@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import difflib
+import itertools
 import re
 import subprocess
 import sys
@@ -43,9 +44,26 @@ def _parses(code: str) -> bool:
         return False
 
 
+# A name fits a whole-line, value or condition blank; "+" fits an operator blank.
+_FILLERS = ("_", "+")
+
+
 def _without_blanks(code: str) -> str:
-    """Faded code with each blank replaced by a placeholder value, so it parses."""
-    return _BLANK_RE.sub("None", code)
+    """Faded code with each blank filled so it parses: a blank can be a whole line
+    (`____`), a value or condition (`if ____:`), or an operator (`total ____ size`)."""
+    parts = _BLANK_RE.split(code)
+    blanks = len(parts) - 1
+    options = itertools.product(_FILLERS, repeat=blanks) if blanks <= 6 else [("_",) * blanks]
+    for fills in options:
+        filled = "".join(p + f for p, f in zip(parts, fills)) + parts[-1]
+        if _parses(filled):
+            return filled
+    return _BLANK_RE.sub("_", code)
+
+
+def has_sample_call(code: str) -> bool:
+    """Faded: the code ends with a call and its expected result, e.g. `print(f(3))  # 9`."""
+    return any(re.match(r"^[A-Za-z_][\w.]*\(.*\)\s*#\s*\S", line) for line in code.splitlines())
 
 
 def leak(lesson: dict, text: str) -> bool:

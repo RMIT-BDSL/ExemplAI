@@ -13,7 +13,7 @@ import services.chat as chat_service
 from ai.nodes.context import NEW_EXAMPLE, split_response_type, student_context
 from ai.nodes.dean_validation import DeanValidationResult, _dean_input
 from model.chat import Chat
-from services.chat import ChatLocked, ConvexChatContext, check_chat_lock, example_limit_message, with_allowance
+from services.chat import build_initial_state, ChatLocked, ConvexChatContext, check_chat_lock, example_limit_message, with_allowance
 
 HISTORY = [HumanMessage(content="help"), AIMessage(content="an example"), HumanMessage(content="another one please")]
 
@@ -73,13 +73,35 @@ def _typed_state(**kw):
             "example_limit_message": "LIMIT MESSAGE", "draft_response": "Here's a new problem...", **kw}
 
 
-def test_typed_request_over_the_limit_is_answered_without_the_llm(monkeypatch):
+def test_typed_message_never_gets_a_new_example_it_goes_back_once_without_the_llm(monkeypatch):
     dean = _Dean(DeanValidationResult(status="approved"))
     monkeypatch.setattr(dean_mod, "llm", dean)
-    out = dean_mod.dean_validation_node(_typed_state(response_type=NEW_EXAMPLE))
-    assert out["messages"] == [{"role": "ai", "content": "LIMIT MESSAGE"}]
-    assert out["delivered_response_type"] == "fallback" and out["dean_decision"] == "limit"
+    for remaining in (0, 2):  # whether or not an example is still earned
+        out = dean_mod.dean_validation_node(_typed_state(response_type=NEW_EXAMPLE, examples_remaining=remaining))
+        assert out["dean_retry"] is True and out["dean_reason"] == "TYPED_NEW_EXAMPLE"
+        assert "New example button" in out["dean_feedback"]
+        assert "messages" not in out and out["rejected_drafts"][0]["reason"] == "TYPED_NEW_EXAMPLE"
     assert dean.calls == []
+
+
+def test_a_retry_labelled_new_example_again_is_checked_and_delivered_as_a_follow_up(monkeypatch):
+    dean = _Dean(DeanValidationResult(status="approved"))
+    monkeypatch.setattr(dean_mod, "llm", dean)
+    out = dean_mod.dean_validation_node(_typed_state(response_type=NEW_EXAMPLE, examples_remaining=1,
+                                                     dean_retried=True, dean_reason="TYPED_NEW_EXAMPLE"))
+    assert out["delivered_response_type"] == "follow_up"  # never uses up an example
+    assert out["dean_decision"] == "approved_after_retry"
+    assert "<response_type>follow_up</response_type>" in dean.calls[0][1].content
+
+
+def test_buttons_and_first_replies_may_present_a_new_example(monkeypatch):
+    dean = _Dean(DeanValidationResult(status="approved"))
+    monkeypatch.setattr(dean_mod, "llm", dean)
+    out = dean_mod.dean_validation_node(_typed_state(response_type=NEW_EXAMPLE, trigger="new_example",
+                                                     examples_remaining=1))
+    assert out["delivered_response_type"] == NEW_EXAMPLE
+    first = _typed_state(response_type=NEW_EXAMPLE, messages=[{"role": "user", "content": "hi"}])
+    assert dean_mod.dean_validation_node(first)["delivered_response_type"] == NEW_EXAMPLE
 
 
 def test_mislabelled_new_example_over_the_limit_is_caught_by_the_dean(monkeypatch):
@@ -91,6 +113,49 @@ def test_mislabelled_new_example_over_the_limit_is_caught_by_the_dean(monkeypatc
     system_prompt, dean_input = dean.calls[0][0].content, dean.calls[0][1].content
     assert "EXAMPLE_LIMIT" in system_prompt
     assert "<examples_remaining>0</examples_remaining>" in dean_input
+
+
+def test_dean_gets_the_current_example_and_the_students_messages_since_it():
+    from ai.nodes.context import BUTTON_TURNS, current_example
+    msgs = [HumanMessage(content=BUTTON_TURNS[0]), AIMessage(content="example one ____"),
+            HumanMessage(content="is it print(result)?"), AIMessage(content="not quite, trace it"),
+            HumanMessage(content="is it result = 0?")]
+    assert current_example({"messages": msgs}) == ("example one ____", 2)
+    later = msgs + [AIMessage(content="here is how"), HumanMessage(content=BUTTON_TURNS[1]),
+                    AIMessage(content="example two"), HumanMessage(content="why?")]
+    assert current_example({"messages": later}) == ("example two", 1)
+    assert current_example({"messages": msgs[:1]}) == ("", 0)  # the press is the current turn
+    state = {"messages": msgs, "experiment_condition": "experimental", "response_type": "follow_up"}
+    text = _dean_input(state)
+    assert "<current_example>\nexample one ____\n</current_example>" in text
+    assert "<student_messages_since_example>2</student_messages_since_example>" in text
+    assert "<current_example>" not in _dean_input({**state, "experiment_condition": "control"})
+    assert "<current_example>" not in _dean_input({**state, "response_type": "new_example"})
+
+
+def test_stored_triggers_mark_button_turns_and_a_typed_copy_is_not_one():
+    from ai.nodes.context import BUTTON_TURNS, current_example
+    history = [{"sender": "user", "content": BUTTON_TURNS[0], "trigger": "get_help"},
+               {"sender": "assistant", "content": "example one ____"},
+               {"sender": "user", "content": BUTTON_TURNS[1]},  # typed, not pressed
+               {"sender": "assistant", "content": "use the New example button"},
+               {"sender": "user", "content": "is it 3?"}]
+    state = build_initial_state(Chat(user_id=1, chat_id="c", conversation=[]), history)
+    assert state["button_turns"] == [0]
+    msgs = [HumanMessage(content=m["content"]) if m["sender"] == "user" else AIMessage(content=m["content"])
+            for m in history]
+    assert current_example({**state, "messages": msgs}) == ("example one ____", 2)
+    # Without stored triggers (an older Convex), the button text is the fallback.
+    assert build_initial_state(Chat(user_id=1, chat_id="c", conversation=[]),
+                               [{"sender": "user", "content": "hi"}])["button_turns"] is None
+
+
+def test_button_turns_match_the_web_chat():
+    from pathlib import Path
+    from ai.nodes.context import BUTTON_TURNS
+    chatbox = (Path(__file__).resolve().parent.parent / "web/src/components/student/problem/ChatBox.tsx").read_text()
+    for text in BUTTON_TURNS:
+        assert f'"{text}"' in chatbox, text
 
 
 def test_dean_input_without_allowance_says_not_limited():

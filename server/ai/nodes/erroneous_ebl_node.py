@@ -77,8 +77,9 @@ condition") without naming the line.
 - Suggest they test a fix themselves by editing the example's code in the chat and pressing Run.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and an input on which the original code went wrong.
-- If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
-erroneous example using a completely DIFFERENT scenario to prevent pattern-matching.
+- If they ask for a DIFFERENT example: tell them the New example button gives one \
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>
