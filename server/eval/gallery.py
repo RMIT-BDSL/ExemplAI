@@ -179,7 +179,11 @@ def _verdict_chips(r: dict) -> str:
 
 
 def _anchor(r: dict) -> str:
-    return r["lesson"] + (f"-{r['rep'] + 1}" if r.get("rep") else "")
+    return f"{r['kind']}-{r['lesson']}" + (f"-{r['rep'] + 1}" if r.get("rep") else "")
+
+
+def _mean(scores: list, places: int = 1) -> str:
+    return f"{statistics.mean(scores):.{places}f}" if scores else "–"
 
 
 def card(r: dict, lesson: dict, count_in_week: int, tries: int = 1) -> str:
@@ -220,7 +224,7 @@ def card(r: dict, lesson: dict, count_in_week: int, tries: int = 1) -> str:
       <pre class="failure">{_esc(r['failure'])}</pre>
     </section>
     <section class="reply">
-      <h4>Faded example <span class="note">{_esc(reply_note)}</span></h4>
+      <h4>{_esc(r['kind'].capitalize())} example <span class="note">{_esc(reply_note)}</span></h4>
       <div class="prose">{md(r['text'])}</div>
     </section>
   </div>
@@ -257,7 +261,7 @@ def week_summary(week: int, rows: list[dict], topic: str) -> str:
     return f"""
 <div class="week-sum">
   <div class="week-name"><b>Week {week}</b> {_esc(TOPIC_NAMES.get(topic, topic))} <span class="muted">· {len({r["lesson"] for r in rows})} lessons, {len(rows)} examples</span></div>
-  <div class="figure"><b>{statistics.mean(scores):.1f}</b><small>/5 mean</small></div>
+  <div class="figure"><b>{_mean(scores)}</b><small>/5 mean</small></div>
   {_distribution(scores)}
   <div class="figure"><b>{statistics.median(times):.1f}</b><small> s median</small></div>
   <div class="figure"><b>{times[-1]:.1f}</b><small> s slowest</small></div>
@@ -304,7 +308,7 @@ def comparison(arms: list[tuple[str, list[dict]]], shown: str) -> str:
         body.append(
             f'<tr class="{"shown" if label == shown else ""}"><th scope="row">{_esc(label)}</th>'
             f'<td><code>{_esc(rows[0].get("prompt", "?"))}</code></td><td>{_esc(rows[0].get("reasoning") or "low")}</td>'
-            f'<td class="num">{len(rows)}</td><td class="num">{statistics.mean(scores):.2f}</td>'
+            f'<td class="num">{len(rows)}</td><td class="num">{_mean(scores, 2)}</td>'
             f'<td class="num">{_pct([r["judge"].get("blanks_well_placed") for r in rows])}</td>'
             f'<td class="num">{_every_try(rows, "blanks_well_placed")}</td>'
             f'<td class="num">{_pct([r["judge"].get("hints_reveal_blank") for r in rows])}</td>'
@@ -361,7 +365,7 @@ def page(rows: list[dict], lessons: dict, source: str, arms: list[tuple[str, lis
     return TEMPLATE.format(
         title=f"{kind} Examples " + (f"Weeks {weeks[0]}–{weeks[-1]}" if len(weeks) > 1 else f"Week {weeks[0]}"),
         heading=f"{kind} examples, {week_label}", lead=lead, n=len(rows),
-        mean=f"{statistics.mean(all_scores):.1f}", median=f"{statistics.median(times):.1f}", slowest=f"{times[-1]:.1f}",
+        mean=_mean(all_scores), median=f"{statistics.median(times):.1f}", slowest=f"{times[-1]:.1f}",
         aims=_pct([r["judge"].get("targets_student_error") for r in rows]),
         blanks=_pct([r["judge"].get("blanks_well_placed") for r in rows]), every=every,
         sample=_pct([r["auto"].get("sample_ok") for r in rows]),

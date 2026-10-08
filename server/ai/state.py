@@ -10,7 +10,7 @@ student-facing message — the research-integrity gate.
 
 from __future__ import annotations
 
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from langgraph.graph import add_messages
 from typing_extensions import TypedDict
@@ -44,6 +44,7 @@ class TutorGraphState(TypedDict):
     # ── Internal: example allowance (web/convex/examples.ts) ──────────
     examples_remaining: int           # examples earned but not yet given this round
     example_limit_message: str        # shown when a typed request would exceed it
+    button_turns: Optional[list[int]]  # positions in messages of Get help / New example turns
     delivered_response_type: str      # set by the Dean: what reached the student
 
     # ── Internal: Dean decision and one retry (reset each request) ────

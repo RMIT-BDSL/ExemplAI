@@ -107,7 +107,8 @@ to help them see the gap.
 - If the student has tried the same blank twice without success: show them how to work \
 out that blank, including its answer, then let them continue with any remaining blank.
 - If they ask for a DIFFERENT example: tell them the New example button gives one \
-(it unlocks after another failed Submit), and keep helping with this example.
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>

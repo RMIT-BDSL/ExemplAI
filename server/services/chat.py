@@ -53,6 +53,11 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
     if not langgraph_messages:
         langgraph_messages = [{"role": "user", "content": "hi!"}]
 
+    # Positions of the turns a Get help / New example press created (Convex
+    # stores the trigger). None when no turn carries one, e.g. a Convex
+    # deployment that predates it: current_example then matches the button text.
+    button_turns = [i for i, m in enumerate(history) if m.get("trigger")] or None
+
     return {
         "messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *langgraph_messages],
         "experiment_condition": chat.experiment_condition,
@@ -63,6 +68,7 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
         "student_code": chat.student_code,
         "error_trace": chat.error_trace,
         "trigger": chat.trigger,
+        "button_turns": button_turns,
         # The Dean's one retry starts fresh on every request (state is checkpointed).
         "dean_retry": False,
         "dean_retried": False,

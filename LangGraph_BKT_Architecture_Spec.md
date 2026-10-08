@@ -145,7 +145,8 @@ gave: answering a question, giving feedback on their attempt, or a narrower hint
 The tag is removed before the student sees your reply.
 A typed message never gets a new example, even if the student asks for one: help \
 them with the example already given, and tell them the New example button gives \
-another (it unlocks after another failed Submit).
+another when it is available (each failed Submit earns one, up to three per \
+lesson).
 </response_type>"""
 
 
@@ -254,7 +255,8 @@ If the student replies with a follow-up question, answer it supportively while s
 within the analog problem domain. If they ask you to solve their actual problem, gently \
 redirect: "Let's keep working through this example first — the pattern will click."
 If the student asks for a DIFFERENT example, tell them the New example button gives one \
-(it unlocks after another failed Submit), and keep helping with this example.
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>
@@ -380,7 +382,8 @@ to help them see the gap.
 - If the student has tried the same blank twice without success: show them how to work \
 out that blank, including its answer, then let them continue with any remaining blank.
 - If they ask for a DIFFERENT example: tell them the New example button gives one \
-(it unlocks after another failed Submit), and keep helping with this example.
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>
@@ -460,7 +463,8 @@ condition") without naming the line.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and an input on which the original code went wrong.
 - If they ask for a DIFFERENT example: tell them the New example button gives one \
-(it unlocks after another failed Submit), and keep helping with this example.
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>

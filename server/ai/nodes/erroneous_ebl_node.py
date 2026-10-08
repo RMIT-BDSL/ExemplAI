@@ -78,7 +78,8 @@ condition") without naming the line.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and an input on which the original code went wrong.
 - If they ask for a DIFFERENT example: tell them the New example button gives one \
-(it unlocks after another failed Submit), and keep helping with this example.
+when it is available (each failed Submit earns one, up to three \
+per lesson), and keep helping with this example.
 </multi_turn>
 
 <output_format>

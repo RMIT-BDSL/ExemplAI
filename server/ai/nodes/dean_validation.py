@@ -210,7 +210,7 @@ TYPED_NEW_EXAMPLE = "TYPED_NEW_EXAMPLE"
 _TYPED_FEEDBACK = (
     "The student typed a message, and a typed message never gets a new example. Answer about "
     "the example already given; if they want another, tell them the New example button gives "
-    "one (it unlocks after another failed Submit)."
+    "one when it is available (each failed Submit earns one, up to three per lesson)."
 )
 
 

@@ -288,7 +288,12 @@ export const getChatContext = authenticatedQuery({
       // The mastery the example type is chosen from (routingMastery).
       bkt_prob_mastery: routingMastery(probMastery, progress),
       // Oldest first, ending with the student's latest message.
-      messages: recent.reverse().map((m) => ({ sender: m.sender, content: m.content })),
+      // `trigger` marks the turns a Get help / New example press created.
+      messages: recent.reverse().map((m) => ({
+        sender: m.sender,
+        content: m.content,
+        ...(m.trigger ? { trigger: m.trigger } : {}),
+      })),
       failed_submits: progress?.failed_submits ?? 0,
       error_trace: progress?.last_error_trace ?? "",
       example_allowance: await allowanceForChat(ctx, chat),

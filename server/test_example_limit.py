@@ -13,7 +13,7 @@ import services.chat as chat_service
 from ai.nodes.context import NEW_EXAMPLE, split_response_type, student_context
 from ai.nodes.dean_validation import DeanValidationResult, _dean_input
 from model.chat import Chat
-from services.chat import ChatLocked, ConvexChatContext, check_chat_lock, example_limit_message, with_allowance
+from services.chat import build_initial_state, ChatLocked, ConvexChatContext, check_chat_lock, example_limit_message, with_allowance
 
 HISTORY = [HumanMessage(content="help"), AIMessage(content="an example"), HumanMessage(content="another one please")]
 
@@ -131,6 +131,23 @@ def test_dean_gets_the_current_example_and_the_students_messages_since_it():
     assert "<student_messages_since_example>2</student_messages_since_example>" in text
     assert "<current_example>" not in _dean_input({**state, "experiment_condition": "control"})
     assert "<current_example>" not in _dean_input({**state, "response_type": "new_example"})
+
+
+def test_stored_triggers_mark_button_turns_and_a_typed_copy_is_not_one():
+    from ai.nodes.context import BUTTON_TURNS, current_example
+    history = [{"sender": "user", "content": BUTTON_TURNS[0], "trigger": "get_help"},
+               {"sender": "assistant", "content": "example one ____"},
+               {"sender": "user", "content": BUTTON_TURNS[1]},  # typed, not pressed
+               {"sender": "assistant", "content": "use the New example button"},
+               {"sender": "user", "content": "is it 3?"}]
+    state = build_initial_state(Chat(user_id=1, chat_id="c", conversation=[]), history)
+    assert state["button_turns"] == [0]
+    msgs = [HumanMessage(content=m["content"]) if m["sender"] == "user" else AIMessage(content=m["content"])
+            for m in history]
+    assert current_example({**state, "messages": msgs}) == ("example one ____", 2)
+    # Without stored triggers (an older Convex), the button text is the fallback.
+    assert build_initial_state(Chat(user_id=1, chat_id="c", conversation=[]),
+                               [{"sender": "user", "content": "hi"}])["button_turns"] is None
 
 
 def test_button_turns_match_the_web_chat():

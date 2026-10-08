@@ -74,8 +74,12 @@ def check(lesson: dict, code: str) -> str:
 def make(llm, lesson: dict) -> Optional[dict]:
     feedback = ""
     for _ in range(3):
-        a = llm.with_structured_output(Attempt).invoke(
-            [SystemMessage(content=_SYSTEM), HumanMessage(content=_prompt(lesson, feedback))])
+        try:
+            a = llm.with_structured_output(Attempt).invoke(
+                [SystemMessage(content=_SYSTEM), HumanMessage(content=_prompt(lesson, feedback))])
+        except Exception as e:  # one failed call shouldn't lose the other lessons' attempts
+            print(f"{lesson['problem_name']}: {type(e).__name__}: {str(e)[:120]}")
+            return None
         feedback = check(lesson, a.code)
         if not feedback:
             return {"code": a.code, "mistake": a.mistake, "model": MODEL}
