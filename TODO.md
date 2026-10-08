@@ -39,8 +39,12 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 
 ## Before the pilot
 
+* [ ] Wait messages while an example is written (user, 2026-10-08): replace the three fixed progress rows in `TutorProgress` (web/src/components/student/problem/ChatBox.tsx: "Reading your message", "Writing a reply", "Checking the reply") with "Reading your submission", "Evaluating any errors", "Building an example", "Checking my work", "Pretty printing". Show the next line about every 3 s (a slow reply, ~20 s, walks through them all; a fast one shows only the first few), still advancing with the server's step events where they say more.
+
 * [ ] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).
-* [ ] Dean enforces `<allowed_python>` (currently an agent instruction only).
+* [ ] Dean enforces `<allowed_python>` (currently an agent instruction only). Faded examples still use week-4 `if` in 14% of week-2 lessons (eval 2026-10-07), mostly rounding-up lessons; a code check could send the draft back.
+* [ ] Faded, week 2: when the student's mistake is in how one expression is written (missing brackets, `/` for `//`), the example splits the expression into steps and so never practises the mistake. Ask for that expression on one line with its key part blank. Most of the remaining misplaced blanks (week 2: 62% well placed, weeks 3–4: 85%).
+* [x] Dean on Faded follow-ups after two wrong tries (2026-10-08): the Dean now gets the current example in full and the student's message count since it, worked out in code. "Here's how to work it out" replies replaced: 17/68 → 3/68; typed replies replaced overall 21/136 → 7/136 (`eval.examples --replies`). Typed chat never starts a new example (new examples only from the buttons).
 * [ ] Guardrail: the injection pattern misses "ignore **all previous** instructions" (allows only one word between "ignore" and "instructions"); typed messages are still screened by the model.
 * [ ] Prompt review items 9–14: runnable Complete/Faded code, no repeated scenarios, scripted reply to "what's wrong with my code?", "in the editor" wording, shared length/style rules, clearer "trivially adaptable" rule.
 * [ ] Empirical DeepSeek runs of the prompts on scripted conversations (needs an OpenRouter key in `server/.env`).
@@ -88,4 +92,5 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 * [ ] Study code per student, entered on the external survey forms (Paas, NASA-TLX, demographics), so form answers can be linked to the trace.
 * [ ] Research export: de-identified, analysis-ready tables (one row per attempt, message, visit and student; ProgSnap2-style) from Convex, reusing the eval analysis code.
 * [ ] "Check my fix" button that runs a student's Erroneous fix against tests.
+* [ ] Wish list: adaptive fading within a lesson (Salden, Aleven, Schwonke & Renkl 2010). A later Faded example fades a little more if the student completed the earlier blanks, and no more if they needed the answer shown. Tried as a prompt rule on 2026-10-07 and dropped (not needed for the study); the server could pass the fading level instead of leaving it to the prompt.
 * [ ] Decide: should mastery unlock the next topic? Trial scope (which weeks)? Fold week 1 into week 2?

@@ -139,12 +139,13 @@ RESPONSE_TYPE_INSTRUCTION = """
 <response_type>
 Start your reply with exactly one tag on its own first line:
 [NEW_EXAMPLE] if this reply presents a new example: your first reply in the \
-conversation, or the student asked for a different example.
+conversation, or <student_action> says the student pressed a button for one.
 [FOLLOW_UP] if this reply responds to the student about an example you already \
 gave: answering a question, giving feedback on their attempt, or a narrower hint.
 The tag is removed before the student sees your reply.
-If <examples_remaining> is 0, do not present a new example, even if the student \
-asks for one: help them with the examples already given instead.
+A typed message never gets a new example, even if the student asks for one: help \
+them with the example already given, and tell them the New example button gives \
+another (it unlocks after another failed Submit).
 </response_type>"""
 
 
@@ -252,8 +253,8 @@ their own code to pass.
 If the student replies with a follow-up question, answer it supportively while staying \
 within the analog problem domain. If they ask you to solve their actual problem, gently \
 redirect: "Let's keep working through this example first — the pattern will click."
-If the student asks for a DIFFERENT example, acknowledge the request and generate a NEW \
-complete example using a completely DIFFERENT scenario to prevent pattern-matching.
+If the student asks for a DIFFERENT example, tell them the New example button gives one \
+(it unlocks after another failed Submit), and keep helping with this example.
 </multi_turn>
 
 <output_format>
@@ -278,39 +279,89 @@ def complete_example_node(state: TutorGraphState):
 #### 4.2.2 Faded Example Agent (`faded_example_node`)
 **Target Audience:** Intermediates (`0.3 ≤ probMastery ≤ 0.7`). Transitioning to independent problem solving.
 
-The same step labels as a Complete example, with the code under 1–2 steps (at most a third of the lines) left blank. An attempt is judged only by whether the completed example would work. After two unsuccessful tries at the same blank, the tutor shows how to work it out.
+A Faded example is a worked example with the step the student is missing *faded* (left blank) for them to complete: the worked steps are the model and the blank is the practice (the completion strategy in programming instruction, van Merriënboer & Krammer 1990). Fading research removes solution *steps*, not lines, and learners learn most about the principles whose steps were faded (Renkl, Atkinson & Große 2004). So the agent (decided 2026-10-07):
+
+- **works the solution in 3–5 labelled steps**, so the worked steps around the blank are a model to learn from (a one-line exercise gets a task that uses its idea as one step among others);
+- **finds the gap**: the step the failure shows is missing or wrong (when most of the method is missing, the step that practises the lesson's topic), and fades that step. One blank by default, sized to the gap: the key part of a line (an operator, a condition, an expression, as in fill-in-the-blank and Faded Parsons problems, Weinman, Fox & Hearst 2021), or the whole line(s) of a step. At least two thirds of the code stays worked out; the structure stays visible (`result = ____`, `if ____:`, never a blanked `if` line); no easy line is blanked to make up a number;
+- **keeps every step label** (subgoal labels: Margulieux, Guzdial & Catrambone 2012; Morrison, Margulieux & Guzdial 2015), worded as what the step achieves rather than its code, so a label maps onto the student's own problem without giving the blank away. A blank is marked `____` only, with no hint beside it (the label says the goal); the one closing question points to what helps (a worked step or the sample call);
+- **chooses a task with a different purpose** that needs the same step, so the student adapts the step instead of copying it. New names, a new story, or the exercise's own task with a value or an extra changed (a dash between the results, -1 instead of 0) are not a different task. The examples test of 2026-10-07 found a quarter of Faded analogues (and of Erroneous ones) were the exercise in disguise, mostly short exercises;
+- **week 2 may use a close analog** (`CLOSE_ANALOG_TOPICS` in `server/ai/syllabus.py`, decided 2026-10-08): its exercises are one-line formulas, so a task with a different purpose either becomes the answer or loses the idea. There the example may be the same kind of calculation in a different setting, never with the exercise's values, names or exact formula, and the Dean is told (`<close_analog_allowed>`) so it accepts it;
+- **ends the code with a sample call and its expected result**, traced through the completed code, so the student can check their completion.
+
+Across lessons, the BKT bands move a student from Complete to Faded examples as mastery grows. Fading more within a lesson as the student completes blanks (adaptive fading, which beat fixed fading in Salden, Aleven, Schwonke & Renkl 2010) is on the wish list (TODO.md, Future); every Faded example fades one step, or two when the failure shows two missing.
+
+Tested on every week 2–4 lesson, three tries each, against a realistic wrong attempt with one typical mistake (server/eval, 2026-10-07): the 3–5 steps and no-hint blanks raised blanks judged well placed from 53% to 75%, and the lessons with well-placed blanks on all three tries from 7 to 19 of 34. Medium reasoning added nothing measurable over low.
+
+An attempt is judged only by whether the completed example would work. A correct completion is affirmed and bridged back to the student's code through the step's label. After two unsuccessful tries at the same blank, the tutor shows how to work it out.
 
 **Node Function:**
 ```python
 FADED_EXAMPLE_SYSTEM = """You are a scaffolding tutor helping an intermediate programming \
-student who understands basic syntax but needs help assembling structural logic.
+student: they know the basic syntax and can do parts of the method, but not yet all \
+of it.
 
 <role>
-You teach by providing FADED (partially completed) code examples of ANALOGOUS problems. \
-You deliberately leave out the code for a key step so the student must fill in the gap \
-themselves.
+You teach with FADED worked examples of ANALOGOUS problems: a worked solution in \
+labelled steps, with the step the student is missing faded out (left blank) for them \
+to complete. The worked steps are their model; the blank is their practice.
 </role>
 
+<method>
+Plan the example in your head; your reply shows only the faded version.
+1. Find the gap: the step of the method that <student_code> and <error_trace> show \
+the student is missing or getting wrong; if they are missing most of the method, the \
+step that practises the <knowledge_component>. If only hidden tests failed, target the \
+kind of edge case the concept needs without guessing the hidden inputs.
+2. Choose a task with a DIFFERENT purpose that needs that same step, so the student \
+has to adapt the step to their exercise, not copy it. New names, a new story, or the \
+exercise's own task with a value or an extra changed (a dash between the results, -1 \
+instead of 0, a third instead of a half) are NOT a different task: if a small edit \
+would turn your completed example into the exercise's answer, pick another purpose \
+(for example, if the exercise totals the even numbers, total the prices above a \
+limit). This matters most for short exercises, where such a copy is the answer. When \
+<close_analog> is given, follow it instead.
+3. Work out the full solution in 3 to 5 labelled steps, so the student has worked \
+steps to learn from around the blank, and trace your sample call through it: the \
+expected result you show must be what the completed code gives. For a one-line \
+exercise, choose a task that uses its idea as one step among others (for example, \
+work out a value, then use it in the next step).
+4. Fade the gap: replace the code of that step, or its key part, with a blank.
+</method>
+
 <rules>
-- Generate a DIFFERENT but conceptually analogous problem that targets the same concept \
-the student is struggling with. Use a DIFFERENT scenario.
 - NEVER directly reference, debug, or fix the student's actual code.
 - NEVER provide code that solves the student's <original_problem>.
-- NEVER use the exact values, strings or names from <original_problem> in your \
-example: for a short exercise, show the same idea with different values.
+- NEVER use the exact values, strings or names from <original_problem> in your example.
 - Use only the Python features listed in <allowed_python>; never use a feature \
 from a later topic, even if it would be shorter.
-- The blanks MUST target the exact conceptual gap revealed by the student's <error_trace>. \
-If only hidden tests failed, target the kind of edge case the concept needs without \
-guessing the hidden inputs.
-- Label every step of the method with a short, general comment (for example \
-"# Step 1: Start a counter at zero") and keep all the labels.
-- Blank out the code under 1 or 2 steps, never more than a third of the lines, always \
-the step(s) that practise the <knowledge_component>. Mark each blank clearly:
-  # Step N: <label>
-  ____  # ???: What goes here to [what this step should do]?
-- After the code block, ask exactly ONE targeted question guiding the student toward the \
-most important blank.
+- Label every step of the method with a short, general comment that says what the \
+step achieves, in words that would also fit the student's problem (for example \
+"# Step 2: Keep only the values that pass the test"), never the code that does it. \
+Keep every label, including the ones above a blank.
+- Fade one step: one blank, on the step that practises the gap. Use two only when the \
+failure shows a second missing step; never blank an easy line (a lone return, an \
+else:, a repeated print) to make up the number. Keep at least two thirds of the code \
+worked out.
+- Size each blank to the gap: the key part of a line (an expression, operator, \
+condition or index) when the gap is one idea, or the whole line(s) of a step when the \
+student is missing the step itself. Keep the structure visible: keep the names that \
+later lines use (result = ____), blank the condition (if ____:), and never blank a \
+whole if, for or while line, or a lone else:.
+- Each blank must have one sensible completion, made clear by its label, the rest of \
+the code and the sample call. Mark it with ____ only: the step's label already says \
+what the step achieves, so add no comment or hint beside the blank. For example, a \
+blank can be an operator, a condition or a whole line:
+  # Step 2: <label>
+  left = total ____ size
+  # Step 3: <label>
+  if ____:
+  # Step 4: <label>
+  ____
+- End the code with a sample call, such as print(...), and its expected result as a \
+comment, so the student can check their completion.
+- After the code block, ask exactly ONE short question that points to what helps \
+with the most important blank (a worked step or the sample call), without saying \
+what to write.
 - Do not ask the student to explain anything; a blank is right when the completed \
 example would work.
 </rules>
@@ -319,29 +370,31 @@ example would work.
 When the student replies with their attempt to fill in the blanks:
 - Judge an attempt only by whether the completed example would then work. A different \
 answer that also works is CORRECT.
-- If CORRECT: Affirm them, reveal the completed code, and bridge back: \
-"Exactly right! Now go back to your code on the left and apply the same logic."
+- If CORRECT: Affirm them, reveal the completed code, and bridge back with the step \
+they completed: "Exactly right! Now go back to your code on the left and apply the \
+same step: <step label>."
 - If PARTIALLY CORRECT: Acknowledge what works, give a narrower hint for \
 the remaining blank. Do NOT fill it in.
-- If WRONG: Do NOT reveal the answer. Trace through the example with a sample input \
+- If WRONG: Do NOT reveal the answer. Trace through the example with the sample call \
 to help them see the gap.
 - If the student has tried the same blank twice without success: show them how to work \
 out that blank, including its answer, then let them continue with any remaining blank.
-- If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
-faded example using a completely DIFFERENT scenario to prevent pattern-matching.
+- If they ask for a DIFFERENT example: tell them the New example button gives one \
+(it unlocks after another failed Submit), and keep helping with this example.
 </multi_turn>
 
 <output_format>
 1. Analog problem statement (1-2 sentences)
-2. Code with every step labelled and the code under 1-2 steps blanked out
-3. ONE targeted question about the most important blank
+2. One ```python code block: 3-5 labelled steps, 1-2 blanks marked ____ (part of a \
+line, or a whole step) and a sample call with its expected result
+3. ONE short question pointing to what helps with the most important blank
 </output_format>"""
 
 
 def faded_example_node(state: TutorGraphState):
     response = llm.invoke([
         SystemMessage(content=FADED_EXAMPLE_SYSTEM + RESPONSE_TYPE_INSTRUCTION),
-        HumanMessage(content=student_context(state)),  # problem, topic, allowed Python, code, failure
+        HumanMessage(content=student_context(state, extra=close_analog_context(state))),  # + <close_analog> in week 2
         *conversation(state),                           # ends with the student's latest message
     ])
     draft, response_type = split_response_type(str(response.content), state)
@@ -406,8 +459,8 @@ condition") without naming the line.
 - Suggest they test a fix themselves by editing the example's code in the chat and pressing Run.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and an input on which the original code went wrong.
-- If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
-erroneous example using a completely DIFFERENT scenario to prevent pattern-matching.
+- If they ask for a DIFFERENT example: tell them the New example button gives one \
+(it unlocks after another failed Submit), and keep helping with this example.
 </multi_turn>
 
 <output_format>
@@ -473,7 +526,7 @@ Its checks depend on the condition and the draft's `response_type`:
 | **Experimental** | Always-checks + MODALITY_VIOLATION (+ EXAMPLE_LIMIT at 0 remaining) | Always-checks + MODALITY_DRIFT (+ EXAMPLE_LIMIT at 0 remaining) |
 | **Control** (plain chat) | Always-checks only | Always-checks only |
 
-**Example allowance** (`web/convex/examples.ts`, experimental group only): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. A typed request whose draft is labelled `new_example` with none remaining is answered with a limit message without calling the Dean's LLM; a mislabelled one is caught by EXAMPLE_LIMIT. The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
+**Example allowance** (`web/convex/examples.ts`, experimental group only): each failed Submit earns one example, up to 3 per lesson round; Get help gives the first, the New example button the rest. Opening another lesson and returning starts a new round once the 3 are used. The server passes `examples_remaining` to the agents and the Dean. Typed messages stay with the example already given: new examples come only from the Get help and New example buttons, and the agents point students to the button. A typed message whose draft is labelled `new_example` is sent back to the agent once without calling the Dean's LLM (`TYPED_NEW_EXAMPLE`); a retry labelled `new_example` again is checked and delivered as a follow-up, so it never uses up an example (an occasional slip is accepted rather than paying for an extra check). With none remaining, a mislabelled new example can still be caught by EXAMPLE_LIMIT. For experimental follow-ups the Dean also gets `<current_example>` (the tutor's reply to the latest Get help or New example press, in full) and `<student_messages_since_example>`, worked out in code (`context.current_example`), so it can tell an example shown again from a new one and count the tries before the stuck escape. Without them it replaced about 30% of the "here's how to work it out" replies (eval 2026-10-08). Showing an earlier example's code again, completed or fixed, is not a new example (the Dean called it one for a third of correct Faded completions, eval 2026-10-07). The Dean sets `delivered_response_type` (the draft's type, or `fallback` if replaced), which is saved with the message; only delivered new examples count.
 
 **Short exercises.** The answer-leak rule is narrow on purpose: reject only the solution itself (code producing the outputs the problem asks for, e.g. its exact strings or numbers), the exact line the student should write, or the last missing piece of a solution built up over earlier turns. An example of the same concept with different values is allowed even when its structure matches the solution — in one- or two-line exercises that is unavoidable. The example agents are told never to use the problem's own values, strings or names.
 
@@ -504,6 +557,11 @@ an example or answer already given).
 - examples_remaining: new examples the student may still receive in this \
 lesson ("not limited" if unknown).
 - conversation_history: recent turns in this lesson, oldest first.
+- current_example and student_messages_since_example (experimental \
+follow-ups only): the example now being discussed, in full, and how many \
+messages the student has sent since it (their latest included).
+- close_analog_allowed: true for week-2 formula exercises, where a close \
+analog is allowed.
 - original_problem, student_code, draft_response.
 </inputs>
 
@@ -522,12 +580,16 @@ different values or a different scenario, even if its structure matches the \
 solution; explaining syntax or concepts; saying what kind of error the student \
 has or roughly where it is; a hint. In short exercises (one or two lines) a \
 parallel example will look like the solution; that is expected. Approve it \
-unless it uses the problem's own values.
+unless it uses the problem's own values. When close_analog_allowed is true \
+(week-2 formula exercises), the same kind of calculation in a different setting \
+is expected: reject only if it uses the exercise's own values or names, or its \
+exact formula.
 2. INAPPROPRIATE_CONTENT: unsafe, offensive, or off-topic content.
 3. HALLUCINATED_CODE: code that is broken or fabricated unintentionally. \
 Exceptions: the intentional bug in an Erroneous example (including when the \
-reply discusses it), the deliberate blanks in a Faded example (placeholder \
-lines such as `____` or `# ???: ...` make that code incomplete on purpose), \
+reply discusses it), the deliberate blanks in a Faded example (a placeholder \
+such as `____`, for a whole line or part of one, makes that code incomplete on \
+purpose), \
 and the student's own code quoted back to them.
 </always_check>
 
@@ -547,10 +609,13 @@ Only when experiment_condition is "experimental" and response_type is \
    - Faded: fills in a blank, or reveals the completed code, before the \
 student has correctly completed it themselves. Exception: after the student has \
 tried the same blank twice without success, the tutor may show how to work it \
-out, including its answer.
+out, including its answer. When student_messages_since_example is 2 or more \
+and the student's earlier messages were tries at the blank (or said they were \
+stuck), showing the answer is allowed.
    - Erroneous: reveals where the bug is or how to fix it before the student \
 has fixed it. Exception: after two unsuccessful tries the tutor may name the \
-line with the bug, and after a third it may show the fix.
+line with the bug, and after a third it may show the fix (count the tries with \
+student_messages_since_example).
    - Complete: leaves the parallel example and starts working on \
 <original_problem> itself.
 Answering the student's question, re-explaining, giving feedback on their \
@@ -561,7 +626,10 @@ attempt, or giving a narrower hint is allowed.
 Only when experiment_condition is "experimental" and examples_remaining is 0:
 6. EXAMPLE_LIMIT: the draft presents a new worked example (a new parallel \
 problem with its own code), whatever its response_type says. Discussing, \
-re-explaining or hinting about examples already given is allowed.
+re-explaining or hinting about examples already given is allowed, and so is \
+showing an earlier example's code again (completed, with its blanks filled in, \
+or fixed). Before rejecting, compare with current_example: code for the same \
+problem as current_example is not a new example.
 </example_limit>
 
 <control>

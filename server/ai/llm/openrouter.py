@@ -5,8 +5,10 @@ Accessed through ai.llm (``llm`` / ``check_llm``). Stays inert — no key is rea
 and no model is bound until the selector activates it (see ai/llm/__init__.py,
 driven by settings.OPENROUTER_ENABLED).
 
-Two roles with their own speed settings (config.py, OPENROUTER_*):
+Roles with their own speed settings (config.py, OPENROUTER_*):
 - "agent": the example and control agents, which write the tutor's replies;
+- "faded": the Faded example agent: the agent's model and cap, with its own
+  reasoning effort (OPENROUTER_FADED_REASONING, by default the agent's);
 - "check": the input guardrail and the Dean, which only classify.
 """
 
@@ -16,7 +18,7 @@ from langchain_openai import ChatOpenAI
 
 from config import settings
 
-Role = Literal["agent", "check"]
+Role = Literal["agent", "faded", "check"]
 
 
 def request_options(role: Role) -> dict:
@@ -24,9 +26,12 @@ def request_options(role: Role) -> dict:
     and output cap. Sent as extra body fields; max_tokens goes here because
     ChatOpenAI would send it as max_completion_tokens."""
     s = settings
-    agent = role == "agent"
-    effort = s.OPENROUTER_AGENT_REASONING if agent else s.OPENROUTER_CHECK_REASONING
-    max_tokens = s.OPENROUTER_AGENT_MAX_TOKENS if agent else s.OPENROUTER_CHECK_MAX_TOKENS
+    writes = role != "check"
+    if role == "faded":
+        effort = s.OPENROUTER_FADED_REASONING or s.OPENROUTER_AGENT_REASONING
+    else:
+        effort = s.OPENROUTER_AGENT_REASONING if writes else s.OPENROUTER_CHECK_REASONING
+    max_tokens = s.OPENROUTER_AGENT_MAX_TOKENS if writes else s.OPENROUTER_CHECK_MAX_TOKENS
 
     options: dict = {}
     provider: dict = {}

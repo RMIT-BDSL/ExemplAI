@@ -48,7 +48,7 @@ def test_spec_agents_use_the_codes_context_layout_and_tag_names():
         assert "<allowed_python>" in prompt, name
         assert "Target Problem" not in prompt, name
     # Context first, conversation last; no trailing "Generate ..." instruction.
-    assert SPEC.count("HumanMessage(content=student_context(state)),") >= 3
+    assert SPEC.count("HumanMessage(content=student_context(state") >= 4
     assert SPEC.count("*conversation(state),") >= 3
     for stale in ("<target_problem>", "<test_result>", "human_msg"):
         assert stale not in SPEC, stale
@@ -100,6 +100,24 @@ def test_dean_exempts_deliberate_faded_blanks():
     assert "deliberate blanks in a Faded example" in dean_validation._SYSTEM_PROMPT
 
 
+def test_typed_messages_are_pointed_to_the_new_example_button():
+    assert "A typed message never gets a new example" in context.RESPONSE_TYPE_INSTRUCTION
+    for prompt in _prompts():
+        assert "New example button gives one" in prompt and "generate a NEW" not in prompt
+
+
+def test_week_two_allows_a_close_analog_for_faded_and_the_dean():
+    from ai.nodes.context import close_analog_context
+    assert "<close_analog>" in close_analog_context({"current_knowledge_component": "variables_expressions"})
+    assert close_analog_context({"current_knowledge_component": "branching"}) == ""
+    _, faded, _ = _prompts()
+    assert "When <close_analog> is given, follow it instead" in faded
+    week2 = dean_validation._dean_input({"current_knowledge_component": "variables_expressions", "messages": []})
+    assert "<close_analog_allowed>true</close_analog_allowed>" in week2
+    assert "<close_analog_allowed>false</close_analog_allowed>" in dean_validation._dean_input({"messages": []})
+    assert "When close_analog_allowed is true" in dean_validation._SYSTEM_PROMPT
+
+
 def test_button_presses_are_spelled_out_for_the_model():
     base = {"current_knowledge_component": "loops", "experiment_condition": "experimental"}
     help_text = student_context({**base, "trigger": "get_help"})
@@ -136,9 +154,16 @@ def test_complete_and_faded_use_step_labels_erroneous_does_not():
     assert "Do not add step labels or other comments that point to the bug" in erroneous
 
 
-def test_faded_blank_sizing_judging_and_stuck_escape():
+def test_faded_fades_the_gap_step_judges_by_working_and_has_the_stuck_escape():
     _, faded, _ = _prompts()
-    assert "1 or 2 steps, never more than a third of the lines" in faded
+    # A different task, not the exercise renamed (a quarter were, eval 2026-10-07).
+    assert "if a small edit would turn your completed example into the exercise's answer" in faded
+    # Fade the step of the gap, sized to it.
+    assert "Fade one step: one blank, on the step that practises the gap" in faded
+    assert "the key part of a line" in faded and "Keep at least two thirds of the code worked out" in faded
+    assert "never the code that does it" in faded  # labels give the goal, not the blank
+    # Enough worked steps to learn from; the label is the only hint (eval, 2026-10-07).
+    assert "3 to 5 labelled steps" in faded and "# ???" not in faded
     assert "only by whether the completed example would then work" in faded
     assert "tried the same blank twice without success" in faded
 
@@ -170,8 +195,16 @@ def test_erroneous_context_lists_the_topics_bug_types_only_for_erroneous():
     assert "topic_bug_context(state)" in Path(err.__file__).read_text()
 
 
+def test_dean_limit_allows_an_earlier_example_shown_again():
+    # The Dean called the completed code of a Faded example "a new worked example" and the
+    # student got the example-limit message: a third of correct completions (eval, 2026-10-07).
+    assert "showing an earlier example's code again" in dean_validation._SYSTEM_PROMPT
+
+
 def test_dean_allows_the_stuck_escapes():
     prompt = dean_validation._SYSTEM_PROMPT
+    assert "student_messages_since_example is 2 or more" in prompt  # tries counted in code
+    assert "compare with current_example" in prompt
     assert "tried the same blank twice without success" in prompt
     assert "after two unsuccessful tries the tutor may name" in prompt
     assert "exactly one intentional, non-trivial logic bug for the student to fix" in prompt

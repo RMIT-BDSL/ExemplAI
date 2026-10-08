@@ -50,6 +50,7 @@ def use(config: str):
     for k, v in CONFIGS[config].items():
         setattr(settings, k, v)
     llm_mod.llm._model = None
+    llm_mod.faded_llm._model = None
     llm_mod.check_llm._model = None
 
 
@@ -145,8 +146,8 @@ def _line(r: dict) -> str:
 
 # ── Phases ────────────────────────────────────────────────────────────
 
-def help_case(lesson: dict, band: str, rep: int = 0) -> Case:
-    case = base_case(lesson, "get_help", BANDS[band], rep)
+def help_case(lesson: dict, band: str, rep: int = 0, attempt: str | None = None) -> Case:
+    case = base_case(lesson, "get_help", BANDS[band], rep, attempt)
     case.history = [{"sender": "user", "content": GET_HELP}]
     case.allowance = {"cap": 3, "used": 0, "earned": 1, "remaining": 1, "exhausted": False, "helpStarted": False}
     return case

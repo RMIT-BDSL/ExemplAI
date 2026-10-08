@@ -17,6 +17,14 @@ def test_defaults_route_to_fast_providers_with_low_reasoning():
     assert openrouter.request_options("check")["max_tokens"] == 8192
 
 
+def test_faded_reasoning_defaults_to_the_agents_and_can_differ(monkeypatch):
+    assert openrouter.request_options("faded") == openrouter.request_options("agent")
+    monkeypatch.setattr(settings, "OPENROUTER_FADED_REASONING", "medium")
+    assert openrouter.request_options("faded")["reasoning"] == {"effort": "medium"}
+    assert openrouter.request_options("agent")["reasoning"] == {"effort": "low"}
+    assert openrouter.request_options("faded")["max_tokens"] == 16384
+
+
 def test_default_model_is_v4_1_flash():
     assert settings.OPENROUTER_MODEL == "deepseek/deepseek-v4.1-flash"
 
