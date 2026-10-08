@@ -6,14 +6,15 @@ import type { Id } from "../../convex/_generated/dataModel";
 // Keep in step with convex/visits.ts HEARTBEAT_MS.
 const HEARTBEAT_MS = 30_000;
 const TICK_MS = 5_000;
-// Input within this long counts as still working (reading, thinking).
-const IDLE_AFTER_MS = 60_000;
+// Input within this long counts as still working: reading an example or the
+// exercise can take a few minutes without touching the mouse or keyboard.
+const IDLE_AFTER_MS = 180_000;
 
 /**
  * Time on task: starts a lessonVisits row each time a lesson is opened and
  * reports active time every 30 s. Time counts only while the tab is visible
  * and the student has typed, clicked, scrolled or moved the mouse in the last
- * minute; the server caps every report by real elapsed time.
+ * 3 minutes; the server caps every report by real elapsed time.
  */
 export function useLessonVisit(lessonId: Id<"questions"> | undefined) {
   const startVisit = useMutation(api.visits.startVisit);

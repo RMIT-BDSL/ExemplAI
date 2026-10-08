@@ -63,3 +63,18 @@ describe("example allowance", () => {
     expect(buttonBlockedReason("get_help", again)).toBeNull();
   });
 });
+
+import { routingMastery } from "../convex/chats";
+
+describe("example type follows the mastery the lesson started with", () => {
+  it("uses mastery before the lesson's first Submit once there is one", () => {
+    // passed two lessons (0.70), then failed this one's first Submit (live 0.43)
+    expect(routingMastery(0.43, { mastery_before: 0.7014 })).toBe(0.7014);
+  });
+
+  it("uses live mastery before any Submit on the lesson, and null when there is none", () => {
+    expect(routingMastery(0.43, null)).toBe(0.43);
+    expect(routingMastery(0.43, {})).toBe(0.43);
+    expect(routingMastery(null, null)).toBeNull();
+  });
+});

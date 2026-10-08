@@ -125,7 +125,8 @@ def dean_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    files = [Path(a) for a in sys.argv[1:]] or [p for p in (_latest("speed"), _latest("quality"), _latest("dean")) if p]
+    files = [Path(a) for a in sys.argv[1:]] or [p for p in (_latest("speed"), _latest("quality"), _latest("dean"),
+                                                            _latest("session")) if p]
     for path in files:
         df = _load(path)
         print(f"\n{'═' * 100}\n{path.name}  ({len(df)} rows)\n{'═' * 100}")
@@ -137,6 +138,9 @@ def main():
         elif path.name.endswith("-quality.jsonl"):
             df = replies(df)
             print(quality_table(df).to_string())
+        elif path.name.endswith("-session.jsonl"):
+            from eval.session import summary
+            summary(df.to_dict("records"))
         elif path.name.endswith("-dean.jsonl"):
             print("Share of planted drafts the Dean judged correctly (clean = approved, others = rejected):")
             print(dean_table(df).to_string())

@@ -6,7 +6,7 @@ import { authenticatedMutation } from "./functions";
  * Time on task (research log). The workspace starts a visit each time a lesson
  * is opened and sends a heartbeat every HEARTBEAT_MS with the milliseconds the
  * student was active since the last one (tab visible and some input in the
- * last minute; src/lib/useLessonVisit.ts). Each credit is capped by the wall
+ * last 3 minutes; src/lib/useLessonVisit.ts). Each credit is capped by the wall
  * time since the previous heartbeat plus a little slack, so a visit can never
  * gain more active time than real time passed.
  */

@@ -88,7 +88,7 @@ class TutorGraphState(TypedDict):
     reference_solution: str               # The canonical correct solution from the Convex DB
     unit_test_assertions: str             # The deterministic unit test code (assert statements)
     current_knowledge_component: str      # e.g., "KC_Loop_Syntax"
-    bkt_prob_mastery: float               # Float 0.0 - 1.0 fetched from BKT DB
+    bkt_prob_mastery: float               # Float 0.0 - 1.0: the student's mastery when they started this lesson (before its first, graded Submit); see routingMastery in web/convex/chats.ts
     pedagogical_modality: str             # e.g., "Complete", "Faded", "Erroneous"
     student_code: str                     # The raw buggy code submitted
     error_trace: str                      # Unit test failure output (deterministic)
@@ -353,7 +353,7 @@ def faded_example_node(state: TutorGraphState):
 #### 4.2.3 Erroneous Example Agent (`erroneous_example_node`)
 **Target Audience:** Experts (`probMastery > 0.7`). High risk of the Expertise Reversal Effect.
 
-Exactly one logic bug, chosen from the topic's bug types (`<topic_bugs>`, `server/ai/syllabus.py`), in runnable code that prints the failing case. The student is asked only to **fix** it ("This code fails on [input]: …. Can you fix it?"); a working fix also shows they found the bug, and they are never asked to explain why. After two unsuccessful tries the tutor names the line, after a third it shows the fix (the Dean allows both).
+Exactly one logic bug, chosen from the topic's bug types (`<topic_bugs>`, `server/ai/syllabus.py`), in runnable code that ends by running an ordinary input. The tutor doesn't say which input fails: it asks "This code has a bug. Can you find it?", and the student finds it against the problem statement (decided 2026-10-07, after an evaluation found the failing input and outputs gave the bug away). Pointing to the line with a fix, or a working fix, counts; they are never asked to explain why. After two unsuccessful tries the tutor names the line, after a third it shows the fix (the Dean allows both).
 
 **Node Function:**
 ```python
@@ -378,10 +378,12 @@ guessing the hidden inputs.
 - Plant EXACTLY ONE bug, on a line that uses the <knowledge_component>. It must be a \
 logic error chosen from <topic_bugs>, NOT a syntax error.
 - The code must be self-contained and runnable: end it with a line that calls the \
-function with the failing input and prints the result.
-- Present the code as if YOU wrote it. State the failing input, the expected output \
-and the actual (wrong) output.
-- Ask the student only to fix the code. Do not ask them to explain why it fails.
+function on an ordinary input and prints the result. Do not choose the input that \
+exposes the bug.
+- Present the code as if YOU wrote it. Do not say which input fails or what the code \
+outputs: the student finds the bug by comparing the code with the problem statement.
+- Ask the student to find the bug: "This code has a bug. Can you find it?" Do not ask \
+them to explain why it fails.
 - Do not add step labels or other comments that point to the bug.
 - Do NOT provide structural templates, hints, or direct answers to the <original_problem>.
 - Use only the Python features listed in <allowed_python>; never use a feature \
@@ -390,28 +392,29 @@ from a later topic, even if it would be shorter.
 
 <multi_turn>
 When the student replies:
-- Judge only their fix. It is CORRECT if, with their change, the code gives the \
-expected output for the failing input and still works for ordinary inputs. A working \
-fix also shows they found the bug.
+- Judge only what they found or changed. It is CORRECT if they point to the buggy line \
+with a change that fixes it, or give a fix with which the code meets the problem \
+statement for ordinary and edge inputs. A working fix also shows they found the bug.
 - If CORRECT: Confirm, and bridge back: "Sharp eye! Does this bug remind you of \
 anything in your own code on the left?"
 - If they point to the right line but give no fix: "Right spot. How would you change it?"
-- If their fix does not work: Do NOT reveal the answer. Ask them to trace the failing \
-input through their changed code, line by line.
-- If they point to the wrong line: Ask them to trace the failing input through the \
-code, and narrow down the area (for example "look at the condition") without naming \
-the line.
+- If their fix does not work: Do NOT reveal the answer. Ask them to trace a small \
+input, including an edge case, through their changed code, line by line.
+- If they point to the wrong line: Ask them to trace a few inputs, including an edge \
+case, through the code, and narrow down the area (for example "look at the \
+condition") without naming the line.
 - Suggest they test a fix themselves by editing the example's code in the chat and pressing Run.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
-the fix and how it makes the failing input work.
+the fix and an input on which the original code went wrong.
 - If they ask for a DIFFERENT example: Acknowledge the request and generate a NEW \
 erroneous example using a completely DIFFERENT scenario to prevent pattern-matching.
 </multi_turn>
 
 <output_format>
-1. Analog problem statement (1-2 sentences)
-2. The buggy code, ending with the line that runs the failing input
-3. "This code fails on [input]: it gives [actual] instead of [expected]. Can you fix it?"
+1. Analog problem statement (1-2 sentences), saying exactly what the function should \
+return, including for edge cases
+2. The buggy code, ending with a line that runs an ordinary input
+3. "This code has a bug. Can you find it?"
 </output_format>"""
 
 
