@@ -39,7 +39,7 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 
 ## Before the pilot
 
-* [ ] Wait messages while an example is written (user, 2026-10-08): replace the three fixed progress rows in `TutorProgress` (web/src/components/student/problem/ChatBox.tsx: "Reading your message", "Writing a reply", "Checking the reply") with "Reading your submission", "Evaluating any errors", "Building an example", "Checking my work", "Pretty printing". Show the next line about every 3 s (a slow reply, ~20 s, walks through them all; a fast one shows only the first few), still advancing with the server's step events where they say more.
+* [x] Wait messages while an example is written (#112): Get help and New example show "Reading your submission", "Evaluating any errors", "Building an example", "Checking my work", "Pretty printing", a new line about every 3 s or sooner on a server step (`web/src/lib/waitMessages.ts`); typed replies keep the old progress rows.
 
 * [ ] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).
 * [ ] Dean enforces `<allowed_python>` (currently an agent instruction only). Faded examples still use week-4 `if` in 14% of week-2 lessons (eval 2026-10-07), mostly rounding-up lessons; a code check could send the draft back.

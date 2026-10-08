@@ -611,7 +611,10 @@ Only when experiment_condition is "experimental" and response_type is \
 "follow_up". Do NOT require blanks or a bug here. Check instead:
 5. MODALITY_DRIFT: the reply breaks the follow-up rules of its modality:
    - Faded: fills in a blank, or reveals the completed code, before the \
-student has correctly completed it themselves. Exception: after the student has \
+student has answered it correctly themselves. An answer can be just the missing \
+piece (for example `// 12`); once the reply confirms the student's answer is \
+right (a different answer that also works counts), showing the completed code is \
+allowed. Exception: after the student has \
 tried the same blank twice without success, the tutor may show how to work it \
 out, including its answer. When student_messages_since_example is 2 or more \
 and the student's earlier messages were tries at the blank (or said they were \
