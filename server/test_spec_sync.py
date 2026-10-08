@@ -205,6 +205,8 @@ def test_dean_allows_the_stuck_escapes():
     prompt = dean_validation._SYSTEM_PROMPT
     assert "student_messages_since_example is 2 or more" in prompt  # tries counted in code
     assert "compare with current_example" in prompt
+    # A short typed answer counts: correct answers were blocked 43/68 times (eval 2026-10-08).
+    assert "An answer can be just the missing" in prompt
     assert "tried the same blank twice without success" in prompt
     assert "after two unsuccessful tries the tutor may name" in prompt
     assert "exactly one intentional, non-trivial logic bug for the student to fix" in prompt
