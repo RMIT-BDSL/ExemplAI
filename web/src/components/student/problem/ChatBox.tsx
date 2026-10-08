@@ -8,6 +8,7 @@ import {
   streamChatMessage,
 } from "#/lib/api.ts";
 import { cn } from "#/lib/utils.ts";
+import { EXAMPLE_WAIT_LINES, exampleWaitLine } from "#/lib/waitMessages.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import RunnableCodeBlock from "./RunnableCodeBlock";
@@ -125,7 +126,14 @@ const AGENT_NODES = [
   "control_agent_node",
 ];
 
-function TutorProgress({ steps }: { steps: string[] }) {
+function TutorProgress({
+  steps,
+  forExample = false,
+}: {
+  steps: string[];
+  /** Get help / New example: show the example wait lines (lib/waitMessages). */
+  forExample?: boolean;
+}) {
   const [seconds, setSeconds] = React.useState(0);
   React.useEffect(() => {
     const started = Date.now();
@@ -135,6 +143,34 @@ function TutorProgress({ steps }: { steps: string[] }) {
     );
     return () => clearInterval(timer);
   }, []);
+
+  if (forExample) {
+    const current = exampleWaitLine(seconds, steps);
+    return (
+      <div
+        className="space-y-1 py-1 font-sans text-xs text-ink-label"
+        role="status"
+        aria-label="The tutor is writing an example"
+      >
+        {EXAMPLE_WAIT_LINES.slice(0, current + 1).map((label, i) => (
+          <div
+            key={label}
+            className={cn(
+              "flex items-center gap-2",
+              i === current && "text-ink",
+            )}
+          >
+            <span className="w-3 text-center">{i < current ? "✓" : "●"}</span>
+            <span>
+              {label}
+              {i === current ? "…" : ""}
+            </span>
+          </div>
+        ))}
+        <div className="pl-5 tabular-nums">{seconds}s</div>
+      </div>
+    );
+  }
 
   const read = steps.includes("input_guardrail");
   const lastDraft = Math.max(...AGENT_NODES.map((n) => steps.lastIndexOf(n)));
@@ -184,12 +220,15 @@ export interface MessageFeedProps {
   isTyping?: boolean;
   /** Graph steps finished so far for the reply being written. */
   progress?: string[];
+  /** The reply being written is a new example (Get help / New example). */
+  waitingForExample?: boolean;
 }
 
 export function MessageFeed({
   messages,
   isTyping,
   progress = [],
+  waitingForExample = false,
 }: MessageFeedProps) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
@@ -208,7 +247,9 @@ export function MessageFeed({
         <MessageBubble key={message.id} message={message} />
       ))}
 
-      {isTyping && <TutorProgress steps={progress} />}
+      {isTyping && (
+        <TutorProgress steps={progress} forExample={waitingForExample} />
+      )}
 
       <div ref={bottomRef} />
     </div>
@@ -307,9 +348,7 @@ export function ChatInput({ onSendMessage, example }: ChatInputProps) {
         </>
       )}
     </form>
-
   );
-
 }
 
 /** Where the input would be while the chat is locked: says why, and what to do next. */
@@ -380,6 +419,8 @@ export default function ChatBox({
   // Graph steps finished for the reply being written (from /chat/stream).
   const [progress, setProgress] = React.useState<string[]>([]);
   const [isTyping, setIsTyping] = React.useState(false);
+  // The reply being waited for is a new example (shows the example wait lines).
+  const [waitingForExample, setWaitingForExample] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
 
   // When the POST /chat connection dies (e.g. Firefox NS_BINDING_ERROR, a reset
@@ -566,6 +607,7 @@ export default function ChatBox({
 
     // Optmistically show typing state
     sentAtRef.current = Date.now();
+    setWaitingForExample(!!trigger);
     setIsTyping(true);
     setLocalError(null);
     expectingReplyRef.current = false;
@@ -634,7 +676,8 @@ export default function ChatBox({
         editorContext,
         trigger ?? "message",
         (node) => {
-          if (chatIdRef.current === chatId) setProgress((prev) => [...prev, node]);
+          if (chatIdRef.current === chatId)
+            setProgress((prev) => [...prev, node]);
         },
       );
       if (chatIdRef.current === chatId) setIsTyping(false);
@@ -698,6 +741,7 @@ export default function ChatBox({
           messages={messages}
           isTyping={isTyping}
           progress={progress}
+          waitingForExample={waitingForExample}
         />
       </div>
 
@@ -711,7 +755,7 @@ export default function ChatBox({
           onClick={() => requestExample(exampleTrigger)}
           disabled={!exampleEnabled}
         />
-      ) : helpStarted && !isTyping && !!chatId && !!convexLessonId ? (
+      ) : helpStarted && !isTyping && chatId && convexLessonId ? (
         // The input only exists while the student can actually type; locked or
         // waiting on the tutor, there is no bar. Why the Example button is
         // unavailable is its tooltip.
@@ -737,6 +781,5 @@ export default function ChatBox({
         />
       ) : null}
     </div>
-
   );
 }
