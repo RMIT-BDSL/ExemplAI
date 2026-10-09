@@ -164,6 +164,8 @@ def test_faded_fades_the_gap_step_judges_by_working_and_has_the_stuck_escape():
     assert "never the code that does it" in faded  # labels give the goal, not the blank
     # Enough worked steps to learn from; the label is the only hint (eval, 2026-10-07).
     assert "3 to 5 labelled steps" in faded and "# ???" not in faded
+    # Expression mistakes (brackets, / for //) stay on one line to be practised (eval 2026-10-09).
+    assert "keep that expression whole on one line and blank it" in faded
     assert "only by whether the completed example would then work" in faded
     assert "tried the same blank twice without success" in faded
 

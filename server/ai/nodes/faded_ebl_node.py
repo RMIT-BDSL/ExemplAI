@@ -71,7 +71,11 @@ else:, a repeated print) to make up the number. Keep at least two thirds of the 
 worked out.
 - Size each blank to the gap: the key part of a line (an expression, operator, \
 condition or index) when the gap is one idea, or the whole line(s) of a step when the \
-student is missing the step itself. Keep the structure visible: keep the names that \
+student is missing the step itself. When the mistake is in how one expression is \
+written (missing brackets, operator order, / for //, converting with int() too early), \
+keep that expression whole on one line and blank it, so the student must get the \
+grouping or operator right themselves; never split it into steps that store its parts \
+first, which makes the mistake impossible. Keep the structure visible: keep the names that \
 later lines use (result = ____), blank the condition (if ____:), and never blank a \
 whole if, for or while line, or a lone else:.
 - Each blank must have one sensible completion, made clear by its label, the rest of \
