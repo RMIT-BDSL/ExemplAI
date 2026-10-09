@@ -32,22 +32,23 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 
 * [ ] Redeploy the Python server on Railway from `dev` (confirm which branch Railway tracks); #86 needs it (Dean retry, progress steps, timing logs). Server and Convex must share `CONVEX_BACKEND_SECRET` or Run/Submit results stop being recorded.
 * [ ] Reset + reseed the dev Convex database (`pnpm run seed` after clearing the tables), then run `students:backfillSummaries` for the admin student view.
-* [ ] Review and merge #88 (one tutor bar: Get help → chat).
 * [ ] Review `server/ai/syllabus.py` (features and bug types per topic) against the course guide.
-* [ ] Manual test of the full flow on exemplai-dev: failed Submit → Get help → chat → New example ×3 → "try another topic" → reset. Also check what's new since 10-03: Dean retry, progress steps, fresh chat per lesson open, Submit history, Run shortcut, resizable columns, console, syllabus opening on the current week.
+* [ ] Manual test of the full flow on exemplai-dev: failed Submit → Get help (wait lines) → type just the missing piece ("Exactly right!") → two wrong guesses (hint, then how to work it out) → ask for another example in chat (pointed to the New example button) → New example ×3 → "try another topic" → reset. Also check: one tutor bar (#88), Submit history, Run shortcut, resizable columns, console, syllabus opening on the current week.
 * [ ] Check the admin student view (#78, #83) gives what testing needs (lesson, topic, mastery + band, status, examples used, last reply type).
 
 ## Before the pilot
 
 * [x] Wait messages while an example is written (#112): Get help and New example show "Reading your submission", "Evaluating any errors", "Building an example", "Checking my work", "Pretty printing", a new line about every 3 s or sooner on a server step (`web/src/lib/waitMessages.ts`); typed replies keep the old progress rows.
 
-* [ ] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).
-* [ ] Dean enforces `<allowed_python>` (currently an agent instruction only). Faded examples still use week-4 `if` in 14% of week-2 lessons (eval 2026-10-07), mostly rounding-up lessons; a code check could send the draft back.
-* [ ] Faded, week 2: when the student's mistake is in how one expression is written (missing brackets, `/` for `//`), the example splits the expression into steps and so never practises the mistake. Ask for that expression on one line with its key part blank. Most of the remaining misplaced blanks (week 2: 62% well placed, weeks 3–4: 85%).
+* [x] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).
+* [ ] Later: Dean enforces `<allowed_python>` (currently an agent instruction only). Faded examples still use week-4 `if` in a few week-2 lessons (2 of 42 on 2026-10-08), mostly rounding-up lessons; a code check could send the draft back. Acceptable for now (2026-10-09).
+* [x] Faded, week 2: a mistake in how one expression is written (missing brackets, `/` for `//`, `int()` too early) now keeps that expression on one line, blanked, instead of splitting it into steps. Blind review of 42 old vs 42 new week-2 examples (2026-10-09): aims at the student's mistake 29 → 37, mean score 3.79 → 4.29.
+* [ ] Later: Faded follow-ups to a wrong answer hint so strongly that they nearly give it away in 6 of 34 cases (mostly week-3 string reorders). Acceptable for now (2026-10-09).
+* [x] Follow-up reply time (2026-10-09): one at a time, a typed answer takes 2.9 s median (5.3 s p90): guardrail 0.5 s, tutor 1.3 s (28 reasoning tokens), Dean 0.8 s. The ~10 s seen in testing came from 6 requests at once plus Dean retries; a correct answer still gets a retry 4 times in 16 (+2–3 s each).
 * [x] Dean on Faded follow-ups after two wrong tries (2026-10-08): the Dean now gets the current example in full and the student's message count since it, worked out in code. "Here's how to work it out" replies replaced: 17/68 → 3/68; typed replies replaced overall 21/136 → 7/136 (`eval.examples --replies`). Typed chat never starts a new example (new examples only from the buttons).
 * [ ] Guardrail: the injection pattern misses "ignore **all previous** instructions" (allows only one word between "ignore" and "instructions"); typed messages are still screened by the model.
 * [ ] Prompt review items 9–14: runnable Complete/Faded code, no repeated scenarios, scripted reply to "what's wrong with my code?", "in the editor" wording, shared length/style rules, clearer "trivially adaptable" rule.
-* [ ] Empirical DeepSeek runs of the prompts on scripted conversations (needs an OpenRouter key in `server/.env`).
+* [x] Empirical runs of the prompts on scripted conversations: `server/eval` (examples, typed replies and answers, simulated sessions).
 * [ ] Teaching team reviews the new lessons (tag `exemplai`) and the reconstructed CSEDM descriptions (check against PSLC DataShop dataset 1798).
 
 ## Research analysis
