@@ -69,6 +69,7 @@ const csedmProblems: SeedProblem[] = [
       { input: "1.5708", expectedOutput: "90.0" },
       { input: "-1", expectedOutput: "-57.3", hidden: true },
       { input: "6.28318", expectedOutput: "360.0", hidden: true },
+      { input: "0.5", expectedOutput: "28.65", hidden: true },
     ],
   },
   {
@@ -220,6 +221,7 @@ const csedmProblems: SeedProblem[] = [
       { input: "1, 2, 1", expectedOutput: "-1.0" },
       { input: "-1, 2, 3", expectedOutput: "3.0", hidden: true },
       { input: "2, -4, -6", expectedOutput: "3.0", hidden: true },
+      { input: "2, -7, 5", expectedOutput: "2.5", hidden: true },
     ],
   },
   {
@@ -401,6 +403,7 @@ const csedm2Problems: SeedProblem[] = [
       { input: "20", expectedOutput: "20" },
       { input: "5", expectedOutput: "10", hidden: true },
       { input: "25", expectedOutput: "30", hidden: true },
+      { input: "4", expectedOutput: "0", hidden: true },
     ],
   },
   {
@@ -939,6 +942,7 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "99", expectedOutput: "9" },
       { input: "30", expectedOutput: "2", hidden: true },
       { input: "4", expectedOutput: "4", hidden: true },
+      { input: "20", expectedOutput: "2", hidden: true },
     ],
   },
   {
@@ -957,6 +961,7 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "99", expectedOutput: "10" },
       { input: "15", expectedOutput: "2", hidden: true },
       { input: "3", expectedOutput: "3", hidden: true },
+      { input: "30", expectedOutput: "2", hidden: true },
     ],
   },
   {
@@ -1220,6 +1225,8 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "10", expectedOutput: "mild" },
       { input: "29", expectedOutput: "mild", hidden: true },
       { input: "-10", expectedOutput: "cold", hidden: true },
+      { input: "29.5", expectedOutput: "mild", hidden: true },
+      { input: "9.5", expectedOutput: "cold", hidden: true },
     ],
   },
   {
@@ -1256,6 +1263,7 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "200, 0, 4", expectedOutput: "200.0" },
       { input: "1000, 5, 0", expectedOutput: "1000.0", hidden: true },
       { input: "100, 50, 2", expectedOutput: "225.0", hidden: true },
+      { input: "1000, 7, 3", expectedOutput: "1225.04", hidden: true },
     ],
   },
   {
@@ -1274,6 +1282,7 @@ const exemplaiProblems: SeedProblem[] = [
       { input: "\"x y z y\"", expectedOutput: "y" },
       { input: "\"b a a b\"", expectedOutput: "b", hidden: true },
       { input: "\"dog cat cat\"", expectedOutput: "cat", hidden: true },
+      { input: "\"a b a b\"", expectedOutput: "a", hidden: true },
     ],
   },
   {
