@@ -32,6 +32,7 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 
 * [ ] Redeploy the Python server on Railway from `dev` (confirm which branch Railway tracks); #86 needs it (Dean retry, progress steps, timing logs). Server and Convex must share `CONVEX_BACKEND_SECRET` or Run/Submit results stop being recorded.
 * [ ] Reset + reseed the dev Convex database (`pnpm run seed` after clearing the tables), then run `students:backfillSummaries` for the admin student view.
+* [ ] Reseed dev and production with the 9 new hidden tests (2026-10-10): a mutation check found wrong solutions passing every test in 8 lessons (convertToDegrees, nearestWaterFountain, makeChange, countNotes, compoundInterest, describeTemperature, mostCommonWord, findRoot); now 137 hidden tests, and every remaining surviving change gives the same answers.
 * [ ] Review `server/ai/syllabus.py` (features and bug types per topic) against the course guide.
 * [ ] Manual test of the full flow on exemplai-dev: failed Submit → Get help (wait lines) → type just the missing piece ("Exactly right!") → two wrong guesses (hint, then how to work it out) → ask for another example in chat (pointed to the New example button) → New example ×3 → "try another topic" → reset. Also check: one tutor bar (#88), Submit history, Run shortcut, resizable columns, console, syllabus opening on the current week.
 * [ ] Check the admin student view (#78, #83) gives what testing needs (lesson, topic, mastery + band, status, examples used, last reply type).

@@ -72,9 +72,14 @@ def leak(lesson: dict, text: str) -> bool:
     for block in code_blocks(text):
         if not _parses(block):
             continue
-        names = [n.name for n in ast.walk(ast.parse(block)) if isinstance(n, ast.FunctionDef)]
+        tree = ast.parse(block)
+        names = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+        # Drop top-level expression lines (the example's sample print calls): their
+        # output would spoil the comparison with the tests' expected output.
+        tree.body = [n for n in tree.body if not isinstance(n, ast.Expr)]
+        definitions = ast.unparse(tree)
         for name in names:
-            program = block + f"\n{target} = {name}\n"
+            program = definitions + f"\n{target} = {name}\n"
             runner = wrap_code_with_runner(program, lesson["starter_code"], lesson["solution_code"])
             solution = wrap_code_with_runner(lesson["solution_code"], lesson["starter_code"], lesson["solution_code"])
             ok = True
