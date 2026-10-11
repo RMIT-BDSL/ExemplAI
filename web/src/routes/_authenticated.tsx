@@ -1,5 +1,5 @@
 import { usePostHog } from "@posthog/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Outlet, redirect, useMatches, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -54,15 +54,18 @@ function AuthenticatedLayout() {
   const joinWithId = useMutation(api.cohorts.joinWithId);
   const [joined, setJoined] = useState(!isIdAccount);
   const [joinError, setJoinError] = useState("");
-  useEffect(() => {
-    if (!isIdAccount || !isAuthenticated) return;
+  const runJoin = useCallback(() => {
+    setJoinError("");
     joinWithId({})
       .then(() => setJoined(true))
       .catch((err) => {
         setJoinError(err.message || "Couldn't open your course.");
         posthog.captureException(err);
       });
-  }, [isIdAccount, isAuthenticated, joinWithId, posthog]);
+  }, [joinWithId, posthog]);
+  useEffect(() => {
+    if (isIdAccount && isAuthenticated) runJoin();
+  }, [isIdAccount, isAuthenticated, runJoin]);
   const intake = useQuery(api.cohorts.myIntake, isIdAccount && joined ? {} : "skip");
 
   // Magic-link sign-in completion: the user followed the link in their email and
@@ -124,10 +127,28 @@ function AuthenticatedLayout() {
 
   if (isIdAccount && (!joined || intake === undefined)) {
     return (
-      <div className="xa-workspace flex min-h-dvh w-full items-center justify-center">
+      <div className="xa-workspace flex min-h-dvh w-full flex-col items-center justify-center gap-4 px-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
           {joinError || "Opening your course..."}
         </p>
+        {joinError && (
+          <div className="flex gap-3 text-xs">
+            <button
+              type="button"
+              onClick={runJoin}
+              className="rounded-[2px] border border-rule-strong px-3 py-1.5 text-ink hover:text-brass cursor-pointer"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/sign-out" })}
+              className="rounded-[2px] border border-rule-strong px-3 py-1.5 text-ink-muted hover:text-brass cursor-pointer"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     );
   }

@@ -9,7 +9,7 @@ import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel.d.ts";
 import authConfig from "./auth.config";
 import { triggers } from "./triggers";
-import { isIdEmail, isValidStudentId, studentIdFromEmail } from "./studentIds";
+import { idPassword, isIdEmail, isValidStudentId, studentIdFromEmail } from "./studentIds";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -82,6 +82,11 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
             const id = studentIdFromEmail(body.email);
             if (!id || !isValidStudentId(id)) {
               throw new APIError("BAD_REQUEST", { message: "Please enter a valid student ID." });
+            }
+            // Only the ID's own password, so nobody can claim an ID with
+            // another password and lock its student out.
+            if (body?.password !== idPassword(id)) {
+              throw new APIError("BAD_REQUEST", { message: "Please sign in with your student ID." });
             }
             return;
           }

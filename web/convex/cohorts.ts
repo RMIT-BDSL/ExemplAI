@@ -83,13 +83,18 @@ export const joinWithId = mutation({
     if (!user) throw new Error("User not found");
 
     const now = Date.now();
-    let participant =
+    // Their own row, else an unlinked row for their ID (roster rows first). A
+    // row linked to another account (e.g. one since deleted) is never taken over.
+    const unlinked = (await ctx.db
+      .query("cohortParticipants")
+      .withIndex("by_student_id", (q) => q.eq("studentId", studentId))
+      .order("desc")
+      .collect()).filter((r) => r.userId === undefined);
+    let participant: Doc<"cohortParticipants"> | null =
       (await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", user._id)).first()) ??
-      (await ctx.db
-        .query("cohortParticipants")
-        .withIndex("by_student_id", (q) => q.eq("studentId", studentId))
-        .order("desc")
-        .first());
+      unlinked.find((r) => r.on_roster) ??
+      unlinked[0] ??
+      null;
     // Their ID was added to a roster after they first signed in unlisted: move
     // them onto the roster row, keeping the group they already have (so nobody
     // switches condition mid-study) and their sign-ins and survey.
@@ -168,10 +173,16 @@ export const submitIntake = authenticatedMutation({
       .withIndex("by_user", (q) => q.eq("userId", ctx.customUser!._id))
       .first();
     if (!row) throw new Error("Not in a cohort");
-    const known = new Set<string>(INTAKE_QUESTIONS.map((q) => q.id));
-    const clean = Object.fromEntries(
-      Object.entries(answers).filter(([k]) => known.has(k)).map(([k, val]) => [k, val.slice(0, 500)]),
-    );
+    const clean: Record<string, string> = {};
+    for (const q of INTAKE_QUESTIONS) {
+      const answer = (answers[q.id] ?? "").trim();
+      if (q.type === "choice") {
+        if (!(q.options as readonly string[]).includes(answer)) throw new Error(`Please answer: ${q.label}`);
+        clean[q.id] = answer;
+      } else if (answer) {
+        clean[q.id] = answer.slice(0, 500);
+      }
+    }
     await ctx.db.patch(row._id, { intake: clean, intake_at: Date.now() });
   },
 });

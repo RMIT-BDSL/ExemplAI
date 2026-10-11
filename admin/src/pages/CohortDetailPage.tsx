@@ -71,7 +71,12 @@ const CohortDetailPage: Component = () => {
 
   const toggleOpen = async () => {
     const c = roster.data()?.cohort;
-    if (c) await convex.mutation(api.cohorts.setOpen, { cohortId: c._id as any, open: !c.open });
+    if (!c) return;
+    try {
+      await convex.mutation(api.cohorts.setOpen, { cohortId: c._id as any, open: !c.open });
+    } catch (err: any) {
+      setError(err.message || 'Failed to change the open cohort');
+    }
   };
 
   const remove = async (p: Participant) => {
