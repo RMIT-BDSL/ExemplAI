@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { authComponent } from "./auth";
 import { shuffledBlock } from "./experiment";
+import { internalQuery } from "./_generated/server";
 import { adminMutation, adminQuery, authenticatedMutation, authenticatedQuery, mutation } from "./functions";
 import {
   balancedGroups,
@@ -10,6 +11,7 @@ import {
   INTAKE_QUESTIONS,
   isValidStudentId,
   normalizeStudentId,
+  passcodeMatches,
   shuffled,
   studentIdFromEmail,
 } from "./studentIds";
@@ -66,6 +68,28 @@ async function blockGroup(ctx: MutationCtx, cohortCode: string): Promise<Group> 
 }
 
 // ── Students ──────────────────────────────────────────────────────────
+
+/**
+ * Sign-in check (convex/auth.ts): does `passcode` open the cohort this ID
+ * belongs to? That's the cohort of its roster row (or its own earlier row),
+ * else the open cohort. A cohort without a passcode lets any ID in. Internal,
+ * so passcodes never reach the browser.
+ */
+export const passcodeAllows = internalQuery({
+  args: { studentId: v.string(), passcode: v.optional(v.string()) },
+  handler: async (ctx, { studentId, passcode }) => {
+    const rows = await ctx.db
+      .query("cohortParticipants")
+      .withIndex("by_student_id", (q) => q.eq("studentId", normalizeStudentId(studentId)))
+      .order("desc")
+      .collect();
+    const row = rows.find((r) => r.on_roster) ?? rows[0];
+    const cohort = row
+      ? await ctx.db.get(row.cohortId)
+      : await ctx.db.query("cohorts").withIndex("by_open", (q) => q.eq("open", true)).order("desc").first();
+    return passcodeMatches(cohort?.passcode, passcode);
+  },
+});
 
 /**
  * Called after every ID sign-in. Links the account to its participant row
@@ -197,6 +221,14 @@ export const create = adminMutation({
     return await ctx.db.insert("cohorts", {
       name: trimmed, code: slug(trimmed), open: false, created_at: Date.now(),
     });
+  },
+});
+
+/** Set or clear the session passcode (empty clears it: ID only). */
+export const setPasscode = adminMutation({
+  args: { cohortId: v.id("cohorts"), passcode: v.string() },
+  handler: async (ctx, { cohortId, passcode }) => {
+    await ctx.db.patch(cohortId, { passcode: passcode.trim().slice(0, 40) });
   },
 });
 

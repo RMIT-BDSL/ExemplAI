@@ -18,7 +18,7 @@ type Participant = {
   intake?: Record<string, string>;
 };
 type Roster = {
-  cohort: { _id: string; name: string; code: string; open: boolean };
+  cohort: { _id: string; name: string; code: string; open: boolean; passcode?: string };
   participants: Participant[];
   questions: Array<{ id: string; label: string }>;
 };
@@ -32,6 +32,18 @@ const CohortDetailPage: Component = () => {
   const [message, setMessage] = createSignal('');
   const [error, setError] = createSignal('');
   const [busy, setBusy] = createSignal(false);
+  const [passcode, setPasscode] = createSignal<string | null>(null); // null: not being edited
+
+  const savePasscode = async (value: string) => {
+    const c = roster.data()?.cohort;
+    if (!c) return;
+    try {
+      await convex.mutation(api.cohorts.setPasscode, { cohortId: c._id as any, passcode: value });
+      setPasscode(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save the passcode');
+    }
+  };
 
   const metadataKeys = createMemo(() => {
     const keys = new Set<string>();
@@ -119,6 +131,36 @@ const CohortDetailPage: Component = () => {
                   {data().cohort.open ? 'Open for IDs not on a roster ✓' : 'Make this the open cohort'}
                 </button>
               </header>
+
+              <section class="rounded-md border border-line bg-white p-6 space-y-3">
+                <h2 class="font-display text-xl text-ink">Class passcode</h2>
+                <p class="text-sm text-body">
+                  If set, students must enter it with their ID to sign in (case and spaces don't matter). Clear it to
+                  allow ID only, or change it after the session to stop further sign-ins.
+                </p>
+                <div class="flex flex-wrap items-center gap-3">
+                  <input
+                    type="text"
+                    value={passcode() ?? data().cohort.passcode ?? ''}
+                    onInput={(e) => setPasscode(e.currentTarget.value)}
+                    placeholder="No passcode: ID only"
+                    class="w-56 rounded-md border border-line bg-white px-3.5 py-2 font-mono text-sm text-ink outline-none focus:border-garnet focus:ring-2 focus:ring-garnet/15"
+                  />
+                  <button
+                    type="button"
+                    disabled={passcode() === null}
+                    onClick={() => savePasscode(passcode() ?? '')}
+                    class="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-soft disabled:opacity-45 disabled:cursor-not-allowed"
+                  >
+                    Save
+                  </button>
+                  <Show when={data().cohort.passcode}>
+                    <button type="button" onClick={() => savePasscode('')} class="text-sm text-muted hover:text-garnet">
+                      Clear
+                    </button>
+                  </Show>
+                </div>
+              </section>
 
               <section class="rounded-md border border-line bg-white p-6 space-y-4">
                 <h2 class="font-display text-xl text-ink">Add participants</h2>

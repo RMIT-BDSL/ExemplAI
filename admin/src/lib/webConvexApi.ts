@@ -10,6 +10,7 @@ export type PublicApiType = {
     roster: FunctionReference<"query", "public", { cohortId: Id<"cohorts"> }, any>;
     create: FunctionReference<"mutation", "public", { name: string }, any>;
     setOpen: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; open: boolean }, any>;
+    setPasscode: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; passcode: string }, any>;
     addParticipants: FunctionReference<
       "mutation",
       "public",

@@ -99,6 +99,8 @@ export default defineSchema({
     name: v.string(),
     code: v.string(),
     open: v.boolean(),
+    // The session passcode students enter with their ID ("" or absent: none).
+    passcode: v.optional(v.string()),
     created_at: v.number(),
     created_by: v.optional(v.string()),
   })

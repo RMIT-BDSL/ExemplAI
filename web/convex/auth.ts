@@ -68,6 +68,22 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
     },
     hooks: {
       before: createAuthMiddleware(async (apiCtx) => {
+        // Student-ID accounts need their cohort's session passcode, if it has
+        // one, to sign in or be created (convex/cohorts.ts passcodeAllows).
+        if (apiCtx.path === "/sign-in/email" || apiCtx.path === "/sign-up/email") {
+          const body = apiCtx.body as any;
+          const studentId = studentIdFromEmail(body?.email);
+          if (studentId) {
+            const allowed = await ctx.runQuery(internal.cohorts.passcodeAllows, {
+              studentId,
+              passcode: typeof body?.passcode === "string" ? body.passcode : undefined,
+            });
+            if (!allowed) {
+              throw new APIError("UNAUTHORIZED", { message: "Wrong or missing class passcode." });
+            }
+          }
+        }
+
         if (apiCtx.path === "/sign-up/email") {
           const body = apiCtx.body as any;
           const adminEmail = process.env.ADMIN_EMAIL;

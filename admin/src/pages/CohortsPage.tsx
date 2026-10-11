@@ -9,6 +9,7 @@ type CohortRow = {
   name: string;
   code: string;
   open: boolean;
+  passcode?: string;
   created_at: number;
   participants: number;
   experimental: number;
@@ -103,6 +104,7 @@ const CohortsPage: Component = () => {
                   <th class="px-4 py-3 text-right">Signed in</th>
                   <th class="px-4 py-3 text-right">Survey done</th>
                   <th class="px-4 py-3 text-right">Not on roster</th>
+                  <th class="px-4 py-3">Passcode</th>
                   <th class="px-4 py-3">Open</th>
                 </tr>
               </thead>
@@ -119,6 +121,7 @@ const CohortsPage: Component = () => {
                       <td class="px-4 py-3 text-right tabular-nums">{c.joined}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{c.intakeDone}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{c.notOnRoster || '–'}</td>
+                      <td class="px-4 py-3 font-mono text-[12px] text-body">{c.passcode || '–'}</td>
                       <td class="px-4 py-3">
                         <Show when={c.open} fallback={<span class="text-muted">–</span>}>
                           <span class="rounded-sm bg-garnet/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-garnet">open</span>

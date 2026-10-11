@@ -1,6 +1,6 @@
 import { usePostHog } from "@posthog/react";
 import { useForm } from "@tanstack/react-form";
-import { ArrowRight, IdCard } from "lucide-react";
+import { ArrowRight, IdCard, KeyRound } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
 import {
   idEmail,
@@ -24,10 +24,15 @@ interface StudentIdFormProps {
 export function StudentIdForm({ onSuccess, onError }: StudentIdFormProps) {
   const posthog = usePostHog();
   const form = useForm({
-    defaultValues: { studentId: "" },
+    defaultValues: { studentId: "", passcode: "" },
     onSubmit: async ({ value }) => {
       const id = normalizeStudentId(value.studentId);
-      const credentials = { email: idEmail(id), password: idPassword(id) };
+      // The class passcode, if the cohort has one, is checked at sign-in (convex/auth.ts).
+      const credentials = {
+        email: idEmail(id),
+        password: idPassword(id),
+        passcode: value.passcode.trim(),
+      };
       try {
         const signIn = await authClient.signIn.email(credentials);
         if (signIn.error) {
@@ -97,6 +102,21 @@ export function StudentIdForm({ onSuccess, onError }: StudentIdFormProps) {
             leadingIcon={<IdCard className="size-5" />}
             autoComplete="username"
             required
+          />
+        )}
+      </form.Field>
+
+      <form.Field name="passcode">
+        {(field) => (
+          <AuthTextField
+            label="Class passcode (if your class has one)"
+            type="text"
+            name={field.name}
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChange={(e) => field.handleChange(e.target.value)}
+            leadingIcon={<KeyRound className="size-5" />}
+            autoComplete="off"
           />
         )}
       </form.Field>

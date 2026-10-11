@@ -6,6 +6,7 @@ import {
   isIdEmail,
   isValidStudentId,
   normalizeStudentId,
+  passcodeMatches,
   shuffled,
   studentIdFromEmail,
 } from "../convex/studentIds";
@@ -55,5 +56,19 @@ describe("balanced groups", () => {
   it("shuffles without losing anyone", () => {
     const ids = ["A1", "B2", "C3", "D4"];
     expect(shuffled(ids).sort()).toEqual(ids);
+  });
+});
+
+describe("class passcode", () => {
+  it("lets any ID in when the cohort has none", () => {
+    expect(passcodeMatches(undefined, undefined)).toBe(true);
+    expect(passcodeMatches("", "anything")).toBe(true);
+  });
+
+  it("needs the cohort's passcode, ignoring case and spaces", () => {
+    expect(passcodeMatches("PY-TUE9", "py-tue9 ")).toBe(true);
+    expect(passcodeMatches("PY-TUE9", "PY TUE9")).toBe(false);
+    expect(passcodeMatches("PY-TUE9", "")).toBe(false);
+    expect(passcodeMatches("PY-TUE9", undefined)).toBe(false);
   });
 });

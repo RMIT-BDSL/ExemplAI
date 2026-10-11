@@ -6,7 +6,9 @@
 // own Better Auth email+password account, so the same ID always reaches the
 // same account on any device. The password is NOT a secret: anyone who knows
 // an ID can enter that account. IDs are cross-checked against the cohort
-// rosters afterwards (cohortParticipants.on_roster).
+// rosters afterwards (cohortParticipants.on_roster). A cohort can also have a
+// session passcode the whole class enters with their ID (checked at sign-in,
+// convex/auth.ts), which keeps out anyone outside the class.
 
 export type Group = "experimental" | "control";
 
@@ -38,6 +40,12 @@ export function isIdEmail(email: string | undefined | null): boolean {
 /** The student ID behind an ID-sign-in email, or null for other accounts. */
 export function studentIdFromEmail(email: string | undefined | null): string | null {
   return isIdEmail(email) ? normalizeStudentId(email!.split("@")[0]) : null;
+}
+
+/** A cohort's session passcode matches what the student typed (case and spaces ignored). */
+export function passcodeMatches(required: string | undefined, given: string | undefined): boolean {
+  const norm = (s: string | undefined) => (s ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  return !norm(required) || norm(required) === norm(given);
 }
 
 /**
