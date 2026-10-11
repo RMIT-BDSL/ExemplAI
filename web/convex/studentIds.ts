@@ -1,0 +1,94 @@
+// Student-ID sign-in and cohort assignment rules, shared by the sign-in page
+// and the Convex functions (convex/cohorts.ts).
+//
+// Students sign in with their university ID only (decided 2026-10-11): no
+// email or one-time code, and any well-formed ID gets in. Each ID maps to its
+// own Better Auth email+password account, so the same ID always reaches the
+// same account on any device. The password is NOT a secret: anyone who knows
+// an ID can enter that account. IDs are cross-checked against the cohort
+// rosters afterwards (cohortParticipants.on_roster).
+
+export type Group = "experimental" | "control";
+
+/** The domain of the placeholder emails behind ID sign-in (never mailed). */
+export const ID_EMAIL_DOMAIN = "id.exemplai.local";
+
+/** "s3912345 " -> "S3912345" */
+export function normalizeStudentId(raw: string): string {
+  return raw.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+export function isValidStudentId(id: string): boolean {
+  return /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(id);
+}
+
+export function idEmail(id: string): string {
+  return `${normalizeStudentId(id).toLowerCase()}@${ID_EMAIL_DOMAIN}`;
+}
+
+/** Not a secret (see above); Better Auth needs a password of 8+ characters. */
+export function idPassword(id: string): string {
+  return `exemplai-id:${normalizeStudentId(id)}`;
+}
+
+export function isIdEmail(email: string | undefined | null): boolean {
+  return !!email && email.toLowerCase().endsWith(`@${ID_EMAIL_DOMAIN}`);
+}
+
+/** The student ID behind an ID-sign-in email, or null for other accounts. */
+export function studentIdFromEmail(email: string | undefined | null): string | null {
+  return isIdEmail(email) ? normalizeStudentId(email!.split("@")[0]) : null;
+}
+
+/**
+ * Groups for `n` new participants that keep the cohort balanced: each goes to
+ * the group with fewer members so far (ties at random). Call with the new IDs
+ * in random order so who lands where is random too.
+ */
+export function balancedGroups(
+  counts: Record<Group, number>,
+  n: number,
+  random: () => number = Math.random,
+): Group[] {
+  const c = { ...counts };
+  const out: Group[] = [];
+  for (let i = 0; i < n; i++) {
+    const g: Group =
+      c.experimental < c.control ? "experimental"
+      : c.control < c.experimental ? "control"
+      : random() < 0.5 ? "experimental" : "control";
+    c[g]++;
+    out.push(g);
+  }
+  return out;
+}
+
+export function shuffled<T>(items: T[], random: () => number = Math.random): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** The intake survey shown on a participant's first sign-in. */
+export const INTAKE_QUESTIONS = [
+  {
+    id: "programming_experience",
+    label: "How much programming have you done before this course?",
+    type: "choice",
+    options: ["None", "A little", "A lot"],
+  },
+  {
+    id: "other_languages",
+    label: "Which other programming languages have you used, if any?",
+    type: "text",
+  },
+  {
+    id: "python_confidence",
+    label: "How confident are you writing Python? (1 = not at all, 5 = very)",
+    type: "choice",
+    options: ["1", "2", "3", "4", "5"],
+  },
+] as const;

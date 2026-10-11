@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel.d.ts";
 import authConfig from "./auth.config";
 import { triggers } from "./triggers";
+import { isIdEmail, isValidStudentId, studentIdFromEmail } from "./studentIds";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -71,6 +72,17 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
           const body = apiCtx.body as any;
           const adminEmail = process.env.ADMIN_EMAIL;
           if (adminEmail && body?.email === adminEmail) {
+            return;
+          }
+
+          // Student-ID sign-in (convex/studentIds.ts): any well-formed ID may
+          // create its account without an invitation code; joinWithId then
+          // places it in a cohort.
+          if (isIdEmail(body?.email)) {
+            const id = studentIdFromEmail(body.email);
+            if (!id || !isValidStudentId(id)) {
+              throw new APIError("BAD_REQUEST", { message: "Please enter a valid student ID." });
+            }
             return;
           }
 

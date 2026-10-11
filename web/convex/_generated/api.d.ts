@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
+import type * as cohorts from "../cohorts.js";
 import type * as courses from "../courses.js";
 import type * as examples from "../examples.js";
 import type * as experiment from "../experiment.js";
@@ -21,6 +22,7 @@ import type * as lessonAccess from "../lessonAccess.js";
 import type * as lessons from "../lessons.js";
 import type * as releaseNotes from "../releaseNotes.js";
 import type * as seed from "../seed.js";
+import type * as studentIds from "../studentIds.js";
 import type * as studentMetrics from "../studentMetrics.js";
 import type * as students from "../students.js";
 import type * as triggers from "../triggers.js";
@@ -36,6 +38,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   chats: typeof chats;
+  cohorts: typeof cohorts;
   courses: typeof courses;
   examples: typeof examples;
   experiment: typeof experiment;
@@ -47,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   lessons: typeof lessons;
   releaseNotes: typeof releaseNotes;
   seed: typeof seed;
+  studentIds: typeof studentIds;
   studentMetrics: typeof studentMetrics;
   students: typeof students;
   triggers: typeof triggers;

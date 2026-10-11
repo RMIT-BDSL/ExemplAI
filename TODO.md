@@ -39,6 +39,9 @@ _Last updated 2026-10-07. Status: testing on dev; each student gets a random, fi
 
 ## Before the pilot
 
+* [x] Cohorts and student-ID sign-in (2026-10-11): admin Cohorts page (create a cohort, add IDs typed or from a CSV, balanced experimental/control split at upload, roster with sign-ins and intake answers, one cohort open for IDs on no roster); students sign in with their university ID only (anyone who knows an ID can enter that account; IDs are cross-checked against the rosters); a three-question intake survey on first sign-in.
+* [ ] Try cohorts on dev: create a cohort, upload a roster CSV, sign in with a listed ID and an unlisted one, answer the survey, check the roster. Then decide whether invite-code sign-up stays for students or only for staff.
+
 * [x] Wait messages while an example is written (#112): Get help and New example show "Reading your submission", "Evaluating any errors", "Building an example", "Checking my work", "Pretty printing", a new line about every 3 s or sooner on a server step (`web/src/lib/waitMessages.ts`); typed replies keep the old progress rows.
 
 * [x] Store each student's A/B group in Convex (#97: blocked randomization per invite code; testing toggle behind `CONDITION_TOGGLE=on`, leave unset in production).

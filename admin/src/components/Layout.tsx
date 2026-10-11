@@ -86,6 +86,7 @@ const Layout: Component<{ children?: JSX.Element }> = (props) => {
             <NavLink href="/" end label="Dashboard" icon={<DashboardIcon />} />
             <NavLink href="/courses" label="Courses" icon={<CoursesIcon />} />
             <NavLink href="/students" label="Students" icon={<StudentsIcon />} />
+            <NavLink href="/cohorts" label="Cohorts" icon={<StudentsIcon />} />
             <NavLink href="/invitation-codes" label="Invitation Codes" icon={<CodesIcon />} />
             <NavLink href="/release-notes" label="Release Notes" icon={<ReleasesIcon />} />
           </nav>
@@ -128,6 +129,7 @@ const Layout: Component<{ children?: JSX.Element }> = (props) => {
             <NavLink href="/" end label="Dashboard" icon={<DashboardIcon />} />
             <NavLink href="/courses" label="Courses" icon={<CoursesIcon />} />
             <NavLink href="/students" label="Students" icon={<StudentsIcon />} />
+            <NavLink href="/cohorts" label="Cohorts" icon={<StudentsIcon />} />
             <NavLink href="/invitation-codes" label="Codes" icon={<CodesIcon />} />
             <NavLink href="/release-notes" label="Release Notes" icon={<ReleasesIcon />} />
           </div>
