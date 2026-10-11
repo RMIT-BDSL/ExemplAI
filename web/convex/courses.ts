@@ -388,6 +388,7 @@ export const recordCodeExecution = authenticatedMutation({
         ...(lesson.knowledge_component ? { knowledge_component: lesson.knowledge_component } : {}),
         kind: args.actionType,
         ...(user.experiment_condition ? { experiment_condition: user.experiment_condition } : {}),
+        ...(user.study_phase ? { study_phase: user.study_phase } : {}),
         code: a.code.slice(0, CODE_SNAPSHOT_CHARS),
         outcome: a.outcome,
         ...(a.testsPassed !== undefined ? { tests_passed: a.testsPassed } : {}),

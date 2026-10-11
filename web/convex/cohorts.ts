@@ -30,6 +30,10 @@ import {
  *   joins the open cohort with on_roster false, for cross-checking later, and
  *   gets a group from that cohort's randomization blocks.
  * - On first sign-in the student answers a short intake survey.
+ * - Phase: while the cohort has a class passcode, a visit is part of the
+ *   experimental session; once the passcode is cleared, students return with
+ *   their ID alone for open practice, keeping their group. Chats, Run/Submit
+ *   attempts and time-on-task visits are tagged with the phase.
  */
 
 const UNLISTED = { name: "Not on a roster", code: "unlisted" };
@@ -151,12 +155,19 @@ export const joinWithId = mutation({
       participant = (await ctx.db.get(id))!;
     }
 
+    // Session while the cohort has a class passcode (every sign-in needed it),
+    // open practice once it's cleared. Records written during the visit copy it.
+    const phase = cohort.passcode?.trim() ? "session" : "practice";
     await ctx.db.patch(participant._id, {
       userId: user._id,
       joined_at: participant.joined_at ?? now,
       last_login_at: now,
       login_count: (participant.login_count ?? 0) + 1,
+      ...(phase === "session"
+        ? { session_visits: (participant.session_visits ?? 0) + 1 }
+        : { practice_visits: (participant.practice_visits ?? 0) + 1 }),
     });
+    if (user.study_phase !== phase) await ctx.db.patch(user._id, { study_phase: phase });
 
     const profile = await ctx.db.query("userProfiles").withIndex("by_user_id", (q) => q.eq("userId", user._id)).unique();
     if (profile) await ctx.db.patch(profile._id, { invitationCode: cohort.code, tokenIdentifier: authUser._id });
@@ -171,7 +182,7 @@ export const joinWithId = mutation({
         name: user.name ?? studentId,
       });
     }
-    return { cohort: cohort.name, onRoster: participant.on_roster, needsIntake: !participant.intake };
+    return { cohort: cohort.name, onRoster: participant.on_roster, phase, needsIntake: !participant.intake };
   },
 });
 

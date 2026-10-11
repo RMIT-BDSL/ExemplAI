@@ -15,6 +15,8 @@ type Participant = {
   joined_at?: number;
   last_login_at?: number;
   login_count?: number;
+  session_visits?: number;
+  practice_visits?: number;
   intake?: Record<string, string>;
 };
 type Roster = {
@@ -135,8 +137,10 @@ const CohortDetailPage: Component = () => {
               <section class="rounded-md border border-line bg-white p-6 space-y-3">
                 <h2 class="font-display text-xl text-ink">Class passcode</h2>
                 <p class="text-sm text-body">
-                  If set, students must enter it with their ID to sign in (case and spaces don't matter). Clear it to
-                  allow ID only, or change it after the session to stop further sign-ins.
+                  If set, students must enter it with their ID to sign in (case and spaces don't matter), and their visits
+                  count as the experimental <strong>session</strong>. Clear it after the session: students then return
+                  with their ID alone for <strong>open practice</strong>, keeping their group, and that activity is
+                  tagged as practice.
                 </p>
                 <div class="flex flex-wrap items-center gap-3">
                   <input
@@ -207,7 +211,8 @@ const CohortDetailPage: Component = () => {
                       <th class="px-4 py-3">Group</th>
                       <th class="px-4 py-3">First sign-in</th>
                       <th class="px-4 py-3">Last sign-in</th>
-                      <th class="px-4 py-3 text-right">Visits</th>
+                      <th class="px-4 py-3 text-right" title="Visits while the cohort had a class passcode">Session visits</th>
+                      <th class="px-4 py-3 text-right" title="Visits after the passcode was cleared">Practice visits</th>
                       <For each={data().questions}>{(q) => <th class="px-4 py-3" title={q.label}>{q.id.replace(/_/g, ' ')}</th>}</For>
                       <th class="px-4 py-3" />
                     </tr>
@@ -226,7 +231,8 @@ const CohortDetailPage: Component = () => {
                           <td class="px-4 py-2.5">{p.group}</td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{when(p.joined_at)}</td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{when(p.last_login_at)}</td>
-                          <td class="px-4 py-2.5 text-right tabular-nums">{p.login_count ?? 0}</td>
+                          <td class="px-4 py-2.5 text-right tabular-nums">{p.session_visits ?? 0}</td>
+                          <td class="px-4 py-2.5 text-right tabular-nums">{p.practice_visits ?? 0}</td>
                           <For each={data().questions}>{(q) => <td class="px-4 py-2.5 text-body">{p.intake?.[q.id] ?? ''}</td>}</For>
                           <td class="px-4 py-2.5 text-right">
                             <Show when={!p.userId}>
