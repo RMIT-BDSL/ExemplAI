@@ -1,8 +1,10 @@
 import { usePostHog } from "@posthog/react";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Outlet, redirect, useMatches, useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { isIdEmail } from "../../convex/studentIds";
+import { IntakeSurvey } from "#/components/intake/IntakeSurvey";
 import { stripSearchParams } from "#/lib/auth-callback";
 import { /* captureSignIn, */ getSession } from "#/lib/auth.functions";
 import Navbar from "#/components/nav/Navbar";
@@ -43,6 +45,28 @@ function AuthenticatedLayout() {
   const isWorkspace = useMatches().some((m) => m.routeId === "/_authenticated/course");
   const posthog = usePostHog();
   const createUserAndUseCode = useMutation(api.invitationCodes.createUserAndUseCode);
+
+  // Student-ID sign-in (convex/studentIds.ts): place the student in their
+  // cohort, record the sign-in and set their group before any page loads (the
+  // pages need the profile this creates), then ask the intake survey once.
+  const isIdAccount = isIdEmail(session?.user?.email);
+  const { isAuthenticated } = useConvexAuth();
+  const joinWithId = useMutation(api.cohorts.joinWithId);
+  const [joined, setJoined] = useState(!isIdAccount);
+  const [joinError, setJoinError] = useState("");
+  const runJoin = useCallback(() => {
+    setJoinError("");
+    joinWithId({})
+      .then(() => setJoined(true))
+      .catch((err) => {
+        setJoinError(err.message || "Couldn't open your course.");
+        posthog.captureException(err);
+      });
+  }, [joinWithId, posthog]);
+  useEffect(() => {
+    if (isIdAccount && isAuthenticated) runJoin();
+  }, [isIdAccount, isAuthenticated, runJoin]);
+  const intake = useQuery(api.cohorts.myIntake, isIdAccount && joined ? {} : "skip");
 
   // Magic-link sign-in completion: the user followed the link in their email and
   // landed here authenticated. This is the only point where a magic-link sign-in
@@ -100,6 +124,35 @@ function AuthenticatedLayout() {
         });
     }
   }, [session, code, createUserAndUseCode, navigate, posthog]);
+
+  if (isIdAccount && (!joined || intake === undefined)) {
+    return (
+      <div className="xa-workspace flex min-h-dvh w-full flex-col items-center justify-center gap-4 px-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
+          {joinError || "Opening your course..."}
+        </p>
+        {joinError && (
+          <div className="flex gap-3 text-xs">
+            <button
+              type="button"
+              onClick={runJoin}
+              className="rounded-[2px] border border-rule-strong px-3 py-1.5 text-ink hover:text-brass cursor-pointer"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/sign-out" })}
+              className="rounded-[2px] border border-rule-strong px-3 py-1.5 text-ink-muted hover:text-brass cursor-pointer"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (intake?.needsIntake) return <IntakeSurvey questions={intake.questions} />;
 
   return (
     <>

@@ -3,6 +3,9 @@ import { v } from "convex/values";
 import { countFields as counts, replyCountFields } from "./studentMetrics";
 
 const experimentCondition = v.union(v.literal("experimental"), v.literal("control"));
+// A cohort student's activity: their experimental session (their cohort has a
+// class passcode) or open practice afterwards (no passcode). convex/cohorts.ts.
+const studyPhase = v.union(v.literal("session"), v.literal("practice"));
 
 // A tutor draft the Dean turned down (server/ai/nodes/dean_validation.py).
 export const rejectedDraft = v.object({
@@ -78,7 +81,11 @@ export default defineSchema({
     // student opens a lesson. "toggle" = changed with the testing toggle.
     experiment_condition: v.optional(experimentCondition),
     condition_assigned_at: v.optional(v.number()),
-    condition_source: v.optional(v.union(v.literal("random"), v.literal("toggle"))),
+    // random: blocked randomization; toggle: the testing toggle; roster: set
+    // when the cohort roster was added (convex/cohorts.ts).
+    condition_source: v.optional(v.union(v.literal("random"), v.literal("toggle"), v.literal("roster"))),
+    // Cohort students only: the phase of their current visit, set on each visit.
+    study_phase: v.optional(studyPhase),
   })
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"]),
@@ -89,6 +96,46 @@ export default defineSchema({
     cohort: v.string(),
     remaining: v.array(experimentCondition),
   }).index("by_cohort", ["cohort"]),
+  // A study session's group of students (convex/cohorts.ts). `code` is the
+  // cohort key: it goes on the students' userProfiles.invitationCode and keys
+  // their randomizationBlocks. Students whose ID is on no roster join the
+  // cohort that is `open`.
+  cohorts: defineTable({
+    name: v.string(),
+    code: v.string(),
+    open: v.boolean(),
+    // The session passcode students enter with their ID ("" or absent: none).
+    passcode: v.optional(v.string()),
+    created_at: v.number(),
+    created_by: v.optional(v.string()),
+  })
+    .index("by_code", ["code"])
+    .index("by_open", ["open"]),
+  // A student in a cohort, keyed by their university ID (normalized, e.g.
+  // "S3912345"). Roster rows get their group when added (balanced); a student
+  // who signs in with an ID on no roster gets a row with on_roster false.
+  cohortParticipants: defineTable({
+    cohortId: v.id("cohorts"),
+    studentId: v.string(),
+    group: experimentCondition,
+    on_roster: v.boolean(),
+    // Extra columns from the roster CSV (e.g. name, class).
+    metadata: v.optional(v.record(v.string(), v.string())),
+    added_at: v.number(),
+    userId: v.optional(v.id("users")),
+    joined_at: v.optional(v.number()),
+    last_login_at: v.optional(v.number()),
+    login_count: v.optional(v.number()),
+    // Visits in each phase (a visit is an app load after signing in).
+    session_visits: v.optional(v.number()),
+    practice_visits: v.optional(v.number()),
+    // Intake survey answers by question id (studentIds.ts INTAKE_QUESTIONS).
+    intake: v.optional(v.record(v.string(), v.string())),
+    intake_at: v.optional(v.number()),
+  })
+    .index("by_cohort", ["cohortId"])
+    .index("by_student_id", ["studentId"])
+    .index("by_user", ["userId"]),
   userProfiles: defineTable({
     userId: v.id("users"),
     tokenIdentifier: v.optional(v.string()),
@@ -142,6 +189,7 @@ export default defineSchema({
     knowledge_component: v.optional(v.string()),
     kind: v.union(v.literal("run"), v.literal("submit")),
     experiment_condition: v.optional(experimentCondition),
+    study_phase: v.optional(studyPhase),
     // The student's code as sent (capped at 20k characters by the server).
     code: v.string(),
     outcome: attemptOutcome,
@@ -169,6 +217,7 @@ export default defineSchema({
     userId: v.id("users"),
     lessonId: v.id("questions"),
     experiment_condition: v.optional(experimentCondition),
+    study_phase: v.optional(studyPhase),
     active_ms: v.number(),
     heartbeats: v.number(),
     last_heartbeat_at: v.number(),
@@ -204,6 +253,7 @@ export default defineSchema({
     lessonId: v.id("questions"),
     // The student's group when the chat started; one chat never mixes groups.
     experiment_condition: v.optional(experimentCondition),
+    study_phase: v.optional(studyPhase),
     // Summary of chatMessages, kept up to date by convex/triggers.ts so the
     // admin views never read a whole conversation. Missing on chats that
     // predate it until students:backfillSummaries runs.

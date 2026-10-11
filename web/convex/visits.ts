@@ -38,6 +38,7 @@ export const startVisit = authenticatedMutation({
       userId,
       lessonId: args.lessonId,
       experiment_condition: await ensureCondition(ctx, ctx.customUser),
+      ...(ctx.customUser.study_phase ? { study_phase: ctx.customUser.study_phase } : {}),
       active_ms: 0,
       heartbeats: 0,
       last_heartbeat_at: now,

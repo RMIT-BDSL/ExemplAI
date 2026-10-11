@@ -4,10 +4,11 @@ import { useConvex } from "convex/react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import * as React from "react";
 import { AuthCard } from "#/components/auth/AuthCard";
-import { AuthTabs } from "#/components/auth/AuthTabs";
+import { type AuthTab, AuthTabs } from "#/components/auth/AuthTabs";
 // import { MagicLinkForm } from "#/components/auth/forms/MagicLinkForm";
 import { SignInForm } from "#/components/auth/forms/SignInForm";
 import { SignUpForm } from "#/components/auth/forms/SignUpForm";
+import { StudentIdForm } from "#/components/auth/forms/StudentIdForm";
 // import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
 // import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { authClient } from "#/lib/auth-client";
@@ -74,9 +75,7 @@ function AuthPage() {
   const convex = useConvex();
   const posthog = usePostHog();
 
-  const [activeTab, setActiveTab] = React.useState<
-    "signin" | "signup" // | "magiclink"
-  >("signin");
+  const [activeTab, setActiveTab] = React.useState<AuthTab>("studentid");
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [globalError, setGlobalError] = React.useState("");
@@ -197,9 +196,11 @@ function AuthPage() {
     <div className="xa-workspace flex min-h-dvh w-full items-center justify-center px-4 py-10">
       <AuthCard
         title={
-          activeTab === "signin"
-            ? "Welcome back"
-            : "Create your account"
+          activeTab === "studentid"
+            ? "Welcome"
+            : activeTab === "signin"
+              ? "Welcome back"
+              : "Create your account"
           /*
           : activeTab === "magiclink"
             ? "Magic Link"
@@ -207,9 +208,11 @@ function AuthPage() {
           */
         }
         subtitle={
-          activeTab === "signin"
-            ? "Sign in with your email and password to continue your course."
-            : "Sign up with the invitation code from your course to start."
+          activeTab === "studentid"
+            ? "Enter your student ID to start or continue."
+            : activeTab === "signin"
+              ? "Sign in with your email and password to continue your course."
+              : "Sign up with the invitation code from your course to start."
           /*
           : activeTab === "magiclink"
             ? "Enter your email to receive a passwordless sign-in link."
@@ -243,6 +246,15 @@ function AuthPage() {
         )}
 
         {/* Render appropriate form component */}
+        {activeTab === "studentid" && (
+          <StudentIdForm
+            onSuccess={() =>
+              navigate({ to: sanitizeRedirect(redirect || "/") })
+            }
+            onError={setGlobalError}
+          />
+        )}
+
         {activeTab === "signin" && (
           <SignInForm
             onSuccess={() =>

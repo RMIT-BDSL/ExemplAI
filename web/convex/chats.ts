@@ -77,8 +77,9 @@ export const startChat = authenticatedMutation({
         .withIndex("by_chat", (q) => q.eq("chatId", latest._id))
         .first();
       if (!anyMessage) {
-        if (latest.experiment_condition !== condition) {
-          await ctx.db.patch(latest._id, { experiment_condition: condition });
+        const phase = ctx.customUser.study_phase;
+        if (latest.experiment_condition !== condition || latest.study_phase !== phase) {
+          await ctx.db.patch(latest._id, { experiment_condition: condition, study_phase: phase });
         }
         return latest._id;
       }
@@ -87,6 +88,7 @@ export const startChat = authenticatedMutation({
       userId,
       lessonId: args.lessonId,
       experiment_condition: condition,
+      ...(ctx.customUser.study_phase ? { study_phase: ctx.customUser.study_phase } : {}),
     });
   },
 });
@@ -108,6 +110,7 @@ export const getOrCreateChat = authenticatedMutation({
       userId: ctx.customUser._id,
       lessonId: args.lessonId,
       experiment_condition: await ensureCondition(ctx, ctx.customUser),
+      ...(ctx.customUser.study_phase ? { study_phase: ctx.customUser.study_phase } : {}),
     });
   },
 });

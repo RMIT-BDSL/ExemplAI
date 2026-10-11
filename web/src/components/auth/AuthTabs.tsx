@@ -1,16 +1,20 @@
 import { cn } from "#/lib/utils";
 
+export type AuthTab = "studentid" | "signin" | "signup"; // | "magiclink"
+
 export interface AuthTabsProps {
-  activeTab: "signin" | "signup"; // | "magiclink"
-  onChange: (tab: "signin" | "signup" /* | "magiclink" */) => void;
+  activeTab: AuthTab;
+  onChange: (tab: AuthTab) => void;
 }
 
+// Students sign in with their ID; staff use email (sign in, or sign up with an invite code).
 const TABS = [
-  { id: "signin", label: "Sign in" },
+  { id: "studentid", label: "Student ID" },
+  { id: "signin", label: "Staff sign in" },
   { id: "signup", label: "Sign up" },
 ] as const;
 
-/** Two-way segmented control (same pattern as the syllabus status filter). */
+/** Segmented control (same pattern as the syllabus status filter). */
 export function AuthTabs({ activeTab, onChange }: AuthTabsProps) {
   return (
     <div

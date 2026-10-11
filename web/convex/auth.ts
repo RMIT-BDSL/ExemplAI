@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import type { DataModel } from "./_generated/dataModel.d.ts";
 import authConfig from "./auth.config";
 import { triggers } from "./triggers";
+import { idPassword, isIdEmail, isValidStudentId, studentIdFromEmail } from "./studentIds";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -67,10 +68,42 @@ export const createAuthOptions = (ctx: any): BetterAuthOptions => {
     },
     hooks: {
       before: createAuthMiddleware(async (apiCtx) => {
+        // Student-ID accounts need their cohort's session passcode, if it has
+        // one, to sign in or be created (convex/cohorts.ts passcodeAllows).
+        if (apiCtx.path === "/sign-in/email" || apiCtx.path === "/sign-up/email") {
+          const body = apiCtx.body as any;
+          const studentId = studentIdFromEmail(body?.email);
+          if (studentId) {
+            const allowed = await ctx.runQuery(internal.cohorts.passcodeAllows, {
+              studentId,
+              passcode: typeof body?.passcode === "string" ? body.passcode : undefined,
+            });
+            if (!allowed) {
+              throw new APIError("UNAUTHORIZED", { message: "Wrong or missing class passcode." });
+            }
+          }
+        }
+
         if (apiCtx.path === "/sign-up/email") {
           const body = apiCtx.body as any;
           const adminEmail = process.env.ADMIN_EMAIL;
           if (adminEmail && body?.email === adminEmail) {
+            return;
+          }
+
+          // Student-ID sign-in (convex/studentIds.ts): any well-formed ID may
+          // create its account without an invitation code; joinWithId then
+          // places it in a cohort.
+          if (isIdEmail(body?.email)) {
+            const id = studentIdFromEmail(body.email);
+            if (!id || !isValidStudentId(id)) {
+              throw new APIError("BAD_REQUEST", { message: "Please enter a valid student ID." });
+            }
+            // Only the ID's own password, so nobody can claim an ID with
+            // another password and lock its student out.
+            if (body?.password !== idPassword(id)) {
+              throw new APIError("BAD_REQUEST", { message: "Please sign in with your student ID." });
+            }
             return;
           }
 

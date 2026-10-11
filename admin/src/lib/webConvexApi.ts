@@ -5,6 +5,28 @@ export const api: PublicApiType = anyApi as unknown as PublicApiType;
 export const internal: InternalApiType = anyApi as unknown as InternalApiType;
 
 export type PublicApiType = {
+  cohorts: {
+    list: FunctionReference<"query", "public", Record<string, never>, any>;
+    roster: FunctionReference<"query", "public", { cohortId: Id<"cohorts"> }, any>;
+    create: FunctionReference<"mutation", "public", { name: string }, any>;
+    setOpen: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; open: boolean }, any>;
+    setPasscode: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; passcode: string }, any>;
+    addParticipants: FunctionReference<
+      "mutation",
+      "public",
+      {
+        cohortId: Id<"cohorts">;
+        participants: Array<{ studentId: string; metadata?: Record<string, string> }>;
+      },
+      any
+    >;
+    removeParticipant: FunctionReference<
+      "mutation",
+      "public",
+      { participantId: Id<"cohortParticipants"> },
+      any
+    >;
+  };
   auth: {
     checkUserExistsQuery: FunctionReference<
       "query",
