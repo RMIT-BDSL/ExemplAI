@@ -8,6 +8,7 @@ from convex import ConvexClient
 from langchain_core.messages import RemoveMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
+from ai.usage import UsageTracker
 from bkt import initial_mastery
 from config import settings
 from model.chat import Chat
@@ -205,6 +206,7 @@ async def _save_assistant_message(
     dean_reason: Optional[str] = None,
     rejected_drafts: Optional[list[dict]] = None,
     mastery_at_reply: Optional[float] = None,
+    usage: Optional[dict] = None,
 ) -> None:
     if text and chat_id:
         try:
@@ -227,6 +229,8 @@ async def _save_assistant_message(
                         **({"rejectedDrafts": rejected_drafts} if rejected_drafts else {}),
                         # The mastery this reply was routed on (research log).
                         **({"masteryAtReply": mastery_at_reply} if mastery_at_reply is not None else {}),
+                        # Tokens and cost of every model call for this reply (ai/usage.py).
+                        **({"usage": usage} if usage else {}),
                         "backendSecret": settings.CONVEX_BACKEND_SECRET.get_secret_value()
                     },
                 ),
@@ -247,7 +251,8 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
 
         allowance = None if chat.experiment_condition == "control" else context.allowance
         state = with_allowance(build_initial_state(chat, context.history), allowance)
-        result = await graph.ainvoke(state, config=_thread_config(chat, auth_user_id))
+        tracker = UsageTracker()
+        result = await graph.ainvoke(state, config={**_thread_config(chat, auth_user_id), "callbacks": [tracker]})
 
         text = _extract_final_message_text(result)
         chosen_model = _determine_chosen_model(result)
@@ -255,6 +260,7 @@ async def run_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> dic
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
             rejected_drafts=result.get("rejected_drafts"), mastery_at_reply=chat.bkt_prob_mastery,
+            usage=tracker.summary(),
         )
 
         # Return a small, guaranteed-serializable payload rather than the raw
@@ -306,7 +312,8 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
         allowance = None if chat.experiment_condition == "control" else context.allowance
         state = with_allowance(build_initial_state(chat, context.history), allowance)
         config = _thread_config(chat, auth_user_id)
-        async for update in graph.astream(state, config=config, stream_mode="updates"):
+        tracker = UsageTracker()
+        async for update in graph.astream(state, config={**config, "callbacks": [tracker]}, stream_mode="updates"):
             for node in update:
                 if node in _PROGRESS_NODES:
                     yield _sse({"type": "step", "node": node})
@@ -326,6 +333,7 @@ async def stream_chat(graph, chat: Chat, auth_user_id: str, auth_token: str) -> 
             client, chat.chat_id, text, chosen_model, result.get("delivered_response_type"),
             dean_decision=result.get("dean_decision"), dean_reason=result.get("dean_reason"),
             rejected_drafts=result.get("rejected_drafts"), mastery_at_reply=chat.bkt_prob_mastery,
+            usage=tracker.summary(),
         )
     except Exception as e:
         log.error(f"Message persistence error: {e}")

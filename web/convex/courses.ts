@@ -13,7 +13,7 @@ import {
   adminQuery 
 } from "./functions";
 import { attemptOutcome } from "./schema";
-import { canOpenLesson, inLessonOrder } from "./lessonAccess";
+import { canOpenLesson, inLessonOrder, sessionWeekFor } from "./lessonAccess";
 import { courseFields } from "./validators";
 
 // Caps on a codeAttempts row (the server applies the same ones).
@@ -93,7 +93,10 @@ export const deleteCourse = zAdminMutation({
 export const getAllCourses = authenticatedQuery({
   args: {},
   handler: async (ctx, _args) => {
-    return inLessonOrder(await ctx.db.query("questions").collect());
+    const lessons = inLessonOrder(await ctx.db.query("questions").collect());
+    // A study session shows only its week (lessonAccess.ts).
+    const sessionWeek = await sessionWeekFor(ctx, ctx.customUser ?? null);
+    return sessionWeek === null ? lessons : lessons.filter((l) => l.week === sessionWeek);
   },
 });
 

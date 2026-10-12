@@ -11,6 +11,14 @@ export type PublicApiType = {
     create: FunctionReference<"mutation", "public", { name: string }, any>;
     setOpen: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; open: boolean }, any>;
     setPasscode: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; passcode: string }, any>;
+    setSession: FunctionReference<
+      "mutation",
+      "public",
+      { cohortId: Id<"cohorts">; session_week: number; exercise_minutes: number },
+      any
+    >;
+    setExercisesEnded: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; ended: boolean }, any>;
+    resetSession: FunctionReference<"mutation", "public", { participantId: Id<"cohortParticipants"> }, any>;
     addParticipants: FunctionReference<
       "mutation",
       "public",

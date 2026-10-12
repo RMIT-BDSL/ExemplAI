@@ -23,6 +23,7 @@ import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
 import { useLessonVisit } from "#/lib/useLessonVisit";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 
 // Shown above a lesson's starter code in the editor (on first load and on
@@ -158,6 +159,7 @@ function Course() {
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
   const openLesson = useMutation(api.examples.openLesson);
+  const saveCodeDraft = useMutation(api.codeDrafts.save);
   const { data: lessonProgress } = useQuery(
     convexQuery(
       api.courses.getLessonProgress,
@@ -204,18 +206,24 @@ function Course() {
         ? questions[0]
         : null;
 
-  // Autosave (no indicator): edits are written to sessionStorage shortly after
-  // typing stops, and flushed on lesson change, unmount and page hide. Saved
-  // code survives a reload in the same browser session only; a new session
-  // starts every lesson fresh from its starter code.
-  const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
+  // Autosave (no indicator): edits are written to sessionStorage and to the
+  // server (convex/codeDrafts.ts) shortly after typing stops, and flushed on
+  // lesson change, unmount and when the page is hidden or closed. A reload
+  // restores the tab's copy; a crashed browser or another computer restores
+  // the server's.
+  const pendingSaveRef = useRef<{ key: string; lessonId?: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runShortcutRef = useRef<() => void>(() => {});
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
     const pending = pendingSaveRef.current;
-    if (pending) sessionStorage.setItem(pending.key, pending.code);
+    if (pending) {
+      sessionStorage.setItem(pending.key, pending.code);
+      if (pending.lessonId) {
+        saveCodeDraft({ lessonId: pending.lessonId as Id<"questions">, code: pending.code }).catch(() => {});
+      }
+    }
     pendingSaveRef.current = null;
   }
 
@@ -284,10 +292,25 @@ function Course() {
   // Time on task: a visit per lesson opening, with active time (research log).
   useLessonVisit(tokenIdentifier && canOpen ? activeQuestionId : undefined);
 
+  // The code saved on the server for this lesson (null: none yet).
+  const { data: codeDraft } = useQuery(
+    convexQuery(
+      api.codeDrafts.get,
+      tokenIdentifier && activeQuestionId && canOpen ? { lessonId: activeQuestionId } : "skip",
+    ),
+  );
+  // Load each lesson's code once: the tab's copy, else the server's (waiting
+  // for it), else the starter. Later draft updates are our own saves.
+  const loadedCodeRef = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once per lesson, when its draft has arrived
   useEffect(() => {
     if (activeQuestion && problemId) {
       const storageKey = `exemplai_code_${problemId}_${language}`;
-      const savedCode = sessionStorage.getItem(storageKey);
+      if (loadedCodeRef.current === storageKey) return;
+      const savedCode = sessionStorage.getItem(storageKey) ?? (canOpen ? codeDraft?.code : undefined);
+      // Still finding out whether there's a saved copy: wait.
+      if (!savedCode && (!tokenIdentifier || unlocked === undefined || (canOpen && codeDraft === undefined))) return;
+      loadedCodeRef.current = storageKey;
 
       if (savedCode) {
         setCodeTemplates((prev) => ({
@@ -317,7 +340,7 @@ function Course() {
         }
       }
     }
-  }, [activeQuestionId, language, problemId]);
+  }, [activeQuestionId, language, problemId, codeDraft, canOpen, unlocked, tokenIdentifier]);
 
   // Resizable columns (wide screens only, where all three sit side by side).
   // Widths are a per-browser convenience; null = the default CSS width.
@@ -404,9 +427,12 @@ function Course() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: flushSave only touches refs
   useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && flushSave();
     window.addEventListener("pagehide", flushSave);
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       window.removeEventListener("pagehide", flushSave);
+      document.removeEventListener("visibilitychange", onHide);
       flushSave();
     };
   }, [problemId]);
@@ -457,7 +483,11 @@ function Course() {
         [language]: value,
       }));
       if (problemId) {
-        pendingSaveRef.current = { key: `exemplai_code_${problemId}_${language}`, code: value };
+        pendingSaveRef.current = {
+          key: `exemplai_code_${problemId}_${language}`,
+          lessonId: activeQuestion?._id,
+          code: value,
+        };
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(flushSave, 800);
       }
