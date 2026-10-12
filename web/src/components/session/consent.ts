@@ -19,7 +19,7 @@ export const CONSENT_SECTIONS: { heading: string; paragraphs: string[] }[] = [
   {
     heading: "What will I do today?",
     paragraphs: [
-      "The session takes under an hour. You will answer a short survey about your background, work through this week's Python exercises in ExemplAI with help from its tutor, and answer a short survey about your experience at the end.",
+      "The session takes under an hour. You will answer a short survey about your background, try two short problems on your own, work through this week's Python exercises in ExemplAI with help from its tutor, try two more short problems on your own, and answer a short survey about your experience at the end. The short problems aren't graded and don't count towards your course.",
       "Students are placed at random in one of two versions of the tutor, so we can compare them. Both versions help you with the same exercises.",
       "There are no costs, and you will not be paid.",
     ],

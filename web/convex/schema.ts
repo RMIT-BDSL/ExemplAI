@@ -130,6 +130,8 @@ export default defineSchema({
     session_week: v.optional(v.number()),
     exercise_minutes: v.optional(v.number()),
     exercises_end_at: v.optional(v.number()),
+    // Minutes for each quick check (convex/quickChecks.ts).
+    check_minutes: v.optional(v.number()),
     created_at: v.number(),
     created_by: v.optional(v.string()),
   })
@@ -162,6 +164,14 @@ export default defineSchema({
     consent_version: v.optional(v.string()),
     pre_survey: v.optional(v.record(v.string(), surveyAnswer)),
     pre_survey_at: v.optional(v.number()),
+    // Quick checks before and after the exercises (convex/quickChecks.ts):
+    // which form comes first (balanced within each group), and when each
+    // check was started (Start pressed) and finished (both problems in).
+    check_order: v.optional(v.union(v.literal("AB"), v.literal("BA"))),
+    pre_check_started_at: v.optional(v.number()),
+    pre_check_finished_at: v.optional(v.number()),
+    post_check_started_at: v.optional(v.number()),
+    post_check_finished_at: v.optional(v.number()),
     exercises_started_at: v.optional(v.number()),
     // Pressed "I'm finished" before the time was up.
     exercises_finished_at: v.optional(v.number()),
@@ -183,10 +193,44 @@ export default defineSchema({
   // computer. Not research data: Run/Submit snapshots are in codeAttempts.
   codeDrafts: defineTable({
     userId: v.id("users"),
-    lessonId: v.id("questions"),
+    // A lesson, or a quick-check problem.
+    lessonId: v.union(v.id("questions"), v.id("checkProblems")),
     code: v.string(),
     updated_at: v.number(),
   }).index("by_user_lesson", ["userId", "lessonId"]),
+  // Quick-check problems (convex/quickChecks.ts): two parallel forms per
+  // week, two problems each, taken before and after the exercises with the
+  // tutor off. `tests` include the shown example and the hidden ones; only
+  // the server's grader reads them.
+  checkProblems: defineTable({
+    week: v.number(),
+    form: v.union(v.literal("A"), v.literal("B")),
+    position: v.number(),
+    problem_name: v.string(),
+    problem_description: v.string(),
+    starter_code: v.string(),
+    example: v.object({ input: v.string(), expectedOutput: v.string() }),
+    tests: v.array(v.object({ input: v.string(), expectedOutput: v.string() })),
+  }).index("by_week_form", ["week", "form", "position"]),
+  // A student's one answer to a quick-check problem, graded by the server.
+  checkAnswers: defineTable({
+    userId: v.id("users"),
+    participantId: v.id("cohortParticipants"),
+    checkProblemId: v.id("checkProblems"),
+    phase: v.union(v.literal("pre"), v.literal("post")),
+    form: v.union(v.literal("A"), v.literal("B")),
+    position: v.number(),
+    code: v.string(),
+    tests_passed: v.number(),
+    tests_total: v.number(),
+    outcome: attemptOutcome,
+    // Submitted by the page when time ran out, not by the student.
+    auto: v.boolean(),
+    experiment_condition: v.optional(experimentCondition),
+    submitted_at: v.number(),
+  })
+    .index("by_participant", ["participantId"])
+    .index("by_user_problem", ["userId", "checkProblemId"]),
   userProfiles: defineTable({
     userId: v.id("users"),
     tokenIdentifier: v.optional(v.string()),

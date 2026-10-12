@@ -18,6 +18,14 @@ class StudentCode(BaseModel):
     action_type: Optional[Literal["run", "submit"]] = "run"
 
 
+class CheckSubmission(BaseModel):
+    """One final answer to a quick-check problem (web/convex/quickChecks.ts)."""
+    check_id: str
+    code: str
+    # Submitted by the page when the time ran out, not by the student.
+    auto: bool = False
+
+
 # data model for sending to judge0
 class CodeSubmission(BaseModel):
     language_id: int

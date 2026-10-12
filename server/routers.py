@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from model.student_code import StudentCode
+from model.student_code import CheckSubmission, StudentCode
 from model.scratchpad import ScratchpadCode
 from model.chat import Chat
 import services
@@ -38,6 +38,17 @@ async def judge0_execution(
     auth: dict = Depends(get_current_user_with_token),
 ):
     return await services.execute_code(student_code, background_tasks, auth_token=auth["token"])
+
+
+@router.post('/check/submit')
+@limiter.limit("10/minute")
+async def check_submission(
+    body: CheckSubmission,
+    request: Request,
+    auth: dict = Depends(get_current_user_with_token),
+):
+    """A final answer to a quick-check problem: graded and recorded, result not returned."""
+    return await services.submit_check(body, auth_token=auth["token"])
 
 
 @router.post('/scratchpad/execute')

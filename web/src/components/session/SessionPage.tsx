@@ -42,11 +42,13 @@ export function SessionPage({
   );
 }
 
-/** The flow's steps, for the step label ("Step 2 of 4 · Background"). */
+/** The flow's steps, for the step label ("Step 2 of 6 · Before you start"). */
 export const STEPS = [
   "Consent",
   "Before you start",
+  "Quick check",
   "Exercises",
+  "Quick check",
   "Feedback",
 ] as const;
 export const stepLabel = (i: number) =>

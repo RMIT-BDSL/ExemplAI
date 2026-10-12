@@ -46,14 +46,16 @@ export function studentIdFromEmail(email: string | undefined | null): string | n
 export const DEFAULT_SESSION_WEEK = 4;
 /**
  * The cap on the exercises, in minutes. The clock starts only when the
- * student finishes the pre-survey, and the post-survey comes after it, so
- * every student gets the same exercise time (decided 2026-10-12). A 55-minute
- * session after the introduction: consent 2, pre-survey 3, exercises 45,
- * post-survey 4, 1 to spare.
+ * student finishes the pre quick check, and the post check and post-survey
+ * come after it, so every student gets the same exercise time. A 55-minute
+ * session after the introduction (decided 2026-10-12): consent 2, pre-survey
+ * 3, quick check 5, exercises 35, quick check 5, post-survey 4, 1 to spare.
  */
-export const DEFAULT_EXERCISE_MINUTES = 45;
+export const DEFAULT_EXERCISE_MINUTES = 35;
+/** Minutes for each quick check (two problems, tutor off). */
+export const DEFAULT_CHECK_MINUTES = 5;
 /** Bump when the consent text changes (web/src/components/session/consent.ts). */
-export const CONSENT_VERSION = "2026-10-12-draft";
+export const CONSENT_VERSION = "2026-10-12-draft2";
 
 /** A cohort's session passcode matches what the student typed (case and spaces ignored). */
 export function passcodeMatches(required: string | undefined, given: string | undefined): boolean {

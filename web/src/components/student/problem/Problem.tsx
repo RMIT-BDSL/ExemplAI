@@ -37,7 +37,11 @@ function submitTime(d: Date) {
 export function formatCall(functionName: string, input: string): string {
   const raw = input.trim();
   const show = (v: unknown) =>
-    typeof v === "string" ? `"${v}"` : JSON.stringify(v);
+    typeof v === "string"
+      ? `"${v}"`
+      : typeof v === "boolean"
+        ? (v ? "True" : "False")
+        : JSON.stringify(v);
   let args: string[];
   if (raw === "") {
     args = [];
@@ -76,9 +80,11 @@ export interface ProblemProps {
   submitHistory?: SubmitRecord[];
   /** The next lesson, open before this one is passed (after 3 failed Submits). */
   moveOn?: { name: string; onClick: () => void };
+  /** The label before the title ("Exercise:" by default). */
+  label?: string;
 }
 
-export default function Problem({ problem, submitHistory = [], moveOn }: ProblemProps) {
+export default function Problem({ problem, submitHistory = [], moveOn, label = "Exercise:" }: ProblemProps) {
   const lastSubmit = submitHistory[0];
   const { example } = problem;
   const exampleResult = lastSubmit?.example;
@@ -87,7 +93,7 @@ export default function Problem({ problem, submitHistory = [], moveOn }: Problem
     <article>
       <h1 className="!mb-4 flex items-baseline gap-3">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.15em] text-ink-label">
-          Exercise:
+          {label}
         </span>
         <span>{problem.title}</span>
       </h1>

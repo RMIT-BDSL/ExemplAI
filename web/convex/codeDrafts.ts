@@ -10,8 +10,11 @@ import { authenticatedMutation, authenticatedQuery } from "./functions";
 
 const MAX_CODE = 50_000;
 
+// A lesson, or a quick-check problem (convex/quickChecks.ts).
+const lessonOrCheck = v.union(v.id("questions"), v.id("checkProblems"));
+
 export const get = authenticatedQuery({
-  args: { lessonId: v.id("questions") },
+  args: { lessonId: lessonOrCheck },
   handler: async (ctx, { lessonId }) => {
     if (!ctx.customUser) return null;
     const row = await ctx.db
@@ -23,7 +26,7 @@ export const get = authenticatedQuery({
 });
 
 export const save = authenticatedMutation({
-  args: { lessonId: v.id("questions"), code: v.string() },
+  args: { lessonId: lessonOrCheck, code: v.string() },
   handler: async (ctx, { lessonId, code }) => {
     if (!ctx.customUser) throw new Error("User not found");
     const userId = ctx.customUser._id;

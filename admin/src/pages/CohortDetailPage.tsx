@@ -28,6 +28,18 @@ type Participant = {
   post_survey_at?: number;
   /** Tutor tokens and cost (USD), summed over the student's tutor replies, by phase. */
   usage: Record<'session' | 'practice', UsageSums> | null;
+  check_order?: 'AB' | 'BA';
+  pre_check_started_at?: number;
+  post_check_started_at?: number;
+  /** Quick-check scores (web/convex/quickChecks.ts checkScores); null = not started. */
+  checks: Record<'pre' | 'post', CheckScore | null>;
+  /** When the exercises started and end (web/convex/sessionFlow.ts timelineOf). */
+  timeline: { exercisesStartAt: number | null; exercisesEndsAt: number | null };
+};
+type CheckScore = {
+  form: 'A' | 'B';
+  score: number;
+  problems: Array<{ problem: string; passed: number; total: number; answered: boolean; auto: boolean }>;
 };
 type UsageSums = { replies: number; input_tokens: number; output_tokens: number; cost_usd: number };
 type Survey = Array<{ title: string; questions: Array<{ id: string; label: string }> }>;
@@ -40,6 +52,7 @@ type Roster = {
     passcode?: string;
     session_week: number;
     exercise_minutes: number;
+    check_minutes: number;
     exercises_end_at?: number;
   };
   participants: Participant[];
@@ -50,15 +63,25 @@ type Roster = {
 const when = (t?: number) => (t ? new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '–');
 const time = (t?: number) => (t ? new Date(t).toLocaleTimeString([], { timeStyle: 'short' }) : '–');
 
-/** Where a student is in the session flow, from their record (web/convex/cohorts.ts stageOf). */
+/**
+ * Roughly where a student is in the session flow, from their record. The app
+ * also moves students on when clocks run out (web/convex/sessionFlow.ts), so
+ * this can lag by a step until they act.
+ */
 function stage(p: Participant, ended: boolean): string {
   if (!p.userId) return 'Not signed in';
   if (p.consented === undefined) return 'Consent';
   if (p.consented && !p.pre_survey) return 'Pre-survey';
   if (p.post_survey) return 'Done';
-  if (p.exercises_finished_at || ended) return p.consented ? 'Post-survey' : 'Done (declined)';
-  return p.consented ? 'Exercises' : 'Exercises (declined)';
+  if (!p.consented) return p.exercises_finished_at || ended ? 'Done (declined)' : 'Exercises (declined)';
+  if (p.post_check_started_at) return 'Post check / post-survey';
+  if (p.exercises_finished_at || ended) return 'Post check';
+  if (p.exercises_started_at || p.checks.pre) return 'Pre check / exercises';
+  return 'Pre check';
 }
+
+const checkCell = (c: CheckScore | null) =>
+  c ? `${c.score} (${c.form}${c.problems.some((x) => x.auto) ? ', auto' : ''})` : '–';
 
 /** CSV of every participant: record fields, then pre_/post_ survey answers by question id. */
 function toCsv(data: Roster): string {
@@ -72,20 +95,40 @@ function toCsv(data: Roster): string {
     'student_id', 'cohort', 'group', 'on_roster', ...metaKeys.map((k) => `meta_${k}`),
     'first_sign_in', 'last_sign_in', 'session_visits', 'practice_visits',
     'consented', 'consent_at', 'consent_version', 'pre_survey_at', 'exercises_started_at',
-    'exercises_finished_at', 'post_survey_at',
+    'exercises_ended_at', 'finished_early_at', 'post_survey_at',
     ...(['session', 'practice'] as const).flatMap((ph) =>
       ['replies', 'input_tokens', 'output_tokens', 'cost_usd'].map((f) => `${ph}_tutor_${f}`),
     ),
+    'check_order',
+    ...(['pre', 'post'] as const).flatMap((ph) => [
+      `${ph}_check_form`, `${ph}_check_score`,
+      ...[1, 2].flatMap((n) => [`${ph}_check_p${n}_passed`, `${ph}_check_p${n}_total`, `${ph}_check_p${n}_auto`]),
+    ]),
     ...pre.map((id) => `pre.${id}`), ...post.map((id) => `post.${id}`),
   ];
   const rows = data.participants.map((p) => [
     p.studentId, data.cohort.code, p.group, String(p.on_roster), ...metaKeys.map((k) => p.metadata?.[k] ?? ''),
     iso(p.joined_at), iso(p.last_login_at), String(p.session_visits ?? 0), String(p.practice_visits ?? 0),
     p.consented === undefined ? '' : String(p.consented), iso(p.consent_at), p.consent_version ?? '',
-    iso(p.pre_survey_at), iso(p.exercises_started_at), iso(p.exercises_finished_at), iso(p.post_survey_at),
+    iso(p.pre_survey_at), iso(p.timeline.exercisesStartAt ?? undefined),
+    // The end only once it has passed (a student still working has a future end).
+    iso(p.timeline.exercisesEndsAt !== null && p.timeline.exercisesEndsAt <= Date.now() ? p.timeline.exercisesEndsAt : undefined),
+    iso(p.exercises_finished_at), iso(p.post_survey_at),
     ...(['session', 'practice'] as const).flatMap((ph) => {
       const u = p.usage?.[ph];
       return u ? [String(u.replies), String(u.input_tokens), String(u.output_tokens), u.cost_usd.toFixed(6)] : ['', '', '', ''];
+    }),
+    p.check_order ?? '',
+    ...(['pre', 'post'] as const).flatMap((ph) => {
+      const c = p.checks[ph];
+      if (!c) return ['', '', '', '', '', '', '', ''];
+      return [
+        c.form, String(c.score),
+        ...[0, 1].flatMap((i) => {
+          const x = c.problems[i];
+          return x ? [x.answered ? String(x.passed) : '', String(x.total), String(x.auto)] : ['', '', ''];
+        }),
+      ];
     }),
     ...pre.map((id) => answer(p.pre_survey?.[id])), ...post.map((id) => answer(p.post_survey?.[id])),
   ]);
@@ -103,6 +146,7 @@ const CohortDetailPage: Component = () => {
   const [passcode, setPasscode] = createSignal<string | null>(null); // null: not being edited
   const [week, setWeek] = createSignal<string | null>(null);
   const [minutes, setMinutes] = createSignal<string | null>(null);
+  const [checkMinutes, setCheckMinutes] = createSignal<string | null>(null);
   const [confirmEnd, setConfirmEnd] = createSignal(false);
 
   const saveSession = async () => {
@@ -113,9 +157,11 @@ const CohortDetailPage: Component = () => {
         cohortId: c._id as any,
         session_week: Number(week() ?? c.session_week),
         exercise_minutes: Number(minutes() ?? c.exercise_minutes),
+        check_minutes: Number(checkMinutes() ?? c.check_minutes),
       });
       setWeek(null);
       setMinutes(null);
+      setCheckMinutes(null);
     } catch (err: any) {
       setError(err.message || 'Failed to save the session settings');
     }
@@ -286,10 +332,11 @@ const CohortDetailPage: Component = () => {
               <section class="rounded-md border border-line bg-white p-6 space-y-4">
                 <h2 class="font-display text-xl text-ink">Session</h2>
                 <p class="text-sm text-body">
-                  While the cohort has a passcode, students go through consent, the pre-survey, the exercises and the
-                  post-survey in order. They see only the session week's lessons. Each student's exercise time starts
-                  when they finish the pre-survey; when it runs out (or you end the exercises for everyone) they move
-                  on to the post-survey.
+                  While the cohort has a passcode, students go through consent, the pre-survey, a quick check (two
+                  problems, tutor off), the exercises, another quick check and the post-survey, in order. They see only
+                  the session week's lessons. Each student's exercise time starts when they finish the first quick
+                  check; when it runs out (or you end the exercises for everyone) they move on to the second. Half of
+                  each group takes form A first and half form B. A week without quick-check problems skips the checks.
                 </p>
                 <div class="flex flex-wrap items-end gap-4">
                   <label class="text-sm text-body">
@@ -314,9 +361,20 @@ const CohortDetailPage: Component = () => {
                       class="mt-1 w-24 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-garnet"
                     />
                   </label>
+                  <label class="text-sm text-body">
+                    <span class="block font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Quick-check minutes</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={checkMinutes() ?? data().cohort.check_minutes}
+                      onInput={(e) => setCheckMinutes(e.currentTarget.value)}
+                      class="mt-1 w-24 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-garnet"
+                    />
+                  </label>
                   <button
                     type="button"
-                    disabled={week() === null && minutes() === null}
+                    disabled={week() === null && minutes() === null && checkMinutes() === null}
                     onClick={saveSession}
                     class="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-soft disabled:opacity-45 disabled:cursor-not-allowed"
                   >
@@ -417,7 +475,9 @@ const CohortDetailPage: Component = () => {
                       <th class="px-4 py-3">Stage</th>
                       <th class="px-4 py-3">Consent</th>
                       <th class="px-4 py-3">Pre-survey</th>
-                      <th class="px-4 py-3" title="Started (after the pre-survey) and finished">Exercises</th>
+                      <th class="px-4 py-3" title="Quick check before the exercises: score 0–100 (form)">Pre check</th>
+                      <th class="px-4 py-3" title="Started (after the pre check) and finished">Exercises</th>
+                      <th class="px-4 py-3" title="Quick check after the exercises: score 0–100 (form)">Post check</th>
                       <th class="px-4 py-3">Post-survey</th>
                       <th class="px-4 py-3 text-right" title="Tutor replies, tokens (in + out) and cost during the session">
                         Tutor (session)
@@ -446,9 +506,12 @@ const CohortDetailPage: Component = () => {
                             {p.consented === undefined ? '–' : p.consented ? `Agreed ${time(p.consent_at)}` : 'Declined'}
                           </td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{time(p.pre_survey_at)}</td>
+                          <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">{checkCell(p.checks.pre)}</td>
                           <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">
-                            {time(p.exercises_started_at)} → {time(p.exercises_finished_at)}
+                            {time(p.timeline.exercisesStartAt ?? undefined)} →{' '}
+                            {time(p.timeline.exercisesEndsAt ?? undefined)}
                           </td>
+                          <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">{checkCell(p.checks.post)}</td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{time(p.post_survey_at)}</td>
                           <td class="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-body">
                             {p.usage?.session.replies

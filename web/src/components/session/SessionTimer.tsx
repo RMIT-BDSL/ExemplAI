@@ -19,10 +19,13 @@ function clock(ms: number) {
 export function SessionTimer({
   msLeft,
   consented,
+  hasChecks,
   testingGroup,
 }: {
   msLeft: number;
   consented: boolean;
+  /** Two more short problems come after the exercises. */
+  hasChecks: boolean;
   testingGroup: string | null;
 }) {
   const finish = useMutation(api.cohorts.finishExercises);
@@ -81,7 +84,9 @@ export function SessionTimer({
           >
             <p className="mb-3 text-xs font-normal leading-relaxed text-ink">
               {consented
-                ? "Finish the exercises and go to the short feedback survey? You can't come back to the exercises after this."
+                ? hasChecks
+                  ? "Finish the exercises and go on to two more short problems and the feedback survey? You can't come back to the exercises after this."
+                  : "Finish the exercises and go to the short feedback survey? You can't come back to the exercises after this."
                 : "Finish the exercises? You can't come back to them after this."}
             </p>
             <div className="flex gap-2">

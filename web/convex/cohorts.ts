@@ -8,6 +8,7 @@ import { adminMutation, adminQuery, authenticatedMutation, authenticatedQuery, m
 import {
   balancedGroups,
   CONSENT_VERSION,
+  DEFAULT_CHECK_MINUTES,
   DEFAULT_EXERCISE_MINUTES,
   DEFAULT_SESSION_WEEK,
   type Group,
@@ -17,6 +18,9 @@ import {
   shuffled,
   studentIdFromEmail,
 } from "./studentIds";
+import { checkScores } from "./quickChecks";
+import { stageAt, timelineOf } from "./sessionFlow";
+import { flowStateOf, sessionWeekOf, weekHasChecks } from "./sessionState";
 import { cleanAnswers, POST_SURVEY, PRE_SURVEY, type SurveyAnswers, surveyQuestions } from "./surveys";
 
 /**
@@ -36,8 +40,9 @@ import { cleanAnswers, POST_SURVEY, PRE_SURVEY, type SurveyAnswers, surveyQuesti
  *   experimental session; once the passcode is cleared, students return with
  *   their ID alone for open practice, keeping their group. Chats, Run/Submit
  *   attempts and time-on-task visits are tagged with the phase.
- * - The session is one linear flow (decided 2026-10-12): consent, pre-survey,
- *   the session week's exercises for a fixed time, post-survey, then a
+ * - The session is one linear flow (decided 2026-10-12; sessionFlow.ts):
+ *   consent, pre-survey, a quick check (quickChecks.ts), the session week's
+ *   exercises for a fixed time, another quick check, post-survey, then a
  *   completion screen. Students see only the session week's lessons
  *   (lessonAccess.ts). In open practice, a student who hasn't yet consented
  *   and answered the pre-survey does that first, then uses the app freely.
@@ -49,7 +54,19 @@ const SESSION_FIELDS = [
   "consented", "consent_at", "consent_version", "pre_survey", "pre_survey_at",
   "exercises_started_at", "exercises_finished_at", "post_survey", "post_survey_at",
   "pre_survey_draft", "post_survey_draft",
+  "pre_check_started_at", "pre_check_finished_at", "post_check_started_at", "post_check_finished_at",
 ] as const;
+
+type CheckOrder = "AB" | "BA";
+
+/** The quick-check form order for a new participant: the one less used in their group (ties at random). */
+async function nextCheckOrder(ctx: MutationCtx, cohortId: Id<"cohorts">, group: Group): Promise<CheckOrder> {
+  const rows = await ctx.db.query("cohortParticipants").withIndex("by_cohort", (q) => q.eq("cohortId", cohortId)).collect();
+  const used = rows.filter((r) => r.group === group).map((r) => r.check_order);
+  const ab = used.filter((o) => o === "AB").length;
+  const ba = used.filter((o) => o === "BA").length;
+  return ab < ba ? "AB" : ba < ab ? "BA" : Math.random() < 0.5 ? "AB" : "BA";
+}
 
 /** Agreeing this soon after declining counts as undoing a misclick: the exercise clock restarts. */
 const UNDO_DECLINE_MS = 5 * 60_000;
@@ -169,6 +186,7 @@ export const joinWithId = mutation({
       const group = await blockGroup(ctx, cohort.code);
       const id = await ctx.db.insert("cohortParticipants", {
         cohortId: cohort._id, studentId, group, on_roster: false, added_at: now,
+        check_order: await nextCheckOrder(ctx, cohort._id, group),
       });
       participant = (await ctx.db.get(id))!;
     }
@@ -178,6 +196,8 @@ export const joinWithId = mutation({
     const phase = cohort.passcode?.trim() ? "session" : "practice";
     await ctx.db.patch(participant._id, {
       userId: user._id,
+      // Rows added before quick checks existed get their form order now.
+      ...(participant.check_order ? {} : { check_order: await nextCheckOrder(ctx, cohort._id, participant.group) }),
       joined_at: participant.joined_at ?? now,
       last_login_at: now,
       login_count: (participant.login_count ?? 0) + 1,
@@ -204,37 +224,16 @@ export const joinWithId = mutation({
   },
 });
 
-export type SessionStage = "consent" | "pre_survey" | "exercises" | "post_survey" | "done" | "open";
-
-/** When the student's exercises end: their own time limit, or the cohort's "End now". */
-function exercisesEndAt(p: Doc<"cohortParticipants">, cohort: Doc<"cohorts">): number | null {
-  if (p.exercises_started_at === undefined) return cohort.exercises_end_at ?? null;
-  const own = p.exercises_started_at + (cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES) * 60_000;
-  return cohort.exercises_end_at !== undefined ? Math.min(own, cohort.exercises_end_at) : own;
-}
-
-/**
- * Where the student is in the flow, not counting the clock: "exercises" turns
- * into "post_survey" (or "done" after declining) once `endsAt` passes, which
- * the page checks itself because a query can't watch the time.
- */
-function stageOf(p: Doc<"cohortParticipants">, phase: Doc<"users">["study_phase"]): SessionStage {
-  if (p.consented === undefined) return "consent";
-  if (p.consented && !p.pre_survey) return "pre_survey";
-  if (phase !== "session") return "open";
-  if (p.post_survey) return "done";
-  if (p.exercises_finished_at !== undefined) return p.consented ? "post_survey" : "done";
-  return "exercises";
-}
-
 async function myParticipant(ctx: QueryCtx, userId: Id<"users">) {
   return await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", userId)).first();
 }
 
 /**
  * The signed-in student's place in the study flow (null: not in a cohort, e.g.
- * staff). `testingGroup` shows their group on screen, only while the testing
- * toggle (CONDITION_TOGGLE=on) is on, never in production.
+ * staff). `flow` is what sessionFlow.stageAt needs: the page re-runs it as
+ * clocks run out, because a query can't watch the time. `testingGroup` shows
+ * their group on screen, only while the testing toggle (CONDITION_TOGGLE=on)
+ * is on, never in production.
  */
 export const mySession = authenticatedQuery({
   args: {},
@@ -243,13 +242,11 @@ export const mySession = authenticatedQuery({
     const p = await myParticipant(ctx, ctx.customUser._id);
     const cohort = p && (await ctx.db.get(p.cohortId));
     if (!p || !cohort) return null;
-    const phase = ctx.customUser.study_phase ?? "practice";
+    const flow = await flowStateOf(ctx, p, cohort, ctx.customUser);
     return {
-      phase,
-      stage: stageOf(p, phase),
+      flow,
       consented: p.consented ?? null,
-      endsAt: phase === "session" ? exercisesEndAt(p, cohort) : null,
-      sessionWeek: phase === "session" ? (cohort.session_week ?? DEFAULT_SESSION_WEEK) : null,
+      sessionWeek: flow.phase === "session" ? sessionWeekOf(cohort) : null,
       testingGroup: conditionToggleEnabled() ? (ctx.customUser.experiment_condition ?? p.group) : null,
       drafts: { pre: p.pre_survey_draft ?? {}, post: p.post_survey_draft ?? {} },
     };
@@ -309,7 +306,11 @@ export const saveSurveyDraft = authenticatedMutation({
 
 const answersValidator = v.record(v.string(), v.union(v.string(), v.array(v.string())));
 
-/** Save the pre-survey; in a session this starts the exercise clock. */
+/**
+ * Save the pre-survey. In a session the quick check comes next; a week
+ * without quick-check problems goes straight to the exercises, whose clock
+ * starts now.
+ */
 export const submitPreSurvey = authenticatedMutation({
   args: { answers: answersValidator },
   handler: async (ctx, { answers }) => {
@@ -317,11 +318,13 @@ export const submitPreSurvey = authenticatedMutation({
     if (!p.consented) throw new Error("Consent first");
     if (p.pre_survey) return;
     const now = Date.now();
+    const cohort = await ctx.db.get(p.cohortId);
+    const flow = cohort ? await flowStateOf(ctx, p, cohort, ctx.customUser!) : null;
     await ctx.db.patch(p._id, {
       pre_survey: cleanAnswers(PRE_SURVEY, answers as SurveyAnswers),
       pre_survey_at: now,
       pre_survey_draft: undefined,
-      ...(ctx.customUser!.study_phase === "session" && p.exercises_started_at === undefined
+      ...(flow?.phase === "session" && !flow.hasChecks && p.exercises_started_at === undefined
         ? { exercises_started_at: now }
         : {}),
     });
@@ -333,7 +336,11 @@ export const finishExercises = authenticatedMutation({
   args: {},
   handler: async (ctx) => {
     const p = await requireParticipant(ctx, ctx.customUser?._id);
-    if (p.exercises_finished_at === undefined) await ctx.db.patch(p._id, { exercises_finished_at: Date.now() });
+    const cohort = await ctx.db.get(p.cohortId);
+    if (!cohort || p.exercises_finished_at !== undefined) return;
+    const now = Date.now();
+    if (stageAt(await flowStateOf(ctx, p, cohort, ctx.customUser!), now) !== "exercises") return;
+    await ctx.db.patch(p._id, { exercises_finished_at: now });
   },
 });
 
@@ -344,14 +351,17 @@ export const submitPostSurvey = authenticatedMutation({
     if (!p.consented || !p.pre_survey) throw new Error("Not at the post-survey yet");
     if (p.post_survey) return;
     const now = Date.now();
-    // Time ran out (rather than "I'm finished"): the exercises ended then.
     const cohort = await ctx.db.get(p.cohortId);
-    const endsAt = cohort ? exercisesEndAt(p, cohort) : null;
+    if (!cohort) throw new Error("Cohort not found");
+    const flow = await flowStateOf(ctx, p, cohort, ctx.customUser!);
+    // A few seconds' grace: the page switches on its own clock.
+    if (stageAt(flow, now + 5_000) !== "post_survey") throw new Error("Not at the post-survey yet");
     await ctx.db.patch(p._id, {
       post_survey: cleanAnswers(POST_SURVEY, answers as SurveyAnswers),
       post_survey_at: now,
       post_survey_draft: undefined,
-      exercises_finished_at: p.exercises_finished_at ?? Math.min(now, endsAt ?? now),
+      // Time ran out (rather than "I'm finished"): the exercises ended then.
+      exercises_finished_at: p.exercises_finished_at ?? flow.timeline.exercisesEndsAt ?? now,
     });
   },
 });
@@ -379,13 +389,21 @@ export const setPasscode = adminMutation({
 
 /** The session's week and exercise time. */
 export const setSession = adminMutation({
-  args: { cohortId: v.id("cohorts"), session_week: v.number(), exercise_minutes: v.number() },
-  handler: async (ctx, { cohortId, session_week, exercise_minutes }) => {
+  args: {
+    cohortId: v.id("cohorts"),
+    session_week: v.number(),
+    exercise_minutes: v.number(),
+    check_minutes: v.optional(v.number()),
+  },
+  handler: async (ctx, { cohortId, session_week, exercise_minutes, check_minutes }) => {
     if (!Number.isInteger(session_week) || session_week < 1 || session_week > 12) throw new Error("Week must be 1 to 12");
     if (!Number.isInteger(exercise_minutes) || exercise_minutes < 1 || exercise_minutes > 120) {
       throw new Error("Exercise time must be 1 to 120 minutes");
     }
-    await ctx.db.patch(cohortId, { session_week, exercise_minutes });
+    if (check_minutes !== undefined && (!Number.isInteger(check_minutes) || check_minutes < 1 || check_minutes > 30)) {
+      throw new Error("Quick-check time must be 1 to 30 minutes");
+    }
+    await ctx.db.patch(cohortId, { session_week, exercise_minutes, ...(check_minutes !== undefined ? { check_minutes } : {}) });
   },
 });
 
@@ -397,11 +415,14 @@ export const setExercisesEnded = adminMutation({
   },
 });
 
-/** Testing: put a participant back at the start of the flow (consent), keeping their sign-ins. */
+/** Testing: put a participant back at the start of the flow (consent), keeping their sign-ins; their quick-check answers are deleted. */
 export const resetSession = adminMutation({
   args: { participantId: v.id("cohortParticipants") },
   handler: async (ctx, { participantId }) => {
     await ctx.db.patch(participantId, Object.fromEntries(SESSION_FIELDS.map((f) => [f, undefined])));
+    for (const answer of await ctx.db.query("checkAnswers").withIndex("by_participant", (q) => q.eq("participantId", participantId)).collect()) {
+      await ctx.db.delete(answer._id);
+    }
   },
 });
 
@@ -447,8 +468,11 @@ export const addParticipants = adminMutation({
     const groups = balancedGroups(await groupCounts(ctx, cohortId), ids.length);
     const now = Date.now();
     for (let i = 0; i < ids.length; i++) {
+      // Quick-check form order, balanced within each group too (reads see
+      // the rows inserted earlier in this loop).
+      const check_order = await nextCheckOrder(ctx, cohortId, groups[i]);
       await ctx.db.insert("cohortParticipants", {
-        cohortId, studentId: ids[i], group: groups[i], on_roster: true, added_at: now,
+        cohortId, studentId: ids[i], group: groups[i], on_roster: true, added_at: now, check_order,
         ...(fresh.get(ids[i]) ? { metadata: fresh.get(ids[i]) } : {}),
       });
     }
@@ -523,14 +547,29 @@ export const roster = adminQuery({
     if (!cohort) return null;
     const rows = await ctx.db.query("cohortParticipants").withIndex("by_cohort", (q) => q.eq("cohortId", cohortId)).collect();
     rows.sort((a, b) => a.studentId.localeCompare(b.studentId));
+    const hasChecks = await weekHasChecks(ctx, sessionWeekOf(cohort));
+    const timing = {
+      hasChecks,
+      checkMs: (cohort.check_minutes ?? DEFAULT_CHECK_MINUTES) * 60_000,
+      exerciseMs: (cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES) * 60_000,
+      cohortEndAt: cohort.exercises_end_at,
+    };
     return {
       cohort: {
         ...cohort,
         session_week: cohort.session_week ?? DEFAULT_SESSION_WEEK,
         exercise_minutes: cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES,
+        check_minutes: cohort.check_minutes ?? DEFAULT_CHECK_MINUTES,
       },
       participants: await Promise.all(
-        rows.map(async (r) => ({ ...r, usage: r.userId ? await usageByPhase(ctx, r.userId) : null })),
+        rows.map(async (r) => ({
+          ...r,
+          usage: r.userId ? await usageByPhase(ctx, r.userId) : null,
+          checks: await checkScores(ctx, r, cohort),
+          // When the exercises actually started and ended (a check that ran out
+          // isn't stored as a moment of its own; sessionFlow.ts works it out).
+          timeline: timelineOf(r, timing),
+        })),
       ),
       preSurvey: PRE_SURVEY,
       postSurvey: POST_SURVEY,

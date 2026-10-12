@@ -14,7 +14,7 @@ export type PublicApiType = {
     setSession: FunctionReference<
       "mutation",
       "public",
-      { cohortId: Id<"cohorts">; session_week: number; exercise_minutes: number },
+      { cohortId: Id<"cohorts">; session_week: number; exercise_minutes: number; check_minutes?: number },
       any
     >;
     setExercisesEnded: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; ended: boolean }, any>;
