@@ -18,18 +18,15 @@ function clock(ms: number) {
  */
 export function SessionTimer({
   msLeft,
-  consented,
   hasChecks,
   testingGroup,
 }: {
   msLeft: number;
-  consented: boolean;
   /** Two more short problems come after the exercises. */
   hasChecks: boolean;
   testingGroup: string | null;
 }) {
   const finish = useMutation(api.cohorts.finishExercises);
-  const giveConsent = useMutation(api.cohorts.giveConsent);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const warn = msLeft <= WARN_MS;
@@ -57,16 +54,6 @@ export function SessionTimer({
         >
           I'm finished
         </button>
-        {!consented && (
-          <button
-            type="button"
-            onClick={() => giveConsent({ agree: true })}
-            className="rounded-[2px] border border-brass px-2 py-1 normal-case tracking-normal font-medium text-brass hover:bg-surface-raised cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
-            title="You chose not to take part, so nothing you do is used in the research. Changed your mind, or clicked by mistake? Take part now: a short survey, then back to the exercises."
-          >
-            Not taking part · I want to take part
-          </button>
-        )}
         {testingGroup && (
           <span
             className="rounded-[2px] border border-dashed border-brass px-2 py-1 text-brass"
@@ -83,11 +70,9 @@ export function SessionTimer({
             className="absolute left-1/2 top-10 w-72 -translate-x-1/2 rounded-[4px] border border-rule-strong bg-surface-panel p-4 normal-case tracking-normal shadow-lg"
           >
             <p className="mb-3 text-xs font-normal leading-relaxed text-ink">
-              {consented
-                ? hasChecks
-                  ? "Finish the exercises and go on to two more short problems and the feedback survey? You can't come back to the exercises after this."
-                  : "Finish the exercises and go to the short feedback survey? You can't come back to the exercises after this."
-                : "Finish the exercises? You can't come back to them after this."}
+              {hasChecks
+                ? "Finish the exercises and go on to two more short problems and the feedback survey? You can't come back to the exercises after this."
+                : "Finish the exercises and go to the short feedback survey? You can't come back to the exercises after this."}
             </p>
             <div className="flex gap-2">
               <button

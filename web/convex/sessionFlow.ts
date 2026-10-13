@@ -3,8 +3,9 @@
 // when a clock runs out, which a query can't watch) agree exactly.
 //
 // The flow: consent → pre-survey → pre quick check → exercises → post quick
-// check → post-survey → done. A student who declines goes straight to the
-// exercises and skips the surveys and checks. Each quick check is untimed
+// check → post-survey → done. A student who declines is stopped there
+// ("declined": no exercises, nothing more recorded) and can still change
+// their mind. Each quick check is untimed
 // until the student presses Start, then lasts CHECK minutes or until both
 // problems are submitted; the exercise clock starts when the pre check ends.
 // A week with no quick-check problems skips the checks.
@@ -19,6 +20,7 @@ export type SessionStage =
   | "post_check"
   | "post_survey"
   | "done"
+  | "declined"
   | "open";
 
 export type CheckPhase = "pre" | "post";
@@ -64,8 +66,8 @@ export function timelineOf(
     checks && p.pre_check_started_at !== undefined
       ? (p.pre_check_finished_at ?? p.pre_check_started_at + opts.checkMs)
       : null;
-  // Set directly when the student declined, finished the pre check early or
-  // had no checks; otherwise the pre check's time-out.
+  // Set directly when the student finished the pre check early or the week
+  // has no checks; otherwise the pre check's time-out.
   const exercisesStartAt = p.exercises_started_at ?? preCheckEndsAt;
   const exercisesEndsAt =
     exercisesStartAt === null
@@ -85,15 +87,15 @@ export function timelineOf(
 export function stageAt(s: FlowState, now: number): SessionStage {
   const t = s.timeline;
   if (s.consented === null) return "consent";
-  if (s.consented && !s.preSurveyDone) return "pre_survey";
+  if (s.consented === false) return "declined";
+  if (!s.preSurveyDone) return "pre_survey";
   if (s.phase !== "session") return "open";
   if (s.postSurveyDone) return "done";
-  const checks = s.hasChecks && s.consented;
+  const checks = s.hasChecks;
   if (checks && (!s.preCheckStarted || (t.preCheckEndsAt !== null && now < t.preCheckEndsAt))) {
     return "pre_check";
   }
   if (t.exercisesEndsAt === null || now < t.exercisesEndsAt) return "exercises";
-  if (!s.consented) return "done";
   if (checks && (!s.postCheckStarted || (t.postCheckEndsAt !== null && now < t.postCheckEndsAt))) {
     return "post_check";
   }

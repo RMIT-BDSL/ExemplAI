@@ -73,7 +73,7 @@ function stage(p: Participant, ended: boolean): string {
   if (p.consented === undefined) return 'Consent';
   if (p.consented && !p.pre_survey) return 'Pre-survey';
   if (p.post_survey) return 'Done';
-  if (!p.consented) return p.exercises_finished_at || ended ? 'Done (declined)' : 'Exercises (declined)';
+  if (!p.consented) return 'Declined';
   if (p.post_check_started_at) return 'Post check / post-survey';
   if (p.exercises_finished_at || ended) return 'Post check';
   if (p.exercises_started_at || p.checks.pre) return 'Pre check / exercises';

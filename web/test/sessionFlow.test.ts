@@ -66,10 +66,10 @@ describe("session flow", () => {
     expect(stageAt(s, 35 * MIN)).toBe("post_survey");
   });
 
-  it("sends a student who declined to the exercises, then done, with no checks", () => {
-    const s = state({ consented: false, exercises_started_at: 0 });
-    expect(stageAt(s, MIN)).toBe("exercises");
-    expect(stageAt(s, 35 * MIN)).toBe("done");
+  it("stops a student who declined, in a session or in practice", () => {
+    expect(stageAt(state({ consented: false }), MIN)).toBe("declined");
+    expect(stageAt(state({ consented: false }, { phase: "practice" }), MIN)).toBe("declined");
+    expect(nextDeadline(state({ consented: false }), MIN)).toBeNull();
   });
 
   it("is done after the post-survey, and open in practice", () => {
