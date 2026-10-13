@@ -24,10 +24,11 @@ describe("surveys", () => {
     expect(clean.stuck_strategy).toBeUndefined();
   });
 
-  it("rejects a missing required answer", () => {
+  it("lets any question be skipped", () => {
+    expect(cleanAnswers(PRE_SURVEY, {})).toEqual({});
     const a = minimal(PRE_SURVEY);
     delete a.ai_use_frequency;
-    expect(() => cleanAnswers(PRE_SURVEY, a)).toThrow(/How often do you use AI/);
+    expect(cleanAnswers(PRE_SURVEY, a).ai_use_frequency).toBeUndefined();
   });
 
   it("rejects an answer that isn't an option or is off the scale", () => {

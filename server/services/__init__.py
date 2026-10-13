@@ -784,7 +784,7 @@ async def submit_check(body: CheckSubmission, auth_token: str) -> dict:
             for tc in tests
         ])
     passed = sum(1 for r in results if r.get("passed"))
-    if any(r.get("status_id") == 500 for r in results):
+    if any(error_kind(r.get("status_id"), r.get("stderr")) == "service_error" for r in results):
         # The grader itself failed: don't record a score the student didn't earn.
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The grader is unavailable. Try again.")
 

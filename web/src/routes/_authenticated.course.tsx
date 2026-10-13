@@ -70,6 +70,24 @@ export const Route = createFileRoute("/_authenticated/course")({
   },
 });
 
+/** sessionStorage key for a lesson's code in this tab. */
+const codeStorageKey = (lessonId: string, language: string) => `exemplai_code_${lessonId}_${language}`;
+
+/** The tab's copy of a lesson's code and when it was saved (older tabs stored the code alone). */
+function readTabCopy(key: string): { code: string; at: number } | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.code === "string" && typeof parsed?.at === "number") return parsed;
+    } catch {}
+    return { code: raw, at: 0 };
+  } catch {
+    return null;
+  }
+}
+
 const CODE_TEMPLATES = {
   python: `def main():\n    # Write your Python code here\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()`,
 };
@@ -144,9 +162,9 @@ function Course() {
 
   // Autosave (no indicator): edits are written to sessionStorage and to the
   // server (convex/codeDrafts.ts) shortly after typing stops, and flushed on
-  // lesson change, unmount and when the page is hidden or closed. A reload
-  // restores the tab's copy; a crashed browser or another computer restores
-  // the server's.
+  // lesson change, unmount and when the page is hidden or closed. Opening a
+  // lesson restores the newer of the tab's copy and the server's (a crashed
+  // browser, or work saved later on another computer).
   const pendingSaveRef = useRef<{ key: string; lessonId?: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runShortcutRef = useRef<() => void>(() => {});
@@ -155,7 +173,10 @@ function Course() {
     saveTimerRef.current = null;
     const pending = pendingSaveRef.current;
     if (pending) {
-      sessionStorage.setItem(pending.key, pending.code);
+      // A full or blocked browser store mustn't stop the server save.
+      try {
+        sessionStorage.setItem(pending.key, JSON.stringify({ code: pending.code, at: Date.now() }));
+      } catch {}
       if (pending.lessonId) {
         saveCodeDraft({ lessonId: pending.lessonId as Id<"questions">, code: pending.code }).catch(() => {});
       }
@@ -235,48 +256,32 @@ function Course() {
       tokenIdentifier && activeQuestionId && canOpen ? { lessonId: activeQuestionId } : "skip",
     ),
   );
-  // Load each lesson's code once: the tab's copy, else the server's (waiting
-  // for it), else the starter. Later draft updates are our own saves.
-  const loadedCodeRef = useRef<string | null>(null);
+  // Load each lesson's code once, when we know whether there's a saved copy:
+  // the newer of the tab's copy and the server's, else the starter. Later
+  // draft updates are our own saves. The editor is read-only until then, so
+  // nothing typed meanwhile is overwritten.
+  const [loadedCodeKey, setLoadedCodeKey] = useState<string | null>(null);
+  const codeKey = activeQuestionId ? codeStorageKey(activeQuestionId, language) : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once per lesson, when its draft has arrived
   useEffect(() => {
-    if (activeQuestion && problemId) {
-      const storageKey = `exemplai_code_${problemId}_${language}`;
-      if (loadedCodeRef.current === storageKey) return;
-      const savedCode = sessionStorage.getItem(storageKey) ?? (canOpen ? codeDraft?.code : undefined);
-      // Still finding out whether there's a saved copy: wait.
-      if (!savedCode && (!tokenIdentifier || unlocked === undefined || (canOpen && codeDraft === undefined))) return;
-      loadedCodeRef.current = storageKey;
+    if (!activeQuestion || !codeKey || loadedCodeKey === codeKey) return;
+    if (!tokenIdentifier || unlocked === undefined || (canOpen && codeDraft === undefined)) return;
+    const tab = readTabCopy(codeKey);
+    const server = canOpen ? (codeDraft ?? null) : null;
+    const savedCode =
+      tab && server ? (server.updated_at > tab.at ? server.code : tab.code) : (tab?.code ?? server?.code ?? null);
+    setLoadedCodeKey(codeKey);
 
-      if (savedCode) {
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: savedCode,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(savedCode);
-        }
-      } else if (activeQuestion.starter_code) {
-        const starter = withStarterHint(activeQuestion.starter_code);
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: starter,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(starter);
-        }
-      } else {
-        const defaultCode = CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: defaultCode,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(defaultCode);
-        }
-      }
-    }
-  }, [activeQuestionId, language, problemId, codeDraft, canOpen, unlocked, tokenIdentifier]);
+    // An empty saved copy is still the student's code (they cleared it).
+    const code =
+      savedCode !== null
+        ? savedCode
+        : activeQuestion.starter_code
+          ? withStarterHint(activeQuestion.starter_code)
+          : CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+    setCodeTemplates((prev) => ({ ...prev, [language]: code }));
+    if (editorRef.current) editorRef.current.setValue(code);
+  }, [codeKey, loadedCodeKey, codeDraft, canOpen, unlocked, tokenIdentifier]);
 
   // Resizable columns (wide screens only, where all three sit side by side).
   // Widths are a per-browser convenience; null = the default CSS width.
@@ -371,7 +376,7 @@ function Course() {
       document.removeEventListener("visibilitychange", onHide);
       flushSave();
     };
-  }, [problemId]);
+  }, [activeQuestionId]);
 
   if (activeQuestion === undefined) {
     return <LessonSkeleton />;
@@ -418,10 +423,11 @@ function Course() {
         ...prev,
         [language]: value,
       }));
-      if (problemId) {
+      // Not before the lesson's code has loaded (that setValue is not an edit).
+      if (activeQuestionId && loadedCodeKey === codeStorageKey(activeQuestionId, language)) {
         pendingSaveRef.current = {
-          key: `exemplai_code_${problemId}_${language}`,
-          lessonId: activeQuestion?._id,
+          key: codeStorageKey(activeQuestionId, language),
+          lessonId: activeQuestionId,
           code: value,
         };
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -679,6 +685,7 @@ function Course() {
                   language={language}
                   value={currentCode}
                   onChange={handleCodeChange}
+                  readOnly={!codeKey || loadedCodeKey !== codeKey}
                   fontSize={fontSize}
                   isRunning={isRunning}
                   isSubmitting={isSubmitting}

@@ -160,7 +160,8 @@ export const joinWithId = mutation({
       null;
     // Their ID was added to a roster after they first signed in unlisted: move
     // them onto the roster row, keeping the group they already have (so nobody
-    // switches condition mid-study) and their sign-ins and survey.
+    // switches condition mid-study), their sign-ins, session record and
+    // quick-check answers.
     if (participant && !participant.on_roster) {
       const rosterRow = await ctx.db
         .query("cohortParticipants")
@@ -174,8 +175,16 @@ export const joinWithId = mutation({
           joined_at: participant.joined_at,
           last_login_at: participant.last_login_at,
           login_count: participant.login_count,
+          // Their quick-check form order too, so they don't get a form twice.
+          ...(participant.check_order ? { check_order: participant.check_order } : {}),
           ...Object.fromEntries(SESSION_FIELDS.map((f) => [f, participant![f]])),
         });
+        for (const answer of await ctx.db
+          .query("checkAnswers")
+          .withIndex("by_participant", (q) => q.eq("participantId", participant!._id))
+          .collect()) {
+          await ctx.db.patch(answer._id, { participantId: rosterRow._id });
+        }
         await ctx.db.delete(participant._id);
         participant = await ctx.db.get(rosterRow._id);
       }

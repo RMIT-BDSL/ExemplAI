@@ -18,8 +18,17 @@ from model.chat import Chat
 import services
 from dependencies import get_current_user, get_current_user_with_token
 
+def rate_limit_key(request: Request) -> str:
+    """Limits count per signed-in student (set by the auth dependency, which
+    runs before the limit is checked), else per network address. Per address
+    alone, a whole class behind campus Wi-Fi, or every request behind a
+    proxy, would share one limit."""
+    user = getattr(request.state, "rate_limit_user", None)
+    return f"user:{user}" if user else get_remote_address(request)
+
+
 # Shared with main.py for app.state + SlowAPIMiddleware wiring.
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=rate_limit_key)
 
 router = APIRouter()
 

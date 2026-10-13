@@ -132,7 +132,12 @@ function toCsv(data: Roster): string {
     }),
     ...pre.map((id) => answer(p.pre_survey?.[id])), ...post.map((id) => answer(p.post_survey?.[id])),
   ]);
-  const cell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const cell = (raw: string) => {
+    // Text starting like a formula (a survey answer, a roster column) would run
+    // as one in Excel; a leading ' keeps it text. Plain numbers are left alone.
+    const v = /^[=+\-@\t\r]/.test(raw) && !/^-?\d+(\.\d+)?$/.test(raw) ? `'${raw}` : raw;
+    return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
   return [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
 }
 
@@ -194,7 +199,8 @@ const CohortDetailPage: Component = () => {
     a.href = URL.createObjectURL(blob);
     a.download = `${data.cohort.code}-responses-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    // Some browsers read the link after click() returns.
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
   };
 
   const savePasscode = async (value: string) => {

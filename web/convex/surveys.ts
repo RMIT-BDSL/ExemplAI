@@ -14,12 +14,15 @@
 // interest in using it for the rest of the course, and two open questions for
 // the thematic analysis (§7.2).
 //
+// Every question can be skipped, as the study information tells students;
+// an unanswered question is simply missing from the answers.
+//
 // Question ids are the column names in the export: change wording freely, but
 // keep an id once data has been collected under it.
 
 export type SurveyQuestion =
-  | { id: string; label: string; type: "choice"; options: readonly string[]; optional?: boolean }
-  | { id: string; label: string; type: "multi"; options: readonly string[]; optional?: boolean }
+  | { id: string; label: string; type: "choice"; options: readonly string[] }
+  | { id: string; label: string; type: "multi"; options: readonly string[] }
   | {
       id: string;
       label: string;
@@ -28,9 +31,8 @@ export type SurveyQuestion =
       max: number;
       minLabel: string;
       maxLabel: string;
-      optional?: boolean;
     }
-  | { id: string; label: string; type: "text" | "long"; optional?: boolean };
+  | { id: string; label: string; type: "text" | "long" };
 
 export type SurveySection = { title: string; questions: readonly SurveyQuestion[] };
 
@@ -92,7 +94,6 @@ export const PRE_SURVEY: readonly SurveySection[] = [
         id: "stuck_strategy",
         label: "What do you usually do when you get stuck on a programming exercise?",
         type: "long",
-        optional: true,
       },
     ],
   },
@@ -149,10 +150,9 @@ export const POST_SURVEY: readonly SurveySection[] = [
         max: 5,
         minLabel: "Very unclear",
         maxLabel: "Very clear",
-        optional: true,
       },
-      { id: "tutor_helped_understand", label: "The tutor helped me understand the ideas behind the exercises.", ...AGREE, optional: true },
-      { id: "tutor_made_me_think", label: "The tutor made me think for myself instead of giving me the answer.", ...AGREE, optional: true },
+      { id: "tutor_helped_understand", label: "The tutor helped me understand the ideas behind the exercises.", ...AGREE },
+      { id: "tutor_made_me_think", label: "The tutor made me think for myself instead of giving me the answer.", ...AGREE },
       {
         id: "use_rest_of_course",
         label: "Would you be interested in using the tutor for help for the rest of Python Programming Bootcamp?",
@@ -164,12 +164,11 @@ export const POST_SURVEY: readonly SurveySection[] = [
   {
     title: "In your own words",
     questions: [
-      { id: "most_helpful", label: "What did you find most helpful, if anything?", type: "long", optional: true },
+      { id: "most_helpful", label: "What did you find most helpful, if anything?", type: "long" },
       {
         id: "challenges",
         label: "What was difficult or frustrating, and what would make the tutor better?",
         type: "long",
-        optional: true,
       },
     ],
   },
@@ -179,8 +178,9 @@ export const surveyQuestions = (survey: readonly SurveySection[]) => survey.flat
 
 /**
  * Checks answers against the survey and returns them cleaned (trimmed, long
- * text capped, unknown ids dropped). Throws on a missing required answer or
- * an answer that isn't one of the options.
+ * text capped, unknown ids and skipped questions dropped). Any question may
+ * be skipped; an answer that isn't one of the options or is off the scale is
+ * refused.
  */
 export function cleanAnswers(survey: readonly SurveySection[], answers: SurveyAnswers): SurveyAnswers {
   const clean: SurveyAnswers = {};
@@ -189,18 +189,14 @@ export function cleanAnswers(survey: readonly SurveySection[], answers: SurveyAn
     if (q.type === "multi") {
       const picked = (Array.isArray(raw) ? raw : []).filter((o) => q.options.includes(o));
       if (picked.length) clean[q.id] = [...new Set(picked)];
-      else if (!q.optional) throw new Error(`Please answer: ${q.label}`);
       continue;
     }
     const value = (typeof raw === "string" ? raw : "").trim();
-    if (!value) {
-      if (!q.optional && q.type !== "text" && q.type !== "long") throw new Error(`Please answer: ${q.label}`);
-      continue;
-    }
-    if (q.type === "choice" && !q.options.includes(value)) throw new Error(`Please answer: ${q.label}`);
+    if (!value) continue;
+    if (q.type === "choice" && !q.options.includes(value)) throw new Error(`Not a valid answer: ${q.label}`);
     if (q.type === "scale") {
       const n = Number(value);
-      if (!Number.isInteger(n) || n < q.min || n > q.max) throw new Error(`Please answer: ${q.label}`);
+      if (!Number.isInteger(n) || n < q.min || n > q.max) throw new Error(`Not a valid answer: ${q.label}`);
     }
     clean[q.id] = value.slice(0, 2000);
   }

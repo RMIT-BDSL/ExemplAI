@@ -22,8 +22,9 @@ function isAnswered(q: SurveyQuestion, a: SurveyAnswers) {
   return Array.isArray(v) ? v.length > 0 : !!v?.trim();
 }
 
-const required = (q: SurveyQuestion) =>
-  !q.optional && q.type !== "text" && q.type !== "long";
+/** Questions with options; a skipped one gets a gentle reminder (text boxes don't). */
+const hasOptions = (q: SurveyQuestion) =>
+  q.type !== "text" && q.type !== "long";
 
 const DRAFT_SAVE_MS = 800;
 
@@ -32,6 +33,8 @@ const DRAFT_SAVE_MS = 800;
  * student goes: to the tab at once (a reload) and to the server shortly
  * after (a frozen or restarted computer, or moving to another one). The tab
  * copy is session storage, so it doesn't outlive the tab on a shared PC.
+ * Every question can be skipped: on submit, skipped ones are pointed out
+ * once, then "Submit anyway" goes ahead.
  */
 export function SurveyScreen({
   storageKey,
@@ -62,7 +65,7 @@ export function SurveyScreen({
     } catch {}
     return serverDraft;
   });
-  const [showMissing, setShowMissing] = useState(false);
+  const [showSkipped, setShowSkipped] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -104,19 +107,16 @@ export function SurveyScreen({
 
   const set = (id: string, value: string | string[]) =>
     setAnswers((a) => ({ ...a, [id]: value }));
-  const missing = sections
+  const skipped = sections
     .flatMap((s) => s.questions)
-    .filter((q) => required(q) && !isAnswered(q, answers));
+    .filter((q) => hasOptions(q) && !isAnswered(q, answers));
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (missing.length) {
-      setShowMissing(true);
-      setError(
-        `Please answer the ${missing.length === 1 ? "question" : `${missing.length} questions`} marked below.`,
-      );
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (skipped.length && !showSkipped) {
+      setShowSkipped(true);
       document
-        .getElementById(`q-${missing[0].id}`)
+        .getElementById(`q-${skipped[0].id}`)
         ?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
@@ -139,7 +139,11 @@ export function SurveyScreen({
   };
 
   return (
-    <SessionPage step={step} title={title} intro={<p>{intro}</p>}>
+    <SessionPage
+      step={step}
+      title={title}
+      intro={<p>{intro} You can skip any question you'd rather not answer.</p>}
+    >
       <form onSubmit={submit} className="flex flex-col gap-12" noValidate>
         {sections.map((section) => (
           <section key={section.title} className="flex flex-col gap-8">
@@ -152,7 +156,9 @@ export function SurveyScreen({
                 q={q}
                 value={answers[q.id]}
                 onChange={(v) => set(q.id, v)}
-                flagged={showMissing && required(q) && !isAnswered(q, answers)}
+                flagged={
+                  showSkipped && hasOptions(q) && !isAnswered(q, answers)
+                }
               />
             ))}
           </section>
@@ -167,6 +173,17 @@ export function SurveyScreen({
             <p className="font-medium">{error}</p>
           </div>
         )}
+        {showSkipped && skipped.length > 0 && (
+          <p role="status" className="text-sm leading-relaxed text-ink">
+            You skipped{" "}
+            {skipped.length === 1
+              ? "one question"
+              : `${skipped.length} questions`}{" "}
+            (marked above). That's fine: answer{" "}
+            {skipped.length === 1 ? "it" : "them"} if you'd like, or submit
+            anyway.
+          </p>
+        )}
         <div className="border-t border-rule-strong pt-6">
           <AuthButton
             type="submit"
@@ -175,7 +192,7 @@ export function SurveyScreen({
             disabled={saving}
             icon={<ArrowRight className="size-4" />}
           >
-            {submitLabel}
+            {showSkipped && skipped.length > 0 ? "Submit anyway" : submitLabel}
           </AuthButton>
         </div>
       </form>
@@ -194,22 +211,16 @@ function Question({
   onChange: (v: string | string[]) => void;
   flagged: boolean;
 }) {
-  const optional = !required(q);
   return (
     <fieldset
       id={`q-${q.id}`}
       className={cn(
         "m-0 min-w-0 border-0 p-0",
-        flagged && "border-l-2 border-danger pl-3",
+        flagged && "border-l-2 border-brass pl-3",
       )}
     >
       <legend className="mb-3 text-sm font-medium leading-snug text-ink">
         {q.label}
-        {optional && (
-          <span className="ml-1.5 text-xs font-normal text-ink-label">
-            (optional)
-          </span>
-        )}
       </legend>
 
       {q.type === "choice" && (
@@ -219,7 +230,8 @@ function Question({
               key={o}
               type="button"
               aria-pressed={value === o}
-              onClick={() => onChange(o)}
+              // Clicking the chosen answer again clears it (skip after all).
+              onClick={() => onChange(value === o ? "" : o)}
               className={chip(value === o)}
             >
               {o}
@@ -262,7 +274,7 @@ function Question({
                   type="button"
                   aria-pressed={value === n}
                   aria-label={`${n}${n === String(q.min) ? `, ${q.minLabel}` : n === String(q.max) ? `, ${q.maxLabel}` : ""}`}
-                  onClick={() => onChange(n)}
+                  onClick={() => onChange(value === n ? "" : n)}
                   className={cn(chip(value === n), "w-9 px-0 tabular-nums")}
                 >
                   {n}
