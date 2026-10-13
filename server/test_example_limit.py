@@ -186,7 +186,8 @@ def test_delivered_type_is_saved_with_the_reply(monkeypatch):
     asyncio.run(chat_service.run_chat(FakeGraph(), chat, auth_user_id="u", auth_token="t"))
     assert saved == {"text": "example 2", "response_type": NEW_EXAMPLE,
                      "dean_decision": "approved_after_retry", "dean_reason": "DIRECT_ANSWER_LEAK",
-                     "rejected_drafts": None, "mastery_at_reply": 0.0}
+                     "rejected_drafts": None, "mastery_at_reply": 0.0,
+                     "usage": None}  # the fake graph makes no model calls
 
 
 # ── control group: plain chat, Dean checks the answer leak only ───────

@@ -15,7 +15,10 @@ type CohortRow = {
   experimental: number;
   control: number;
   joined: number;
-  intakeDone: number;
+  consented: number;
+  declined: number;
+  preDone: number;
+  postDone: number;
   notOnRoster: number;
 };
 
@@ -50,7 +53,9 @@ const CohortsPage: Component = () => {
         <p class="mt-2 max-w-2xl text-[15px] text-body">
           A cohort is one session's students, tracked by student ID. Add their IDs (typed or from a CSV) and each gets
           an experimental or control group straight away, keeping the cohort balanced. Students sign in with their ID
-          only. An ID on no roster still gets in: it joins the cohort marked <em>open</em>, flagged for checking.
+          (and the class passcode, during a session). An ID on no roster still gets in: it joins the cohort marked{' '}
+          <em>open</em>, flagged for checking. A session runs as one flow: consent, pre-survey, the session week's
+          exercises for a set time, post-survey.
         </p>
       </header>
 
@@ -102,7 +107,8 @@ const CohortsPage: Component = () => {
                   <th class="px-4 py-3 text-right">Participants</th>
                   <th class="px-4 py-3 text-right">Experimental / control</th>
                   <th class="px-4 py-3 text-right">Signed in</th>
-                  <th class="px-4 py-3 text-right">Survey done</th>
+                  <th class="px-4 py-3 text-right" title="Agreed / declined">Consent</th>
+                  <th class="px-4 py-3 text-right" title="Pre-survey / post-survey done">Surveys</th>
                   <th class="px-4 py-3 text-right">Not on roster</th>
                   <th class="px-4 py-3">Passcode</th>
                   <th class="px-4 py-3">Open</th>
@@ -119,7 +125,8 @@ const CohortsPage: Component = () => {
                       <td class="px-4 py-3 text-right tabular-nums">{c.participants}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{c.experimental} / {c.control}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{c.joined}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{c.intakeDone}</td>
+                      <td class="px-4 py-3 text-right tabular-nums">{c.consented} / {c.declined}</td>
+                      <td class="px-4 py-3 text-right tabular-nums">{c.preDone} / {c.postDone}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{c.notOnRoster || '–'}</td>
                       <td class="px-4 py-3 font-mono text-[12px] text-body">{c.passcode || '–'}</td>
                       <td class="px-4 py-3">

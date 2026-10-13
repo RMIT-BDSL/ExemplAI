@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from convex import ConvexClient
 import logging
@@ -11,6 +11,7 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user_with_token(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
     """Authenticate via Convex JWT and return {user, token}.
@@ -63,7 +64,11 @@ async def get_current_user_with_token(
                 detail="Invalid token or session expired",
             )
 
-        return {"user": session_data["user"], "token": token}
+        user = session_data["user"]
+        # Rate limits count per student, not per network address: a class on
+        # campus Wi-Fi shares one address (routers.rate_limit_key).
+        request.state.rate_limit_user = str(user.get("id") or user.get("_id") or user.get("email") or "")
+        return {"user": user, "token": token}
     except HTTPException:
         raise
     except Exception as e:

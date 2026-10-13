@@ -1,6 +1,7 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery } from "./functions";
+import { DEFAULT_SESSION_WEEK } from "./studentIds";
 import { isStudent } from "./studentMetrics";
 
 /**
@@ -20,6 +21,9 @@ import { isStudent } from "./studentMetrics";
  * Staff (admin or management role, on the login account or the user row) see
  * and open every lesson; staff testing can also turn locks off for everyone
  * with the Convex environment variable LESSON_LOCKS=off.
+ *
+ * During a study session (convex/cohorts.ts) a student sees and opens only the
+ * session week's lessons, still unlocking in order.
  */
 
 export const UNLOCK_AFTER_FAILED_SUBMITS = 3;
@@ -65,6 +69,14 @@ export function bypassesLocks(user: Pick<Doc<"users">, "role"> | null, isAdmin: 
   return !lessonLocksEnabled() || isAdmin || (user !== null && !isStudent(user));
 }
 
+/** The one week a student in a study session may see, or null (not in a session). */
+export async function sessionWeekFor(ctx: QueryCtx, user: Doc<"users"> | null): Promise<number | null> {
+  if (!user || user.study_phase !== "session") return null;
+  const p = await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", user._id)).first();
+  const cohort = p && (await ctx.db.get(p.cohortId));
+  return cohort ? (cohort.session_week ?? DEFAULT_SESSION_WEEK) : null;
+}
+
 /** Whether this user may open this lesson (always, for staff or with locks off). */
 export async function canOpenLesson(
   ctx: QueryCtx,
@@ -72,8 +84,10 @@ export async function canOpenLesson(
   lessonId: Id<"questions">,
   isAdmin: boolean,
 ): Promise<boolean> {
-  if (bypassesLocks(user, isAdmin)) return true;
+  const sessionWeek = await sessionWeekFor(ctx, user);
   const lesson = await ctx.db.get(lessonId);
+  if (sessionWeek !== null && lesson?.week !== sessionWeek) return false;
+  if (bypassesLocks(user, isAdmin)) return true;
   if (!lesson) return false;
   const week = await ctx.db
     .query("questions")

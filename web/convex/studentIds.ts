@@ -42,6 +42,21 @@ export function studentIdFromEmail(email: string | undefined | null): string | n
   return isIdEmail(email) ? normalizeStudentId(email!.split("@")[0]) : null;
 }
 
+/** The week students see in a session, unless the cohort sets another (decided 2026-10-12). */
+export const DEFAULT_SESSION_WEEK = 4;
+/**
+ * The cap on the exercises, in minutes. The clock starts only when the
+ * student finishes the pre quick check, and the post check and post-survey
+ * come after it, so every student gets the same exercise time. A 55-minute
+ * session after the introduction (decided 2026-10-12): consent 2, pre-survey
+ * 3, quick check 5, exercises 35, quick check 5, post-survey 4, 1 to spare.
+ */
+export const DEFAULT_EXERCISE_MINUTES = 35;
+/** Minutes for each quick check (two problems, tutor off). */
+export const DEFAULT_CHECK_MINUTES = 5;
+/** Bump when the consent text changes (web/src/components/session/consent.ts). */
+export const CONSENT_VERSION = "2026-10-12-draft2";
+
 /** A cohort's session passcode matches what the student typed (case and spaces ignored). */
 export function passcodeMatches(required: string | undefined, given: string | undefined): boolean {
   const norm = (s: string | undefined) => (s ?? "").trim().toUpperCase().replace(/\s+/g, "");
@@ -79,24 +94,3 @@ export function shuffled<T>(items: T[], random: () => number = Math.random): T[]
   }
   return a;
 }
-
-/** The intake survey shown on a participant's first sign-in. */
-export const INTAKE_QUESTIONS = [
-  {
-    id: "programming_experience",
-    label: "How much programming have you done before this course?",
-    type: "choice",
-    options: ["None", "A little", "A lot"],
-  },
-  {
-    id: "other_languages",
-    label: "Which other programming languages have you used, if any?",
-    type: "text",
-  },
-  {
-    id: "python_confidence",
-    label: "How confident are you writing Python? (1 = not at all, 5 = very)",
-    type: "choice",
-    options: ["1", "2", "3", "4", "5"],
-  },
-] as const;

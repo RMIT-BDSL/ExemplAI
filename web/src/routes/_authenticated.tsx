@@ -1,10 +1,10 @@
 import { usePostHog } from "@posthog/react";
 import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Outlet, redirect, useMatches, useNavigate } from "@tanstack/react-router";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { isIdEmail } from "../../convex/studentIds";
-import { IntakeSurvey } from "#/components/intake/IntakeSurvey";
+import { SessionGate } from "#/components/session/SessionGate";
 import { stripSearchParams } from "#/lib/auth-callback";
 import { /* captureSignIn, */ getSession } from "#/lib/auth.functions";
 import Navbar from "#/components/nav/Navbar";
@@ -48,7 +48,8 @@ function AuthenticatedLayout() {
 
   // Student-ID sign-in (convex/studentIds.ts): place the student in their
   // cohort, record the sign-in and set their group before any page loads (the
-  // pages need the profile this creates), then ask the intake survey once.
+  // pages need the profile this creates), then run the study session's flow
+  // (SessionGate: consent, surveys, timed exercises).
   const isIdAccount = isIdEmail(session?.user?.email);
   const { isAuthenticated } = useConvexAuth();
   const joinWithId = useMutation(api.cohorts.joinWithId);
@@ -66,7 +67,6 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (isIdAccount && isAuthenticated) runJoin();
   }, [isIdAccount, isAuthenticated, runJoin]);
-  const intake = useQuery(api.cohorts.myIntake, isIdAccount && joined ? {} : "skip");
 
   // Magic-link sign-in completion: the user followed the link in their email and
   // landed here authenticated. This is the only point where a magic-link sign-in
@@ -125,7 +125,7 @@ function AuthenticatedLayout() {
     }
   }, [session, code, createUserAndUseCode, navigate, posthog]);
 
-  if (isIdAccount && (!joined || intake === undefined)) {
+  if (isIdAccount && !joined) {
     return (
       <div className="xa-workspace flex min-h-dvh w-full flex-col items-center justify-center gap-4 px-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-label">
@@ -152,13 +152,12 @@ function AuthenticatedLayout() {
       </div>
     );
   }
-  if (intake?.needsIntake) return <IntakeSurvey questions={intake.questions} />;
-
-  return (
+  const app = (
     <>
       {/* The lesson workspace has its own status bar instead. */}
       {!isWorkspace && <Navbar />}
       <Outlet />
     </>
   );
+  return isIdAccount ? <SessionGate userId={session.user.id}>{app}</SessionGate> : app;
 }

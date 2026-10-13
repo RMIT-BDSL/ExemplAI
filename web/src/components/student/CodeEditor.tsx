@@ -27,6 +27,8 @@ interface CodeEditorProps {
   onSubmit: () => void;
   /** Set only after a passing Submit: the Submit button turns into "Next lesson". */
   onNextLesson?: () => void;
+  /** No typing yet (e.g. while the saved code is still loading). */
+  readOnly?: boolean;
 }
 
 export default function CodeEditor({
@@ -46,6 +48,7 @@ export default function CodeEditor({
   onRun,
   onSubmit,
   onNextLesson,
+  readOnly = false,
 }: CodeEditorProps) {
   const isLoading = isRunning || isSubmitting;
 
@@ -71,6 +74,7 @@ export default function CodeEditor({
               </div>
             }
             options={{
+              readOnly,
               minimap: { enabled: false },
               fontSize: fontSize,
               lineHeight: 22,

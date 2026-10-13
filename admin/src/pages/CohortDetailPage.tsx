@@ -17,15 +17,129 @@ type Participant = {
   login_count?: number;
   session_visits?: number;
   practice_visits?: number;
-  intake?: Record<string, string>;
+  consented?: boolean;
+  consent_at?: number;
+  consent_version?: string;
+  pre_survey?: Record<string, string | string[]>;
+  pre_survey_at?: number;
+  exercises_started_at?: number;
+  exercises_finished_at?: number;
+  post_survey?: Record<string, string | string[]>;
+  post_survey_at?: number;
+  /** Tutor tokens and cost (USD), summed over the student's tutor replies, by phase. */
+  usage: Record<'session' | 'practice', UsageSums> | null;
+  check_order?: 'AB' | 'BA';
+  pre_check_started_at?: number;
+  post_check_started_at?: number;
+  /** Quick-check scores (web/convex/quickChecks.ts checkScores); null = not started. */
+  checks: Record<'pre' | 'post', CheckScore | null>;
+  /** When the exercises started and end (web/convex/sessionFlow.ts timelineOf). */
+  timeline: { exercisesStartAt: number | null; exercisesEndsAt: number | null };
 };
+type CheckScore = {
+  form: 'A' | 'B';
+  score: number;
+  problems: Array<{ problem: string; passed: number; total: number; answered: boolean; auto: boolean }>;
+};
+type UsageSums = { replies: number; input_tokens: number; output_tokens: number; cost_usd: number };
+type Survey = Array<{ title: string; questions: Array<{ id: string; label: string }> }>;
 type Roster = {
-  cohort: { _id: string; name: string; code: string; open: boolean; passcode?: string };
+  cohort: {
+    _id: string;
+    name: string;
+    code: string;
+    open: boolean;
+    passcode?: string;
+    session_week: number;
+    exercise_minutes: number;
+    check_minutes: number;
+    exercises_end_at?: number;
+  };
   participants: Participant[];
-  questions: Array<{ id: string; label: string }>;
+  preSurvey: Survey;
+  postSurvey: Survey;
 };
 
 const when = (t?: number) => (t ? new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '–');
+const time = (t?: number) => (t ? new Date(t).toLocaleTimeString([], { timeStyle: 'short' }) : '–');
+
+/**
+ * Roughly where a student is in the session flow, from their record. The app
+ * also moves students on when clocks run out (web/convex/sessionFlow.ts), so
+ * this can lag by a step until they act.
+ */
+function stage(p: Participant, ended: boolean): string {
+  if (!p.userId) return 'Not signed in';
+  if (p.consented === undefined) return 'Consent';
+  if (p.consented && !p.pre_survey) return 'Pre-survey';
+  if (p.post_survey) return 'Done';
+  if (!p.consented) return p.exercises_finished_at || ended ? 'Done (declined)' : 'Exercises (declined)';
+  if (p.post_check_started_at) return 'Post check / post-survey';
+  if (p.exercises_finished_at || ended) return 'Post check';
+  if (p.exercises_started_at || p.checks.pre) return 'Pre check / exercises';
+  return 'Pre check';
+}
+
+const checkCell = (c: CheckScore | null) =>
+  c ? `${c.score} (${c.form}${c.problems.some((x) => x.auto) ? ', auto' : ''})` : '–';
+
+/** CSV of every participant: record fields, then pre_/post_ survey answers by question id. */
+function toCsv(data: Roster): string {
+  const ids = (survey: Survey) => survey.flatMap((s) => s.questions.map((q) => q.id));
+  const pre = ids(data.preSurvey);
+  const post = ids(data.postSurvey);
+  const metaKeys = [...new Set(data.participants.flatMap((p) => Object.keys(p.metadata ?? {})))];
+  const iso = (t?: number) => (t ? new Date(t).toISOString() : '');
+  const answer = (v?: string | string[]) => (Array.isArray(v) ? v.join('; ') : (v ?? ''));
+  const header = [
+    'student_id', 'cohort', 'group', 'on_roster', ...metaKeys.map((k) => `meta_${k}`),
+    'first_sign_in', 'last_sign_in', 'session_visits', 'practice_visits',
+    'consented', 'consent_at', 'consent_version', 'pre_survey_at', 'exercises_started_at',
+    'exercises_ended_at', 'finished_early_at', 'post_survey_at',
+    ...(['session', 'practice'] as const).flatMap((ph) =>
+      ['replies', 'input_tokens', 'output_tokens', 'cost_usd'].map((f) => `${ph}_tutor_${f}`),
+    ),
+    'check_order',
+    ...(['pre', 'post'] as const).flatMap((ph) => [
+      `${ph}_check_form`, `${ph}_check_score`,
+      ...[1, 2].flatMap((n) => [`${ph}_check_p${n}_passed`, `${ph}_check_p${n}_total`, `${ph}_check_p${n}_auto`]),
+    ]),
+    ...pre.map((id) => `pre.${id}`), ...post.map((id) => `post.${id}`),
+  ];
+  const rows = data.participants.map((p) => [
+    p.studentId, data.cohort.code, p.group, String(p.on_roster), ...metaKeys.map((k) => p.metadata?.[k] ?? ''),
+    iso(p.joined_at), iso(p.last_login_at), String(p.session_visits ?? 0), String(p.practice_visits ?? 0),
+    p.consented === undefined ? '' : String(p.consented), iso(p.consent_at), p.consent_version ?? '',
+    iso(p.pre_survey_at), iso(p.timeline.exercisesStartAt ?? undefined),
+    // The end only once it has passed (a student still working has a future end).
+    iso(p.timeline.exercisesEndsAt !== null && p.timeline.exercisesEndsAt <= Date.now() ? p.timeline.exercisesEndsAt : undefined),
+    iso(p.exercises_finished_at), iso(p.post_survey_at),
+    ...(['session', 'practice'] as const).flatMap((ph) => {
+      const u = p.usage?.[ph];
+      return u ? [String(u.replies), String(u.input_tokens), String(u.output_tokens), u.cost_usd.toFixed(6)] : ['', '', '', ''];
+    }),
+    p.check_order ?? '',
+    ...(['pre', 'post'] as const).flatMap((ph) => {
+      const c = p.checks[ph];
+      if (!c) return ['', '', '', '', '', '', '', ''];
+      return [
+        c.form, String(c.score),
+        ...[0, 1].flatMap((i) => {
+          const x = c.problems[i];
+          return x ? [x.answered ? String(x.passed) : '', String(x.total), String(x.auto)] : ['', '', ''];
+        }),
+      ];
+    }),
+    ...pre.map((id) => answer(p.pre_survey?.[id])), ...post.map((id) => answer(p.post_survey?.[id])),
+  ]);
+  const cell = (raw: string) => {
+    // Text starting like a formula (a survey answer, a roster column) would run
+    // as one in Excel; a leading ' keeps it text. Plain numbers are left alone.
+    const v = /^[=+\-@\t\r]/.test(raw) && !/^-?\d+(\.\d+)?$/.test(raw) ? `'${raw}` : raw;
+    return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  return [header, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+}
 
 const CohortDetailPage: Component = () => {
   const params = useParams();
@@ -35,6 +149,59 @@ const CohortDetailPage: Component = () => {
   const [error, setError] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [passcode, setPasscode] = createSignal<string | null>(null); // null: not being edited
+  const [week, setWeek] = createSignal<string | null>(null);
+  const [minutes, setMinutes] = createSignal<string | null>(null);
+  const [checkMinutes, setCheckMinutes] = createSignal<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = createSignal(false);
+
+  const saveSession = async () => {
+    const c = roster.data()?.cohort;
+    if (!c) return;
+    try {
+      await convex.mutation(api.cohorts.setSession, {
+        cohortId: c._id as any,
+        session_week: Number(week() ?? c.session_week),
+        exercise_minutes: Number(minutes() ?? c.exercise_minutes),
+        check_minutes: Number(checkMinutes() ?? c.check_minutes),
+      });
+      setWeek(null);
+      setMinutes(null);
+      setCheckMinutes(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save the session settings');
+    }
+  };
+
+  const setEnded = async (ended: boolean) => {
+    const c = roster.data()?.cohort;
+    if (!c) return;
+    setConfirmEnd(false);
+    try {
+      await convex.mutation(api.cohorts.setExercisesEnded, { cohortId: c._id as any, ended });
+    } catch (err: any) {
+      setError(err.message || 'Failed to change the session');
+    }
+  };
+
+  const reset = async (p: Participant) => {
+    try {
+      await convex.mutation(api.cohorts.resetSession, { participantId: p._id as any });
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset');
+    }
+  };
+
+  const download = () => {
+    const data = roster.data();
+    if (!data) return;
+    const blob = new Blob([toCsv(data)], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${data.cohort.code}-responses-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    // Some browsers read the link after click() returns.
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
+  };
 
   const savePasscode = async (value: string) => {
     const c = roster.data()?.cohort;
@@ -121,7 +288,9 @@ const CohortDetailPage: Component = () => {
                   <p class="mt-2 text-[15px] text-body">
                     {ps().length} participants · {count((p) => p.group === 'experimental')} experimental /{' '}
                     {count((p) => p.group === 'control')} control · {count((p) => !!p.userId)} signed in ·{' '}
-                    {count((p) => !!p.intake)} survey done · {count((p) => !p.on_roster)} not on roster
+                    {count((p) => p.consented === true)} consented · {count((p) => p.consented === false)} declined ·{' '}
+                    {count((p) => !!p.pre_survey)} pre-survey · {count((p) => !!p.post_survey)} post-survey ·{' '}
+                    {count((p) => !p.on_roster)} not on roster
                   </p>
                 </div>
                 <button
@@ -167,6 +336,92 @@ const CohortDetailPage: Component = () => {
               </section>
 
               <section class="rounded-md border border-line bg-white p-6 space-y-4">
+                <h2 class="font-display text-xl text-ink">Session</h2>
+                <p class="text-sm text-body">
+                  While the cohort has a passcode, students go through consent, the pre-survey, a quick check (two
+                  problems, tutor off), the exercises, another quick check and the post-survey, in order. They see only
+                  the session week's lessons. Each student's exercise time starts when they finish the first quick
+                  check; when it runs out (or you end the exercises for everyone) they move on to the second. Half of
+                  each group takes form A first and half form B. A week without quick-check problems skips the checks.
+                </p>
+                <div class="flex flex-wrap items-end gap-4">
+                  <label class="text-sm text-body">
+                    <span class="block font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Week</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={week() ?? data().cohort.session_week}
+                      onInput={(e) => setWeek(e.currentTarget.value)}
+                      class="mt-1 w-20 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-garnet"
+                    />
+                  </label>
+                  <label class="text-sm text-body">
+                    <span class="block font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Exercise minutes</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={minutes() ?? data().cohort.exercise_minutes}
+                      onInput={(e) => setMinutes(e.currentTarget.value)}
+                      class="mt-1 w-24 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-garnet"
+                    />
+                  </label>
+                  <label class="text-sm text-body">
+                    <span class="block font-mono text-[11px] uppercase tracking-[0.14em] text-muted">Quick-check minutes</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={checkMinutes() ?? data().cohort.check_minutes}
+                      onInput={(e) => setCheckMinutes(e.currentTarget.value)}
+                      class="mt-1 w-24 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-garnet"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={week() === null && minutes() === null && checkMinutes() === null}
+                    onClick={saveSession}
+                    class="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper hover:bg-ink-soft disabled:opacity-45 disabled:cursor-not-allowed"
+                  >
+                    Save
+                  </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+                  <Show
+                    when={data().cohort.exercises_end_at}
+                    fallback={
+                      <Show
+                        when={confirmEnd()}
+                        fallback={
+                          <button
+                            type="button"
+                            onClick={() => setConfirmEnd(true)}
+                            class="rounded-md border border-garnet px-4 py-2 text-sm text-garnet hover:bg-garnet/10"
+                          >
+                            End exercises for everyone now
+                          </button>
+                        }
+                      >
+                        <span class="text-sm text-ink">Send every student in this cohort to the post-survey now?</span>
+                        <button type="button" onClick={() => setEnded(true)} class="rounded-md bg-garnet px-4 py-2 text-sm font-medium text-white">
+                          Yes, end now
+                        </button>
+                        <button type="button" onClick={() => setConfirmEnd(false)} class="text-sm text-muted hover:text-ink">
+                          Cancel
+                        </button>
+                      </Show>
+                    }
+                  >
+                    <span class="text-sm text-garnet">Exercises ended for everyone at {time(data().cohort.exercises_end_at)}.</span>
+                    <button type="button" onClick={() => setEnded(false)} class="text-sm text-muted hover:text-ink">
+                      Undo
+                    </button>
+                  </Show>
+                </div>
+              </section>
+
+              <section class="rounded-md border border-line bg-white p-6 space-y-4">
                 <h2 class="font-display text-xl text-ink">Add participants</h2>
                 <p class="text-sm text-body">
                   Type student IDs, one per line, or upload a CSV. The ID column is the one headed <code>id</code>,{' '}
@@ -202,6 +457,16 @@ const CohortDetailPage: Component = () => {
                 </Show>
               </section>
 
+              <div class="flex justify-end">
+                <button
+                  type="button"
+                  onClick={download}
+                  class="rounded-md border border-line px-4 py-2 text-sm text-body hover:text-ink"
+                  title="One row per student: their record, then pre.* and post.* survey answers"
+                >
+                  Download responses (CSV)
+                </button>
+              </div>
               <div class="overflow-x-auto rounded-md border border-line bg-white">
                 <table class="w-full text-sm">
                   <thead>
@@ -213,7 +478,16 @@ const CohortDetailPage: Component = () => {
                       <th class="px-4 py-3">Last sign-in</th>
                       <th class="px-4 py-3 text-right" title="Visits while the cohort had a class passcode">Session visits</th>
                       <th class="px-4 py-3 text-right" title="Visits after the passcode was cleared">Practice visits</th>
-                      <For each={data().questions}>{(q) => <th class="px-4 py-3" title={q.label}>{q.id.replace(/_/g, ' ')}</th>}</For>
+                      <th class="px-4 py-3">Stage</th>
+                      <th class="px-4 py-3">Consent</th>
+                      <th class="px-4 py-3">Pre-survey</th>
+                      <th class="px-4 py-3" title="Quick check before the exercises: score 0–100 (form)">Pre check</th>
+                      <th class="px-4 py-3" title="Started (after the pre check) and finished">Exercises</th>
+                      <th class="px-4 py-3" title="Quick check after the exercises: score 0–100 (form)">Post check</th>
+                      <th class="px-4 py-3">Post-survey</th>
+                      <th class="px-4 py-3 text-right" title="Tutor replies, tokens (in + out) and cost during the session">
+                        Tutor (session)
+                      </th>
                       <th class="px-4 py-3" />
                     </tr>
                   </thead>
@@ -233,10 +507,36 @@ const CohortDetailPage: Component = () => {
                           <td class="px-4 py-2.5 tabular-nums text-body">{when(p.last_login_at)}</td>
                           <td class="px-4 py-2.5 text-right tabular-nums">{p.session_visits ?? 0}</td>
                           <td class="px-4 py-2.5 text-right tabular-nums">{p.practice_visits ?? 0}</td>
-                          <For each={data().questions}>{(q) => <td class="px-4 py-2.5 text-body">{p.intake?.[q.id] ?? ''}</td>}</For>
-                          <td class="px-4 py-2.5 text-right">
+                          <td class="px-4 py-2.5 whitespace-nowrap">{stage(p, !!data().cohort.exercises_end_at)}</td>
+                          <td class="px-4 py-2.5 whitespace-nowrap text-body">
+                            {p.consented === undefined ? '–' : p.consented ? `Agreed ${time(p.consent_at)}` : 'Declined'}
+                          </td>
+                          <td class="px-4 py-2.5 tabular-nums text-body">{time(p.pre_survey_at)}</td>
+                          <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">{checkCell(p.checks.pre)}</td>
+                          <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">
+                            {time(p.timeline.exercisesStartAt ?? undefined)} →{' '}
+                            {time(p.timeline.exercisesEndsAt ?? undefined)}
+                          </td>
+                          <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-body">{checkCell(p.checks.post)}</td>
+                          <td class="px-4 py-2.5 tabular-nums text-body">{time(p.post_survey_at)}</td>
+                          <td class="px-4 py-2.5 whitespace-nowrap text-right tabular-nums text-body">
+                            {p.usage?.session.replies
+                              ? `${p.usage.session.replies} · ${(p.usage.session.input_tokens + p.usage.session.output_tokens).toLocaleString()} tok · $${p.usage.session.cost_usd.toFixed(4)}`
+                              : '–'}
+                          </td>
+                          <td class="px-4 py-2.5 text-right whitespace-nowrap">
                             <Show when={!p.userId}>
                               <button type="button" onClick={() => remove(p)} class="text-xs text-muted hover:text-garnet">Remove</button>
+                            </Show>
+                            <Show when={p.consented !== undefined}>
+                              <button
+                                type="button"
+                                onClick={() => reset(p)}
+                                class="text-xs text-muted hover:text-garnet"
+                                title="Testing: clear consent, surveys and exercise times so this student starts the session again"
+                              >
+                                Reset
+                              </button>
                             </Show>
                           </td>
                         </tr>

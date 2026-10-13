@@ -53,6 +53,13 @@ export default function CourseList() {
     api.lessonAccess.getUnlockedLessons,
     tokenIdentifier ? {} : "skip",
   );
+  // In a study session the server sends only the session's week
+  // (convex/lessonAccess.ts): show it open, without search or filters.
+  const studySession = useQuery(
+    api.cohorts.mySession,
+    tokenIdentifier ? {} : "skip",
+  );
+  const inSession = studySession?.sessionWeek != null;
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
@@ -125,7 +132,10 @@ export default function CourseList() {
 
   // While searching or filtering, show every matching week open.
   const filtering =
-    term !== "" || selectedWeek !== "all" || selectedStatus !== "all";
+    inSession ||
+    term !== "" ||
+    selectedWeek !== "all" ||
+    selectedStatus !== "all";
 
   return (
     <div>
@@ -138,15 +148,17 @@ export default function CourseList() {
           Python Programming
         </h1>
         <p className="mt-2 font-serif text-[0.95rem] leading-[1.75] text-ink-prose">
-          Work through the exercises in order: each one unlocks when you pass
-          the one before it (or after three tries at it, so you're never
-          stuck). Each opens in the workspace, where you can run your code,
-          submit it, and ask the tutor for help.
+          {inSession
+            ? "Work through this week's exercises in order, as far as you can get. Each one unlocks when you pass the one before it (or after three tries at it, so you're never stuck). Each opens in the workspace, where you can run your code, submit it, and ask the tutor for help."
+            : "Work through the exercises in order: each one unlocks when you pass the one before it (or after three tries at it, so you're never stuck). Each opens in the workspace, where you can run your code, submit it, and ask the tutor for help."}
         </p>
       </header>
 
-      {/* Search and filters */}
-      <div className="mb-8 space-y-3 border-y border-rule-strong py-4">
+      {/* Search and filters (not in a study session: one week only) */}
+      <div
+        hidden={inSession}
+        className="mb-8 space-y-3 border-y border-rule-strong py-4"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <label className="relative flex-1">
             <span className="sr-only">Search exercises</span>

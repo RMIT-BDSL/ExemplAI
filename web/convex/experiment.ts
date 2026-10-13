@@ -78,6 +78,8 @@ export const getMyCondition = authenticatedQuery({
     return {
       condition: ctx.customUser?.experiment_condition ?? null,
       toggleEnabled: conditionToggleEnabled(),
+      // A study session sets the group from the roster; its timer shows it instead.
+      inSession: ctx.customUser?.study_phase === "session",
     };
   },
 });

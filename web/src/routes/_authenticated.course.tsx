@@ -17,12 +17,14 @@ import LessonIndex from "#/components/student/LessonIndex";
 import LessonExposition from "#/components/student/LessonExposition";
 import ResizeHandle from "#/components/ide/ResizeHandle";
 import { formatCall, type SubmitRecord } from "#/components/student/problem/Problem";
+import { defineEditorThemes } from "#/lib/editorThemes";
 import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
 import { useLessonVisit } from "#/lib/useLessonVisit";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 
 // Shown above a lesson's starter code in the editor (on first load and on
@@ -68,68 +70,21 @@ export const Route = createFileRoute("/_authenticated/course")({
   },
 });
 
-// Monaco themes built from the workspace tokens (styles.css --xa-*).
-// Monaco needs literal hex values, so keep these in step with the tokens.
-const EDITOR_THEMES = {
-  exemplaiLight: {
-    base: "vs",
-    inherit: true,
-    rules: [
-      { token: "comment", foreground: "8a8580", fontStyle: "italic" },
-      { token: "keyword", foreground: "8a6420", fontStyle: "bold" },
-      { token: "string", foreground: "3c6f50" },
-      { token: "number", foreground: "8a6420" },
-      { token: "operator", foreground: "5f5b64" },
-    ],
-    colors: {
-      "editor.background": "#fbf9f4",
-      "editor.foreground": "#1c1b1f",
-      "editorLineNumber.foreground": "#a39d93",
-      "editorLineNumber.activeForeground": "#8a6420",
-      "editor.lineHighlightBackground": "#f0e7d4",
-      "editor.lineHighlightBorder": "#00000000",
-      "editorGutter.background": "#fbf9f4",
-      "editorCursor.foreground": "#8a6420",
-      "editor.selectionBackground": "#e9dcc0",
-      "editor.inactiveSelectionBackground": "#f0e7d4",
-      "scrollbar.shadow": "#00000000",
-      "scrollbarSlider.background": "#d8d2c766",
-      "scrollbarSlider.hoverBackground": "#c9c1b399",
-      "scrollbarSlider.activeBackground": "#b8ae9ebb",
-    },
-  },
-  exemplaiDark: {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "comment", foreground: "6e6d73", fontStyle: "italic" },
-      { token: "keyword", foreground: "c29a53", fontStyle: "bold" },
-      { token: "string", foreground: "769480" },
-      { token: "number", foreground: "b89053" },
-      { token: "operator", foreground: "9f9da4" },
-    ],
-    colors: {
-      "editor.background": "#141318",
-      "editor.foreground": "#eaeaea",
-      "editorLineNumber.foreground": "#4f4d54",
-      "editorLineNumber.activeForeground": "#c29a53",
-      "editor.lineHighlightBackground": "#1e1d24",
-      "editor.lineHighlightBorder": "#00000000",
-      "editorGutter.background": "#141318",
-      "editorCursor.foreground": "#c29a53",
-      "editor.selectionBackground": "#282630",
-      "editor.inactiveSelectionBackground": "#1e1d24",
-      "scrollbar.shadow": "#00000000",
-      "scrollbarSlider.background": "#3a384166",
-      "scrollbarSlider.hoverBackground": "#4a485299",
-      "scrollbarSlider.activeBackground": "#5a5862bb",
-    },
-  },
-} as const;
+/** sessionStorage key for a lesson's code in this tab. */
+const codeStorageKey = (lessonId: string, language: string) => `exemplai_code_${lessonId}_${language}`;
 
-function defineEditorThemes(monaco: any) {
-  for (const [name, theme] of Object.entries(EDITOR_THEMES)) {
-    monaco.editor.defineTheme(name, theme);
+/** The tab's copy of a lesson's code and when it was saved (older tabs stored the code alone). */
+function readTabCopy(key: string): { code: string; at: number } | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.code === "string" && typeof parsed?.at === "number") return parsed;
+    } catch {}
+    return { code: raw, at: 0 };
+  } catch {
+    return null;
   }
 }
 
@@ -158,6 +113,7 @@ function Course() {
   const tokenIdentifier = session?.user?.id;
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
   const openLesson = useMutation(api.examples.openLesson);
+  const saveCodeDraft = useMutation(api.codeDrafts.save);
   const { data: lessonProgress } = useQuery(
     convexQuery(
       api.courses.getLessonProgress,
@@ -204,18 +160,27 @@ function Course() {
         ? questions[0]
         : null;
 
-  // Autosave (no indicator): edits are written to sessionStorage shortly after
-  // typing stops, and flushed on lesson change, unmount and page hide. Saved
-  // code survives a reload in the same browser session only; a new session
-  // starts every lesson fresh from its starter code.
-  const pendingSaveRef = useRef<{ key: string; code: string } | null>(null);
+  // Autosave (no indicator): edits are written to sessionStorage and to the
+  // server (convex/codeDrafts.ts) shortly after typing stops, and flushed on
+  // lesson change, unmount and when the page is hidden or closed. Opening a
+  // lesson restores the newer of the tab's copy and the server's (a crashed
+  // browser, or work saved later on another computer).
+  const pendingSaveRef = useRef<{ key: string; lessonId?: string; code: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runShortcutRef = useRef<() => void>(() => {});
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
     const pending = pendingSaveRef.current;
-    if (pending) sessionStorage.setItem(pending.key, pending.code);
+    if (pending) {
+      // A full or blocked browser store mustn't stop the server save.
+      try {
+        sessionStorage.setItem(pending.key, JSON.stringify({ code: pending.code, at: Date.now() }));
+      } catch {}
+      if (pending.lessonId) {
+        saveCodeDraft({ lessonId: pending.lessonId as Id<"questions">, code: pending.code }).catch(() => {});
+      }
+    }
     pendingSaveRef.current = null;
   }
 
@@ -284,40 +249,39 @@ function Course() {
   // Time on task: a visit per lesson opening, with active time (research log).
   useLessonVisit(tokenIdentifier && canOpen ? activeQuestionId : undefined);
 
+  // The code saved on the server for this lesson (null: none yet).
+  const { data: codeDraft } = useQuery(
+    convexQuery(
+      api.codeDrafts.get,
+      tokenIdentifier && activeQuestionId && canOpen ? { lessonId: activeQuestionId } : "skip",
+    ),
+  );
+  // Load each lesson's code once, when we know whether there's a saved copy:
+  // the newer of the tab's copy and the server's, else the starter. Later
+  // draft updates are our own saves. The editor is read-only until then, so
+  // nothing typed meanwhile is overwritten.
+  const [loadedCodeKey, setLoadedCodeKey] = useState<string | null>(null);
+  const codeKey = activeQuestionId ? codeStorageKey(activeQuestionId, language) : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once per lesson, when its draft has arrived
   useEffect(() => {
-    if (activeQuestion && problemId) {
-      const storageKey = `exemplai_code_${problemId}_${language}`;
-      const savedCode = sessionStorage.getItem(storageKey);
+    if (!activeQuestion || !codeKey || loadedCodeKey === codeKey) return;
+    if (!tokenIdentifier || unlocked === undefined || (canOpen && codeDraft === undefined)) return;
+    const tab = readTabCopy(codeKey);
+    const server = canOpen ? (codeDraft ?? null) : null;
+    const savedCode =
+      tab && server ? (server.updated_at > tab.at ? server.code : tab.code) : (tab?.code ?? server?.code ?? null);
+    setLoadedCodeKey(codeKey);
 
-      if (savedCode) {
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: savedCode,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(savedCode);
-        }
-      } else if (activeQuestion.starter_code) {
-        const starter = withStarterHint(activeQuestion.starter_code);
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: starter,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(starter);
-        }
-      } else {
-        const defaultCode = CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
-        setCodeTemplates((prev) => ({
-          ...prev,
-          [language]: defaultCode,
-        }));
-        if (editorRef.current) {
-          editorRef.current.setValue(defaultCode);
-        }
-      }
-    }
-  }, [activeQuestionId, language, problemId]);
+    // An empty saved copy is still the student's code (they cleared it).
+    const code =
+      savedCode !== null
+        ? savedCode
+        : activeQuestion.starter_code
+          ? withStarterHint(activeQuestion.starter_code)
+          : CODE_TEMPLATES[language as keyof typeof CODE_TEMPLATES] || "";
+    setCodeTemplates((prev) => ({ ...prev, [language]: code }));
+    if (editorRef.current) editorRef.current.setValue(code);
+  }, [codeKey, loadedCodeKey, codeDraft, canOpen, unlocked, tokenIdentifier]);
 
   // Resizable columns (wide screens only, where all three sit side by side).
   // Widths are a per-browser convenience; null = the default CSS width.
@@ -404,12 +368,15 @@ function Course() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: flushSave only touches refs
   useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && flushSave();
     window.addEventListener("pagehide", flushSave);
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       window.removeEventListener("pagehide", flushSave);
+      document.removeEventListener("visibilitychange", onHide);
       flushSave();
     };
-  }, [problemId]);
+  }, [activeQuestionId]);
 
   if (activeQuestion === undefined) {
     return <LessonSkeleton />;
@@ -456,8 +423,13 @@ function Course() {
         ...prev,
         [language]: value,
       }));
-      if (problemId) {
-        pendingSaveRef.current = { key: `exemplai_code_${problemId}_${language}`, code: value };
+      // Not before the lesson's code has loaded (that setValue is not an edit).
+      if (activeQuestionId && loadedCodeKey === codeStorageKey(activeQuestionId, language)) {
+        pendingSaveRef.current = {
+          key: codeStorageKey(activeQuestionId, language),
+          lessonId: activeQuestionId,
+          code: value,
+        };
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(flushSave, 800);
       }
@@ -713,6 +685,7 @@ function Course() {
                   language={language}
                   value={currentCode}
                   onChange={handleCodeChange}
+                  readOnly={!codeKey || loadedCodeKey !== codeKey}
                   fontSize={fontSize}
                   isRunning={isRunning}
                   isSubmitting={isSubmitting}

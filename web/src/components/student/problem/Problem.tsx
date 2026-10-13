@@ -25,7 +25,11 @@ export interface SubmitRecord extends LastSubmit {
 }
 
 function submitTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
 }
 
 /**
@@ -36,8 +40,23 @@ function submitTime(d: Date) {
  */
 export function formatCall(functionName: string, input: string): string {
   const raw = input.trim();
-  const show = (v: unknown) =>
-    typeof v === "string" ? `"${v}"` : JSON.stringify(v);
+  // Python literals, nested too: True/False, None, quoted strings.
+  const show = (v: unknown): string =>
+    typeof v === "string"
+      ? `"${v}"`
+      : typeof v === "boolean"
+        ? v
+          ? "True"
+          : "False"
+        : v === null
+          ? "None"
+          : Array.isArray(v)
+            ? `[${v.map(show).join(", ")}]`
+            : typeof v === "object"
+              ? `{${Object.entries(v as Record<string, unknown>)
+                  .map(([k, x]) => `"${k}": ${show(x)}`)
+                  .join(", ")}}`
+              : JSON.stringify(v);
   let args: string[];
   if (raw === "") {
     args = [];
@@ -76,9 +95,16 @@ export interface ProblemProps {
   submitHistory?: SubmitRecord[];
   /** The next lesson, open before this one is passed (after 3 failed Submits). */
   moveOn?: { name: string; onClick: () => void };
+  /** The label before the title ("Exercise:" by default). */
+  label?: string;
 }
 
-export default function Problem({ problem, submitHistory = [], moveOn }: ProblemProps) {
+export default function Problem({
+  problem,
+  submitHistory = [],
+  moveOn,
+  label = "Exercise:",
+}: ProblemProps) {
   const lastSubmit = submitHistory[0];
   const { example } = problem;
   const exampleResult = lastSubmit?.example;
@@ -87,7 +113,7 @@ export default function Problem({ problem, submitHistory = [], moveOn }: Problem
     <article>
       <h1 className="!mb-4 flex items-baseline gap-3">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.15em] text-ink-label">
-          Exercise:
+          {label}
         </span>
         <span>{problem.title}</span>
       </h1>
@@ -139,13 +165,17 @@ export default function Problem({ problem, submitHistory = [], moveOn }: Problem
             {submitHistory.map((s, i) => {
               const passedAll = s.total > 0 && s.passed === s.total;
               return (
-                <div key={s.at.getTime() + "-" + i} className="flex items-baseline gap-3">
+                <div
+                  key={s.at.getTime() + "-" + i}
+                  className="flex items-baseline gap-3"
+                >
                   <span className="flex-shrink-0 whitespace-nowrap tabular-nums text-ink-label">
                     {submitTime(s.at)}
                   </span>
                   <div className="min-w-0">
                     <div className={passedAll ? "text-success" : "text-danger"}>
-                      {passedAll ? "✓" : "✗"} {s.passed} of {s.total} tests passed
+                      {passedAll ? "✓" : "✗"} {s.passed} of {s.total} tests
+                      passed
                     </div>
                     {/* The example's output on that Submit, as a trace of attempts. */}
                     {s.example && (
@@ -163,10 +193,12 @@ export default function Problem({ problem, submitHistory = [], moveOn }: Problem
 
       {moveOn && (
         <div className="mt-4 border-t border-rule pt-4 font-sans text-xs text-ink-label">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]">Stuck?</div>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]">
+            Stuck?
+          </div>
           <div className="text-ink-prose">
-            After three tries, the next exercise is open. You can move on and come back to this one
-            later.
+            After three tries, the next exercise is open. You can move on and
+            come back to this one later.
           </div>
           <button
             type="button"

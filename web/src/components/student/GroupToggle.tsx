@@ -11,12 +11,13 @@ const GROUPS = [
  * Staff testing only: switches the signed-in user's study group. Rendered only
  * while the Convex environment variable CONDITION_TOGGLE is "on"
  * (convex/experiment.ts), which also gates the mutation, so production
- * students never see or use it.
+ * students never see or use it. Hidden in a study session, where the roster
+ * sets the group and the session timer shows it (components/session).
  */
 export default function GroupToggle() {
   const mine = useQuery(api.experiment.getMyCondition);
   const setCondition = useMutation(api.experiment.setMyCondition);
-  if (!mine?.toggleEnabled) return null;
+  if (!mine?.toggleEnabled || mine.inSession) return null;
 
   return (
     <div

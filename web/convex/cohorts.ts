@@ -2,19 +2,26 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { authComponent } from "./auth";
-import { shuffledBlock } from "./experiment";
-import { internalQuery } from "./_generated/server";
+import { conditionToggleEnabled, shuffledBlock } from "./experiment";
+import { internalQuery, type QueryCtx } from "./_generated/server";
 import { adminMutation, adminQuery, authenticatedMutation, authenticatedQuery, mutation } from "./functions";
 import {
   balancedGroups,
+  CONSENT_VERSION,
+  DEFAULT_CHECK_MINUTES,
+  DEFAULT_EXERCISE_MINUTES,
+  DEFAULT_SESSION_WEEK,
   type Group,
-  INTAKE_QUESTIONS,
   isValidStudentId,
   normalizeStudentId,
   passcodeMatches,
   shuffled,
   studentIdFromEmail,
 } from "./studentIds";
+import { checkScores } from "./quickChecks";
+import { stageAt, timelineOf } from "./sessionFlow";
+import { flowStateOf, sessionWeekOf, weekHasChecks } from "./sessionState";
+import { cleanAnswers, POST_SURVEY, PRE_SURVEY, type SurveyAnswers, surveyQuestions } from "./surveys";
 
 /**
  * Cohorts: a study session's students, tracked by university ID (decided
@@ -29,12 +36,40 @@ import {
  *   invite code) and their roster group. An ID on no roster still gets in: it
  *   joins the open cohort with on_roster false, for cross-checking later, and
  *   gets a group from that cohort's randomization blocks.
- * - On first sign-in the student answers a short intake survey.
  * - Phase: while the cohort has a class passcode, a visit is part of the
  *   experimental session; once the passcode is cleared, students return with
  *   their ID alone for open practice, keeping their group. Chats, Run/Submit
  *   attempts and time-on-task visits are tagged with the phase.
+ * - The session is one linear flow (decided 2026-10-12; sessionFlow.ts):
+ *   consent, pre-survey, a quick check (quickChecks.ts), the session week's
+ *   exercises for a fixed time, another quick check, post-survey, then a
+ *   completion screen. Students see only the session week's lessons
+ *   (lessonAccess.ts). In open practice, a student who hasn't yet consented
+ *   and answered the pre-survey does that first, then uses the app freely.
  */
+
+// Everything a student records in the session flow, moved together when an
+// unlisted row is merged into a roster row and cleared by resetSession.
+const SESSION_FIELDS = [
+  "consented", "consent_at", "consent_version", "pre_survey", "pre_survey_at",
+  "exercises_started_at", "exercises_finished_at", "post_survey", "post_survey_at",
+  "pre_survey_draft", "post_survey_draft",
+  "pre_check_started_at", "pre_check_finished_at", "post_check_started_at", "post_check_finished_at",
+] as const;
+
+type CheckOrder = "AB" | "BA";
+
+/** The quick-check form order for a new participant: the one less used in their group (ties at random). */
+async function nextCheckOrder(ctx: MutationCtx, cohortId: Id<"cohorts">, group: Group): Promise<CheckOrder> {
+  const rows = await ctx.db.query("cohortParticipants").withIndex("by_cohort", (q) => q.eq("cohortId", cohortId)).collect();
+  const used = rows.filter((r) => r.group === group).map((r) => r.check_order);
+  const ab = used.filter((o) => o === "AB").length;
+  const ba = used.filter((o) => o === "BA").length;
+  return ab < ba ? "AB" : ba < ab ? "BA" : Math.random() < 0.5 ? "AB" : "BA";
+}
+
+/** Agreeing this soon after declining counts as undoing a misclick: the exercise clock restarts. */
+const UNDO_DECLINE_MS = 5 * 60_000;
 
 const UNLISTED = { name: "Not on a roster", code: "unlisted" };
 
@@ -125,7 +160,8 @@ export const joinWithId = mutation({
       null;
     // Their ID was added to a roster after they first signed in unlisted: move
     // them onto the roster row, keeping the group they already have (so nobody
-    // switches condition mid-study) and their sign-ins and survey.
+    // switches condition mid-study), their sign-ins, session record and
+    // quick-check answers.
     if (participant && !participant.on_roster) {
       const rosterRow = await ctx.db
         .query("cohortParticipants")
@@ -139,8 +175,16 @@ export const joinWithId = mutation({
           joined_at: participant.joined_at,
           last_login_at: participant.last_login_at,
           login_count: participant.login_count,
-          ...(participant.intake ? { intake: participant.intake, intake_at: participant.intake_at } : {}),
+          // Their quick-check form order too, so they don't get a form twice.
+          ...(participant.check_order ? { check_order: participant.check_order } : {}),
+          ...Object.fromEntries(SESSION_FIELDS.map((f) => [f, participant![f]])),
         });
+        for (const answer of await ctx.db
+          .query("checkAnswers")
+          .withIndex("by_participant", (q) => q.eq("participantId", participant!._id))
+          .collect()) {
+          await ctx.db.patch(answer._id, { participantId: rosterRow._id });
+        }
         await ctx.db.delete(participant._id);
         participant = await ctx.db.get(rosterRow._id);
       }
@@ -151,6 +195,7 @@ export const joinWithId = mutation({
       const group = await blockGroup(ctx, cohort.code);
       const id = await ctx.db.insert("cohortParticipants", {
         cohortId: cohort._id, studentId, group, on_roster: false, added_at: now,
+        check_order: await nextCheckOrder(ctx, cohort._id, group),
       });
       participant = (await ctx.db.get(id))!;
     }
@@ -160,6 +205,8 @@ export const joinWithId = mutation({
     const phase = cohort.passcode?.trim() ? "session" : "practice";
     await ctx.db.patch(participant._id, {
       userId: user._id,
+      // Rows added before quick checks existed get their form order now.
+      ...(participant.check_order ? {} : { check_order: await nextCheckOrder(ctx, cohort._id, participant.group) }),
       joined_at: participant.joined_at ?? now,
       last_login_at: now,
       login_count: (participant.login_count ?? 0) + 1,
@@ -182,43 +229,149 @@ export const joinWithId = mutation({
         name: user.name ?? studentId,
       });
     }
-    return { cohort: cohort.name, onRoster: participant.on_roster, phase, needsIntake: !participant.intake };
+    return { cohort: cohort.name, onRoster: participant.on_roster, phase };
   },
 });
 
-/** The intake survey questions, and whether this student still has to answer them. */
-export const myIntake = authenticatedQuery({
+async function myParticipant(ctx: QueryCtx, userId: Id<"users">) {
+  return await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", userId)).first();
+}
+
+/**
+ * The signed-in student's place in the study flow (null: not in a cohort, e.g.
+ * staff). `flow` is what sessionFlow.stageAt needs: the page re-runs it as
+ * clocks run out, because a query can't watch the time. `testingGroup` shows
+ * their group on screen, only while the testing toggle (CONDITION_TOGGLE=on)
+ * is on, never in production.
+ */
+export const mySession = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
-    if (!ctx.customUser) return { needsIntake: false, questions: INTAKE_QUESTIONS };
-    const row = await ctx.db
-      .query("cohortParticipants")
-      .withIndex("by_user", (q) => q.eq("userId", ctx.customUser!._id))
-      .first();
-    return { needsIntake: !!row && !row.intake, questions: INTAKE_QUESTIONS };
+    if (!ctx.customUser) return null;
+    const p = await myParticipant(ctx, ctx.customUser._id);
+    const cohort = p && (await ctx.db.get(p.cohortId));
+    if (!p || !cohort) return null;
+    const flow = await flowStateOf(ctx, p, cohort, ctx.customUser);
+    return {
+      flow,
+      consented: p.consented ?? null,
+      sessionWeek: flow.phase === "session" ? sessionWeekOf(cohort) : null,
+      testingGroup: conditionToggleEnabled() ? (ctx.customUser.experiment_condition ?? p.group) : null,
+      drafts: { pre: p.pre_survey_draft ?? {}, post: p.post_survey_draft ?? {} },
+    };
   },
 });
 
-export const submitIntake = authenticatedMutation({
-  args: { answers: v.record(v.string(), v.string()) },
+async function requireParticipant(ctx: MutationCtx, userId: Id<"users"> | undefined) {
+  if (!userId) throw new Error("User not found");
+  const p = await myParticipant(ctx, userId);
+  if (!p) throw new Error("Not in a cohort");
+  return p;
+}
+
+/**
+ * Agree or decline after reading the consent information. A student who
+ * declined can change to agreeing (until their exercises are over); soon
+ * after declining, that's taken as undoing a misclick and their exercise
+ * clock restarts after the pre-survey.
+ */
+export const giveConsent = authenticatedMutation({
+  args: { agree: v.boolean() },
+  handler: async (ctx, { agree }) => {
+    const p = await requireParticipant(ctx, ctx.customUser?._id);
+    if (p.consented || (p.consented === false && !agree)) return;
+    if (p.consented === false && p.exercises_finished_at !== undefined) throw new Error("Today's exercises are over");
+    const now = Date.now();
+    const inSession = ctx.customUser!.study_phase === "session";
+    const undo = p.consented === false && p.consent_at !== undefined && now - p.consent_at < UNDO_DECLINE_MS;
+    await ctx.db.patch(p._id, {
+      consented: agree,
+      consent_at: now,
+      consent_version: CONSENT_VERSION,
+      // A student who declines may still practise; their clock starts now.
+      ...(!agree && inSession && p.exercises_started_at === undefined ? { exercises_started_at: now } : {}),
+      ...(undo ? { exercises_started_at: undefined } : {}),
+    });
+  },
+});
+
+/** Save survey answers as the student goes (debounced by the page). */
+export const saveSurveyDraft = authenticatedMutation({
+  args: { survey: v.union(v.literal("pre"), v.literal("post")), answers: v.record(v.string(), v.union(v.string(), v.array(v.string()))) },
+  handler: async (ctx, { survey, answers }) => {
+    const p = await requireParticipant(ctx, ctx.customUser?._id);
+    if (survey === "pre" ? p.pre_survey : p.post_survey) return;
+    // Small and bounded: known ids only, text capped (as on submit).
+    const field = survey === "pre" ? "pre_survey_draft" : "post_survey_draft";
+    const known = new Set(surveyQuestions(survey === "pre" ? PRE_SURVEY : POST_SURVEY).map((q) => q.id));
+    const draft = Object.fromEntries(
+      Object.entries(answers)
+        .filter(([id]) => known.has(id))
+        .map(([id, a]) => [id, Array.isArray(a) ? a.slice(0, 20).map((o) => o.slice(0, 100)) : a.slice(0, 2000)]),
+    );
+    await ctx.db.patch(p._id, { [field]: draft });
+  },
+});
+
+const answersValidator = v.record(v.string(), v.union(v.string(), v.array(v.string())));
+
+/**
+ * Save the pre-survey. In a session the quick check comes next; a week
+ * without quick-check problems goes straight to the exercises, whose clock
+ * starts now.
+ */
+export const submitPreSurvey = authenticatedMutation({
+  args: { answers: answersValidator },
   handler: async (ctx, { answers }) => {
-    if (!ctx.customUser) throw new Error("User not found");
-    const row = await ctx.db
-      .query("cohortParticipants")
-      .withIndex("by_user", (q) => q.eq("userId", ctx.customUser!._id))
-      .first();
-    if (!row) throw new Error("Not in a cohort");
-    const clean: Record<string, string> = {};
-    for (const q of INTAKE_QUESTIONS) {
-      const answer = (answers[q.id] ?? "").trim();
-      if (q.type === "choice") {
-        if (!(q.options as readonly string[]).includes(answer)) throw new Error(`Please answer: ${q.label}`);
-        clean[q.id] = answer;
-      } else if (answer) {
-        clean[q.id] = answer.slice(0, 500);
-      }
-    }
-    await ctx.db.patch(row._id, { intake: clean, intake_at: Date.now() });
+    const p = await requireParticipant(ctx, ctx.customUser?._id);
+    if (!p.consented) throw new Error("Consent first");
+    if (p.pre_survey) return;
+    const now = Date.now();
+    const cohort = await ctx.db.get(p.cohortId);
+    const flow = cohort ? await flowStateOf(ctx, p, cohort, ctx.customUser!) : null;
+    await ctx.db.patch(p._id, {
+      pre_survey: cleanAnswers(PRE_SURVEY, answers as SurveyAnswers),
+      pre_survey_at: now,
+      pre_survey_draft: undefined,
+      ...(flow?.phase === "session" && !flow.hasChecks && p.exercises_started_at === undefined
+        ? { exercises_started_at: now }
+        : {}),
+    });
+  },
+});
+
+/** "I'm finished": end the exercises before the time is up. */
+export const finishExercises = authenticatedMutation({
+  args: {},
+  handler: async (ctx) => {
+    const p = await requireParticipant(ctx, ctx.customUser?._id);
+    const cohort = await ctx.db.get(p.cohortId);
+    if (!cohort || p.exercises_finished_at !== undefined) return;
+    const now = Date.now();
+    if (stageAt(await flowStateOf(ctx, p, cohort, ctx.customUser!), now) !== "exercises") return;
+    await ctx.db.patch(p._id, { exercises_finished_at: now });
+  },
+});
+
+export const submitPostSurvey = authenticatedMutation({
+  args: { answers: answersValidator },
+  handler: async (ctx, { answers }) => {
+    const p = await requireParticipant(ctx, ctx.customUser?._id);
+    if (!p.consented || !p.pre_survey) throw new Error("Not at the post-survey yet");
+    if (p.post_survey) return;
+    const now = Date.now();
+    const cohort = await ctx.db.get(p.cohortId);
+    if (!cohort) throw new Error("Cohort not found");
+    const flow = await flowStateOf(ctx, p, cohort, ctx.customUser!);
+    // A few seconds' grace: the page switches on its own clock.
+    if (stageAt(flow, now + 5_000) !== "post_survey") throw new Error("Not at the post-survey yet");
+    await ctx.db.patch(p._id, {
+      post_survey: cleanAnswers(POST_SURVEY, answers as SurveyAnswers),
+      post_survey_at: now,
+      post_survey_draft: undefined,
+      // Time ran out (rather than "I'm finished"): the exercises ended then.
+      exercises_finished_at: p.exercises_finished_at ?? flow.timeline.exercisesEndsAt ?? now,
+    });
   },
 });
 
@@ -240,6 +393,45 @@ export const setPasscode = adminMutation({
   args: { cohortId: v.id("cohorts"), passcode: v.string() },
   handler: async (ctx, { cohortId, passcode }) => {
     await ctx.db.patch(cohortId, { passcode: passcode.trim().slice(0, 40) });
+  },
+});
+
+/** The session's week and exercise time. */
+export const setSession = adminMutation({
+  args: {
+    cohortId: v.id("cohorts"),
+    session_week: v.number(),
+    exercise_minutes: v.number(),
+    check_minutes: v.optional(v.number()),
+  },
+  handler: async (ctx, { cohortId, session_week, exercise_minutes, check_minutes }) => {
+    if (!Number.isInteger(session_week) || session_week < 1 || session_week > 12) throw new Error("Week must be 1 to 12");
+    if (!Number.isInteger(exercise_minutes) || exercise_minutes < 1 || exercise_minutes > 120) {
+      throw new Error("Exercise time must be 1 to 120 minutes");
+    }
+    if (check_minutes !== undefined && (!Number.isInteger(check_minutes) || check_minutes < 1 || check_minutes > 30)) {
+      throw new Error("Quick-check time must be 1 to 30 minutes");
+    }
+    await ctx.db.patch(cohortId, { session_week, exercise_minutes, ...(check_minutes !== undefined ? { check_minutes } : {}) });
+  },
+});
+
+/** End the exercises for everyone now (they move on to the post-survey), or undo that. */
+export const setExercisesEnded = adminMutation({
+  args: { cohortId: v.id("cohorts"), ended: v.boolean() },
+  handler: async (ctx, { cohortId, ended }) => {
+    await ctx.db.patch(cohortId, { exercises_end_at: ended ? Date.now() : undefined });
+  },
+});
+
+/** Testing: put a participant back at the start of the flow (consent), keeping their sign-ins; their quick-check answers are deleted. */
+export const resetSession = adminMutation({
+  args: { participantId: v.id("cohortParticipants") },
+  handler: async (ctx, { participantId }) => {
+    await ctx.db.patch(participantId, Object.fromEntries(SESSION_FIELDS.map((f) => [f, undefined])));
+    for (const answer of await ctx.db.query("checkAnswers").withIndex("by_participant", (q) => q.eq("participantId", participantId)).collect()) {
+      await ctx.db.delete(answer._id);
+    }
   },
 });
 
@@ -285,8 +477,11 @@ export const addParticipants = adminMutation({
     const groups = balancedGroups(await groupCounts(ctx, cohortId), ids.length);
     const now = Date.now();
     for (let i = 0; i < ids.length; i++) {
+      // Quick-check form order, balanced within each group too (reads see
+      // the rows inserted earlier in this loop).
+      const check_order = await nextCheckOrder(ctx, cohortId, groups[i]);
       await ctx.db.insert("cohortParticipants", {
-        cohortId, studentId: ids[i], group: groups[i], on_roster: true, added_at: now,
+        cohortId, studentId: ids[i], group: groups[i], on_roster: true, added_at: now, check_order,
         ...(fresh.get(ids[i]) ? { metadata: fresh.get(ids[i]) } : {}),
       });
     }
@@ -322,13 +517,37 @@ export const list = adminQuery({
           experimental: rows.filter((r) => r.group === "experimental").length,
           control: rows.filter((r) => r.group === "control").length,
           joined: rows.filter((r) => r.userId).length,
-          intakeDone: rows.filter((r) => r.intake).length,
+          consented: rows.filter((r) => r.consented).length,
+          declined: rows.filter((r) => r.consented === false).length,
+          preDone: rows.filter((r) => r.pre_survey).length,
+          postDone: rows.filter((r) => r.post_survey).length,
           notOnRoster: rows.filter((r) => !r.on_roster).length,
         };
       }),
     );
   },
 });
+
+type UsageSums = { replies: number; input_tokens: number; output_tokens: number; cost_usd: number };
+
+/** A student's tutor usage (tokens, cost) by phase, summed over their tutor replies. */
+async function usageByPhase(ctx: QueryCtx, userId: Id<"users">) {
+  const zero = (): UsageSums => ({ replies: 0, input_tokens: 0, output_tokens: 0, cost_usd: 0 });
+  const out = { session: zero(), practice: zero() };
+  const chats = await ctx.db.query("chats").withIndex("by_user_lesson", (q) => q.eq("userId", userId)).collect();
+  for (const chat of chats) {
+    const sums = out[chat.study_phase === "session" ? "session" : "practice"];
+    const messages = await ctx.db.query("chatMessages").withIndex("by_chat", (q) => q.eq("chatId", chat._id)).collect();
+    for (const m of messages) {
+      if (!m.usage) continue;
+      sums.replies++;
+      sums.input_tokens += m.usage.input_tokens;
+      sums.output_tokens += m.usage.output_tokens;
+      sums.cost_usd += m.usage.cost_usd ?? 0;
+    }
+  }
+  return out;
+}
 
 export const roster = adminQuery({
   args: { cohortId: v.id("cohorts") },
@@ -337,6 +556,32 @@ export const roster = adminQuery({
     if (!cohort) return null;
     const rows = await ctx.db.query("cohortParticipants").withIndex("by_cohort", (q) => q.eq("cohortId", cohortId)).collect();
     rows.sort((a, b) => a.studentId.localeCompare(b.studentId));
-    return { cohort, participants: rows, questions: INTAKE_QUESTIONS };
+    const hasChecks = await weekHasChecks(ctx, sessionWeekOf(cohort));
+    const timing = {
+      hasChecks,
+      checkMs: (cohort.check_minutes ?? DEFAULT_CHECK_MINUTES) * 60_000,
+      exerciseMs: (cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES) * 60_000,
+      cohortEndAt: cohort.exercises_end_at,
+    };
+    return {
+      cohort: {
+        ...cohort,
+        session_week: cohort.session_week ?? DEFAULT_SESSION_WEEK,
+        exercise_minutes: cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES,
+        check_minutes: cohort.check_minutes ?? DEFAULT_CHECK_MINUTES,
+      },
+      participants: await Promise.all(
+        rows.map(async (r) => ({
+          ...r,
+          usage: r.userId ? await usageByPhase(ctx, r.userId) : null,
+          checks: await checkScores(ctx, r, cohort),
+          // When the exercises actually started and ended (a check that ran out
+          // isn't stored as a moment of its own; sessionFlow.ts works it out).
+          timeline: timelineOf(r, timing),
+        })),
+      ),
+      preSurvey: PRE_SURVEY,
+      postSurvey: POST_SURVEY,
+    };
   },
 });

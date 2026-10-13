@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
+import type * as codeDrafts from "../codeDrafts.js";
 import type * as cohorts from "../cohorts.js";
 import type * as courses from "../courses.js";
 import type * as examples from "../examples.js";
@@ -20,11 +21,15 @@ import type * as init from "../init.js";
 import type * as invitationCodes from "../invitationCodes.js";
 import type * as lessonAccess from "../lessonAccess.js";
 import type * as lessons from "../lessons.js";
+import type * as quickChecks from "../quickChecks.js";
 import type * as releaseNotes from "../releaseNotes.js";
 import type * as seed from "../seed.js";
+import type * as sessionFlow from "../sessionFlow.js";
+import type * as sessionState from "../sessionState.js";
 import type * as studentIds from "../studentIds.js";
 import type * as studentMetrics from "../studentMetrics.js";
 import type * as students from "../students.js";
+import type * as surveys from "../surveys.js";
 import type * as triggers from "../triggers.js";
 import type * as validators from "../validators.js";
 import type * as visits from "../visits.js";
@@ -38,6 +43,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   chats: typeof chats;
+  codeDrafts: typeof codeDrafts;
   cohorts: typeof cohorts;
   courses: typeof courses;
   examples: typeof examples;
@@ -48,11 +54,15 @@ declare const fullApi: ApiFromModules<{
   invitationCodes: typeof invitationCodes;
   lessonAccess: typeof lessonAccess;
   lessons: typeof lessons;
+  quickChecks: typeof quickChecks;
   releaseNotes: typeof releaseNotes;
   seed: typeof seed;
+  sessionFlow: typeof sessionFlow;
+  sessionState: typeof sessionState;
   studentIds: typeof studentIds;
   studentMetrics: typeof studentMetrics;
   students: typeof students;
+  surveys: typeof surveys;
   triggers: typeof triggers;
   validators: typeof validators;
   visits: typeof visits;

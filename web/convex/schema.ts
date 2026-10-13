@@ -6,6 +6,23 @@ const experimentCondition = v.union(v.literal("experimental"), v.literal("contro
 // A cohort student's activity: their experimental session (their cohort has a
 // class passcode) or open practice afterwards (no passcode). convex/cohorts.ts.
 const studyPhase = v.union(v.literal("session"), v.literal("practice"));
+// One survey answer: text, or the options picked (convex/surveys.ts).
+const surveyAnswer = v.union(v.string(), v.array(v.string()));
+
+// Tokens and cost of the model calls behind one tutor reply (guardrail, agent,
+// Dean and any retry), as reported by OpenRouter (server/ai/usage.py).
+const usageTotals = {
+  input_tokens: v.number(),
+  output_tokens: v.number(),
+  reasoning_tokens: v.number(),
+  cached_tokens: v.number(),
+  cost_usd: v.optional(v.number()),
+  calls: v.number(),
+};
+export const replyUsage = v.object({
+  ...usageTotals,
+  by_model: v.array(v.object({ model: v.string(), ...usageTotals })),
+});
 
 // A tutor draft the Dean turned down (server/ai/nodes/dean_validation.py).
 export const rejectedDraft = v.object({
@@ -106,6 +123,15 @@ export default defineSchema({
     open: v.boolean(),
     // The session passcode students enter with their ID ("" or absent: none).
     passcode: v.optional(v.string()),
+    // The study session (while there's a passcode): the one week of lessons
+    // students see, and how long they get for the exercises after the
+    // pre-survey. `exercises_end_at` ends the exercises for everyone at once
+    // (the admin's "End exercises now").
+    session_week: v.optional(v.number()),
+    exercise_minutes: v.optional(v.number()),
+    exercises_end_at: v.optional(v.number()),
+    // Minutes for each quick check (convex/quickChecks.ts).
+    check_minutes: v.optional(v.number()),
     created_at: v.number(),
     created_by: v.optional(v.string()),
   })
@@ -129,13 +155,82 @@ export default defineSchema({
     // Visits in each phase (a visit is an app load after signing in).
     session_visits: v.optional(v.number()),
     practice_visits: v.optional(v.number()),
-    // Intake survey answers by question id (studentIds.ts INTAKE_QUESTIONS).
+    // The study session, in order (convex/cohorts.ts): consent, pre-survey,
+    // exercises (timed), post-survey. Survey answers are keyed by question id
+    // (convex/surveys.ts). A student who declines consent skips the surveys;
+    // their activity is kept apart by `consented: false`.
+    consented: v.optional(v.boolean()),
+    consent_at: v.optional(v.number()),
+    consent_version: v.optional(v.string()),
+    pre_survey: v.optional(v.record(v.string(), surveyAnswer)),
+    pre_survey_at: v.optional(v.number()),
+    // Quick checks before and after the exercises (convex/quickChecks.ts):
+    // which form comes first (balanced within each group), and when each
+    // check was started (Start pressed) and finished (both problems in).
+    check_order: v.optional(v.union(v.literal("AB"), v.literal("BA"))),
+    pre_check_started_at: v.optional(v.number()),
+    pre_check_finished_at: v.optional(v.number()),
+    post_check_started_at: v.optional(v.number()),
+    post_check_finished_at: v.optional(v.number()),
+    exercises_started_at: v.optional(v.number()),
+    // Pressed "I'm finished" before the time was up.
+    exercises_finished_at: v.optional(v.number()),
+    post_survey: v.optional(v.record(v.string(), surveyAnswer)),
+    post_survey_at: v.optional(v.number()),
+    // Answers saved as the student goes, so a frozen or restarted computer
+    // (or moving to another one) loses nothing. Cleared on submit.
+    pre_survey_draft: v.optional(v.record(v.string(), surveyAnswer)),
+    post_survey_draft: v.optional(v.record(v.string(), surveyAnswer)),
+    // Superseded by pre_survey (kept so earlier test rows still validate).
     intake: v.optional(v.record(v.string(), v.string())),
     intake_at: v.optional(v.number()),
   })
     .index("by_cohort", ["cohortId"])
     .index("by_student_id", ["studentId"])
     .index("by_user", ["userId"]),
+  // The code in a student's editor, saved shortly after they stop typing
+  // (convex/codeDrafts.ts), so it survives a reload, a crash or a change of
+  // computer. Not research data: Run/Submit snapshots are in codeAttempts.
+  codeDrafts: defineTable({
+    userId: v.id("users"),
+    // A lesson, or a quick-check problem.
+    lessonId: v.union(v.id("questions"), v.id("checkProblems")),
+    code: v.string(),
+    updated_at: v.number(),
+  }).index("by_user_lesson", ["userId", "lessonId"]),
+  // Quick-check problems (convex/quickChecks.ts): two parallel forms per
+  // week, two problems each, taken before and after the exercises with the
+  // tutor off. `tests` include the shown example and the hidden ones; only
+  // the server's grader reads them.
+  checkProblems: defineTable({
+    week: v.number(),
+    form: v.union(v.literal("A"), v.literal("B")),
+    position: v.number(),
+    problem_name: v.string(),
+    problem_description: v.string(),
+    starter_code: v.string(),
+    example: v.object({ input: v.string(), expectedOutput: v.string() }),
+    tests: v.array(v.object({ input: v.string(), expectedOutput: v.string() })),
+  }).index("by_week_form", ["week", "form", "position"]),
+  // A student's one answer to a quick-check problem, graded by the server.
+  checkAnswers: defineTable({
+    userId: v.id("users"),
+    participantId: v.id("cohortParticipants"),
+    checkProblemId: v.id("checkProblems"),
+    phase: v.union(v.literal("pre"), v.literal("post")),
+    form: v.union(v.literal("A"), v.literal("B")),
+    position: v.number(),
+    code: v.string(),
+    tests_passed: v.number(),
+    tests_total: v.number(),
+    outcome: attemptOutcome,
+    // Submitted by the page when time ran out, not by the student.
+    auto: v.boolean(),
+    experiment_condition: v.optional(experimentCondition),
+    submitted_at: v.number(),
+  })
+    .index("by_participant", ["participantId"])
+    .index("by_user_problem", ["userId", "checkProblemId"]),
   userProfiles: defineTable({
     userId: v.id("users"),
     tokenIdentifier: v.optional(v.string()),
@@ -331,6 +426,8 @@ export default defineSchema({
     // (one for approved_after_retry, two when the fallback was sent). Research
     // only; never shown to the student.
     rejected_drafts: v.optional(v.array(rejectedDraft)),
+    // Tutor turns: tokens and cost of the model calls behind the reply.
+    usage: v.optional(replyUsage),
   })
     .index("by_chat", ["chatId"])
     // Examples given this round: a bounded range read instead of the whole chat.

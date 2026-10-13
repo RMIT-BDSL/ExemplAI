@@ -4,7 +4,7 @@ import type { MutationCtx } from "./_generated/server";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { ensureCondition } from "./experiment";
 import { canOpenLesson } from "./lessonAccess";
-import { rejectedDraft } from "./schema";
+import { rejectedDraft, replyUsage } from "./schema";
 import { authenticatedMutation, authenticatedQuery } from "./functions";
 
 // A fresh chat starts each time a lesson is opened (students only see their
@@ -193,6 +193,8 @@ export const addSystemMessage = authenticatedMutation({
     rejectedDrafts: v.optional(v.array(rejectedDraft)),
     // The student's mastery the server routed on (research log).
     masteryAtReply: v.optional(v.number()),
+    // Tokens and cost of the model calls behind the reply (server/ai/usage.py).
+    usage: v.optional(replyUsage),
     backendSecret: v.string(),
   },
   handler: async (ctx, args) => {
@@ -214,6 +216,7 @@ export const addSystemMessage = authenticatedMutation({
       ...(args.deanDecision ? { dean_decision: args.deanDecision } : {}),
       ...(args.deanReason ? { dean_reason: args.deanReason } : {}),
       ...(args.rejectedDrafts?.length ? { rejected_drafts: args.rejectedDrafts } : {}),
+      ...(args.usage ? { usage: args.usage } : {}),
       ...(args.sender === "assistant" ? await replyContextFields(ctx, chat, args.masteryAtReply) : {}),
     });
     return { success: true };

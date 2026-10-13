@@ -20,7 +20,7 @@ from sentry_sdk import metrics
 
 from bkt import initial_mastery, is_mastered, update_mastery
 from config import settings
-from model.student_code import StudentCode
+from model.student_code import CheckSubmission, StudentCode, TestCase
 
 log = logging.getLogger("rich")
 
@@ -751,4 +751,65 @@ async def execute_code(
 
 
 # Import chat functions to expose them on the services module
+
+
+# ── Quick checks (web/convex/quickChecks.ts) ─────────────────────────
+
+async def submit_check(body: CheckSubmission, auth_token: str) -> dict:
+    """Grade one final quick-check answer against the problem's tests and
+    record the score in Convex. The tests come from Convex (backend secret),
+    never from the browser, and the student isn't told the result."""
+    secret = settings.CONVEX_BACKEND_SECRET.get_secret_value()
+    client = _convex_client(auth_token)
+    try:
+        info = await asyncio.wait_for(
+            asyncio.to_thread(
+                client.query,
+                "quickChecks:getForGrading",
+                {"checkProblemId": body.check_id, "backendSecret": secret},
+            ),
+            timeout=CONVEX_OP_TIMEOUT,
+        )
+    except Exception as e:
+        log.error("check — couldn't load the problem from Convex: %s", e)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Couldn't load the problem. Try again.")
+    if not info:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This answer can't be accepted now.")
+
+    tests = [TestCase(input=t["input"], expectedOutput=t["expectedOutput"], hidden=True) for t in info["tests"]]
+    program = wrap_code_with_runner(body.code, info.get("starter_code"), None)
+    async with httpx.AsyncClient() as http:
+        results = await asyncio.gather(*[
+            run_single_test_case(http, program, 71, tc, _exec_url(), _judge0_headers())
+            for tc in tests
+        ])
+    passed = sum(1 for r in results if r.get("passed"))
+    if any(error_kind(r.get("status_id"), r.get("stderr")) == "service_error" for r in results):
+        # The grader itself failed: don't record a score the student didn't earn.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The grader is unavailable. Try again.")
+
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                client.mutation,
+                "quickChecks:recordAnswer",
+                {
+                    "checkProblemId": body.check_id,
+                    "code": body.code[:_CODE_SNAPSHOT_CHARS],
+                    "testsPassed": passed,
+                    "testsTotal": len(results),
+                    "outcome": submit_outcome(results),
+                    "auto": body.auto,
+                    "backendSecret": secret,
+                },
+            ),
+            timeout=CONVEX_OP_TIMEOUT,
+        )
+    except Exception as e:
+        log.error("check — couldn't record the answer in Convex: %s", e)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Couldn't save your answer. Try again.")
+    metrics.count("check.submitted", 1)
+    return {"recorded": True}
+
+
 from .chat import run_chat, stream_chat
