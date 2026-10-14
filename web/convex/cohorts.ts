@@ -68,8 +68,6 @@ async function nextCheckOrder(ctx: MutationCtx, cohortId: Id<"cohorts">, group: 
   return ab < ba ? "AB" : ba < ab ? "BA" : Math.random() < 0.5 ? "AB" : "BA";
 }
 
-/** Agreeing this soon after declining counts as undoing a misclick: the exercise clock restarts. */
-const UNDO_DECLINE_MS = 5 * 60_000;
 
 const UNLISTED = { name: "Not on a roster", code: "unlisted" };
 
@@ -270,28 +268,17 @@ async function requireParticipant(ctx: MutationCtx, userId: Id<"users"> | undefi
 }
 
 /**
- * Agree or decline after reading the consent information. A student who
- * declined can change to agreeing (until their exercises are over); soon
- * after declining, that's taken as undoing a misclick and their exercise
- * clock restarts after the pre-survey.
+ * Agree or decline after reading the consent information. Declining ends the
+ * session for the student (nothing more is recorded; lessonAccess.ts refuses
+ * lessons) and flags them for the admin; they can still change their mind
+ * and agree, from the same screen.
  */
 export const giveConsent = authenticatedMutation({
   args: { agree: v.boolean() },
   handler: async (ctx, { agree }) => {
     const p = await requireParticipant(ctx, ctx.customUser?._id);
     if (p.consented || (p.consented === false && !agree)) return;
-    if (p.consented === false && p.exercises_finished_at !== undefined) throw new Error("Today's exercises are over");
-    const now = Date.now();
-    const inSession = ctx.customUser!.study_phase === "session";
-    const undo = p.consented === false && p.consent_at !== undefined && now - p.consent_at < UNDO_DECLINE_MS;
-    await ctx.db.patch(p._id, {
-      consented: agree,
-      consent_at: now,
-      consent_version: CONSENT_VERSION,
-      // A student who declines may still practise; their clock starts now.
-      ...(!agree && inSession && p.exercises_started_at === undefined ? { exercises_started_at: now } : {}),
-      ...(undo ? { exercises_started_at: undefined } : {}),
-    });
+    await ctx.db.patch(p._id, { consented: agree, consent_at: Date.now(), consent_version: CONSENT_VERSION });
   },
 });
 

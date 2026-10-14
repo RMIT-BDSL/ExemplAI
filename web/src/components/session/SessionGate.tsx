@@ -6,7 +6,7 @@ import { POST_SURVEY, PRE_SURVEY } from "../../../convex/surveys";
 import { ConnectionNotice } from "./ConnectionNotice";
 import { ConsentScreen } from "./ConsentScreen";
 import { QuickCheckScreen } from "./QuickCheckScreen";
-import { SessionDone } from "./SessionDone";
+import { SessionDeclined, SessionDone } from "./SessionDone";
 import { stepLabel } from "./SessionPage";
 import { SessionTimer } from "./SessionTimer";
 import { SurveyScreen } from "./SurveyScreen";
@@ -105,7 +105,10 @@ export function SessionGate({
       );
       break;
     case "done":
-      screen = <SessionDone consented={session.consented === true} />;
+      screen = <SessionDone />;
+      break;
+    case "declined":
+      screen = <SessionDeclined />;
       break;
     default: {
       const endsAt =
@@ -116,7 +119,6 @@ export function SessionGate({
           {endsAt !== null && (
             <SessionTimer
               msLeft={endsAt - now}
-              consented={session.consented === true}
               hasChecks={session.flow.hasChecks}
               testingGroup={session.testingGroup}
             />

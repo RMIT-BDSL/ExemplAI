@@ -23,7 +23,8 @@ import { isStudent } from "./studentMetrics";
  * with the Convex environment variable LESSON_LOCKS=off.
  *
  * During a study session (convex/cohorts.ts) a student sees and opens only the
- * session week's lessons, still unlocking in order.
+ * session week's lessons, still unlocking in order. A cohort student who
+ * declined to take part opens none.
  */
 
 export const UNLOCK_AFTER_FAILED_SUBMITS = 3;
@@ -69,6 +70,13 @@ export function bypassesLocks(user: Pick<Doc<"users">, "role"> | null, isAdmin: 
   return !lessonLocksEnabled() || isAdmin || (user !== null && !isStudent(user));
 }
 
+/** A cohort student who declined to take part (convex/cohorts.ts giveConsent): they open no lessons. */
+export async function declinedStudy(ctx: QueryCtx, user: Doc<"users"> | null): Promise<boolean> {
+  if (!user) return false;
+  const p = await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", user._id)).first();
+  return p?.consented === false;
+}
+
 /** The one week a student in a study session may see, or null (not in a session). */
 export async function sessionWeekFor(ctx: QueryCtx, user: Doc<"users"> | null): Promise<number | null> {
   if (!user || user.study_phase !== "session") return null;
@@ -84,6 +92,7 @@ export async function canOpenLesson(
   lessonId: Id<"questions">,
   isAdmin: boolean,
 ): Promise<boolean> {
+  if (await declinedStudy(ctx, user)) return false;
   const sessionWeek = await sessionWeekFor(ctx, user);
   const lesson = await ctx.db.get(lessonId);
   if (sessionWeek !== null && lesson?.week !== sessionWeek) return false;

@@ -54,8 +54,8 @@ export const DEFAULT_SESSION_WEEK = 4;
 export const DEFAULT_EXERCISE_MINUTES = 35;
 /** Minutes for each quick check (two problems, tutor off). */
 export const DEFAULT_CHECK_MINUTES = 5;
-/** Bump when the consent text changes (web/src/components/session/consent.ts). */
-export const CONSENT_VERSION = "2026-10-12-draft2";
+/** Bump when the consent text changes (web/src/components/session/consent.ts, from Participant-Info-v2-Oct-13.docx). */
+export const CONSENT_VERSION = "participant-info-v2-2026-10-13";
 
 /** A cohort's session passcode matches what the student typed (case and spaces ignored). */
 export function passcodeMatches(required: string | undefined, given: string | undefined): boolean {
