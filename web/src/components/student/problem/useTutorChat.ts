@@ -32,11 +32,14 @@ export function useTutorChat({
   currentCode,
   lessonId,
   onExampleRequested,
+  getEditorContext,
 }: {
   editorRef?: React.MutableRefObject<any>;
   currentCode?: string;
   lessonId?: string;
   onExampleRequested?: (trigger: ExampleTrigger, examplesUsed: number) => void;
+  /** The code context sent with a turn, when there's no single editor to read it from (/solve). */
+  getEditorContext?: () => string;
 }) {
   // Graph steps finished for the reply being written (from /chat/stream).
   const [progress, setProgress] = React.useState<string[]>([]);
@@ -266,7 +269,9 @@ export function useTutorChat({
         }
       }
 
-      if (code) {
+      if (getEditorContext) {
+        editorContext = getEditorContext();
+      } else if (code) {
         editorContext = `Code:\n${code}\n`;
         if (cursorLine !== null && cursorColumn !== null) {
           editorContext += `Cursor Line: ${cursorLine}, Column: ${cursorColumn}\n`;

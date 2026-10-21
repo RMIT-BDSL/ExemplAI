@@ -11,41 +11,46 @@ import {
   ChevronsUpDown,
   Loader2,
   Lock,
-  MessageSquare,
-  Play,
   Sparkles,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import AttemptBlock, { type Version } from "#/components/solve/AttemptBlock";
+import { useEffect, useRef, useState } from "react";
+import { RunOutputBlock, SubmitBlock, TutorOutputBlock } from "#/components/solve/CellOutputs";
 import { type FoldAll, useFold } from "#/components/solve/fold";
-import type { NotebookBlock, NotebookHandle } from "#/components/solve/NotebookEditor";
-import ThreadBlock, { DraftThread } from "#/components/solve/ThreadBlock";
+import type { CellEditorHandle } from "#/components/solve/MarkdownCellEditor";
+import NotebookCell, { InsertBar } from "#/components/solve/NotebookCell";
+import {
+  afterReload,
+  type Cell,
+  type CellType,
+  newCellId,
+  programOf,
+  type RunOutput,
+  type SubmitOutput,
+  type TutorOutput,
+} from "#/components/solve/notebook";
+import { codeStorageKey, readTabCopy, withStarterHint } from "#/components/student/lessonCode";
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
-import type { Message } from "#/components/student/problem/ChatBox";
 import Problem, { formatCall, type ProblemData } from "#/components/student/problem/Problem";
-import { useTutorChat } from "#/components/student/problem/useTutorChat";
+import { GET_HELP_MESSAGE, NEW_EXAMPLE_MESSAGE, useTutorChat } from "#/components/student/problem/useTutorChat";
 import StatusBar from "#/components/student/StatusBar";
-import { codeStorageKey, readTabCopy, withStarterHint } from "#/components/student/lessonCode";
 import { authClient } from "#/lib/auth-client";
 import { useLessonVisit } from "#/lib/useLessonVisit";
 import { cn } from "#/lib/utils.ts";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
-// Monaco is several hundred KB: keep it out of the route chunk.
-const NotebookEditor = lazy(() => import("#/components/solve/NotebookEditor"));
-// NotebookEditor's END, repeated so the route chunk doesn't pull in Monaco.
-const END = -1;
-
-// Solve: an alternative lesson workspace shaped like a notebook that is still
-// one file. The student's code is a single document; the problem sits above
-// it, and every Run/Submit (frozen as a version) and every tutor thread sits
-// between its lines, at the place it was about. Run/Submit grade exactly as
-// on /course and the server logs each one in codeAttempts, which is where the
-// versions come from; the tutor follows the course chat's rules (useTutorChat).
-// Lesson locks, autosaved drafts and time on task work as on /course.
+// Solve: an alternative lesson workspace shaped like a notebook. The student
+// works in cells, each either code or markdown, and moves between them as in
+// Jupyter or SolveIt. Running a code cell runs it with the code cells above
+// it; "running" a markdown cell asks the tutor about it, and the reply shows
+// under it. Submit grades all the code cells together, exactly as /course
+// grades its one file. Every Run and Submit is still logged by the server in
+// codeAttempts, and every question in chatMessages; the notebook itself (cells
+// and their last outputs) is the student's working copy, saved in
+// solveNotebooks. Lesson locks, the tutor's rules (useTutorChat) and time on
+// task work as on /course.
 export const Route = createFileRoute("/_authenticated/solve")({
   component: Solve,
   validateSearch: (search: Record<string, unknown>) => ({
@@ -62,32 +67,16 @@ export const Route = createFileRoute("/_authenticated/solve")({
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
-/** A Run/Submit in flight: its block shows until the server's row arrives. */
-interface Pending {
-  kind: "run" | "submit";
-  /** How many versions there were when it was sent. */
-  before: number;
-  /** The server has answered; the row is being saved. */
-  answered: boolean;
-}
-
-/** A question being written at a line (`sending` once it has been sent). */
-interface Draft {
-  anchor: number;
-  about: string;
-  sending: string | null;
-}
-
 const OUTLINE_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-[2px] border border-rule-strong px-3 text-[11px] font-medium tracking-[0.02em] text-brass transition-colors hover:bg-surface-raised disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass";
 const FILLED_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-[2px] border border-brass-fill bg-brass-fill px-3 text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass";
 
-/** The problem above the code; folds to its title. */
+/** The problem above the cells; folds to its title. */
 function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; lessonId: string; foldAll: FoldAll }) {
   const [open, setOpen] = useFold(true, foldAll);
   return (
-    <div className="mb-3 rounded-[4px] border border-rule-strong bg-surface-panel">
+    <div className="mx-4 mb-3 rounded-[4px] border border-rule-strong bg-surface-panel">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -101,9 +90,11 @@ function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; le
       {open && (
         <div className="editorial-prose border-t border-rule px-6 pt-4 pb-5">
           <Problem problem={problem} />
-          <p className="mt-4 font-sans text-[11px] text-ink-label">
-            Runs and Submits are saved in the code as versions you can't change, each with what you changed. Select
-            lines and press Ctrl+I to ask the tutor about them.{" "}
+          <p className="mt-4 font-sans text-[11px] leading-relaxed text-ink-label">
+            Work in cells: code, or markdown for notes and questions. Ctrl/⌘+Enter runs a code cell (after the code
+            cells above it) or asks the tutor about a markdown cell; Shift+Enter does the same and moves on; Ctrl/⌘+M
+            switches a cell between code and markdown. Submit grades all your code cells together, so leave test
+            prints out of them.{" "}
             <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
               Classic workspace
             </Link>
@@ -112,12 +103,6 @@ function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; le
       )}
     </div>
   );
-}
-
-function lastCodeLine(code: string) {
-  const lines = code.split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) if (lines[i].trim()) return i + 1;
-  return 1;
 }
 
 function Solve() {
@@ -142,7 +127,7 @@ function Solve() {
   );
   const setLessonStatus = useMutation(api.courses.setLessonStatus);
   const openLesson = useMutation(api.examples.openLesson);
-  const saveCodeDraft = useMutation(api.codeDrafts.save);
+  const saveNotebook = useMutation(api.solveNotebooks.save);
 
   const activeQuestion = problemId
     ? fetchedQuestion
@@ -153,34 +138,34 @@ function Solve() {
   const unlockedSet = unlocked ? new Set<string>(unlocked) : unlocked;
   const isLocked = !!lessonId && !!unlockedSet && !unlockedSet.has(lessonId);
   const canOpen = signedIn && unlocked !== undefined && !isLocked;
-  const attempts: Version[] | undefined = useConvexQuery(
-    api.codeAttempts.listMine,
-    lessonId && canOpen ? { lessonId } : "skip",
+  const savedNotebook = useConvexQuery(api.solveNotebooks.get, lessonId && canOpen ? { lessonId } : "skip");
+  // Only needed to start a first notebook from the student's /course code.
+  const codeDraft = useConvexQuery(
+    api.codeDrafts.get,
+    lessonId && canOpen && savedNotebook === null ? { lessonId } : "skip",
   );
-  const codeDraft = useConvexQuery(api.codeDrafts.get, lessonId && canOpen ? { lessonId } : "skip");
 
-  const editorRef = useRef<any>(null);
-  const notebookRef = useRef<NotebookHandle | null>(null);
-  const [code, setCode] = useState("");
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [runError, setRunError] = useState<string | null>(null);
+  // The notebook, once loaded for this lesson.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [submit, setSubmit] = useState<SubmitOutput | null>(null);
+  const cellsRef = useRef(cells);
+  cellsRef.current = cells;
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [autoFocusId, setAutoFocusId] = useState<string | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [isIndexOpen, setIsIndexOpen] = useState(false);
   const [foldAll, setFoldAll] = useState<FoldAll>({ open: true, n: 0 });
-
-  // Threads: which thread each student turn belongs to (a thread is named by
-  // its first turn) and the line each thread was opened at. This visit only,
-  // like the chat itself.
-  const [threadOf, setThreadOf] = useState<Record<string, string>>({});
-  const [threadAnchor, setThreadAnchor] = useState<Record<string, number>>({});
-  const [draft, setDraft] = useState<Draft | null>(null);
-  // A turn has been sent but Convex hasn't given its id yet: hold it back so
-  // it doesn't flash up as a thread of its own.
-  const [awaitingSave, setAwaitingSave] = useState(false);
+  const handles = useRef(new Map<string, CellEditorHandle>());
 
   const chat = useTutorChat({
-    editorRef,
-    currentCode: code,
     lessonId,
+    // The tutor sees the notebook's program, as /course sends its file.
+    getEditorContext: () => {
+      const code = programOf(cellsRef.current);
+      return code ? `Code:\n${code}\n` : "";
+    },
     onExampleRequested: (trigger, examplesUsed) =>
       posthog.capture(trigger === "get_help" ? "get_help_clicked" : "new_example_clicked", {
         problem_id: lessonId,
@@ -200,48 +185,36 @@ function Solve() {
   // Time on task: a visit per lesson opening, with active time (research log).
   useLessonVisit(canOpen ? lessonId : undefined);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new lesson starts clean
+  // Load each lesson's notebook once: the saved one, else a first code cell
+  // with the newer of the tab's and the server's /course code, else the starter.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per lesson, when its notebook has arrived
   useEffect(() => {
-    setRunError(null);
-    setPending(null);
-    setDraft(null);
-    setThreadOf({});
-    setThreadAnchor({});
-  }, [lessonId]);
+    if (!activeQuestion || !lessonId || loadedFor === lessonId || !canOpen) return;
+    if (savedNotebook === undefined || (savedNotebook === null && codeDraft === undefined)) return;
+    if (savedNotebook) {
+      setCells(afterReload(savedNotebook.cells as Cell[]));
+      setSubmit((savedNotebook.submit as SubmitOutput | null) ?? null);
+    } else {
+      const tab = readTabCopy(codeStorageKey(lessonId, "python"));
+      const server = codeDraft ?? null;
+      const saved =
+        tab && server ? (server.updated_at > tab.at ? server.code : tab.code) : (tab?.code ?? server?.code ?? null);
+      const id = newCellId();
+      setCells([{ id, type: "code", source: saved ?? withStarterHint(activeQuestion.starter_code ?? "") }]);
+      setSubmit(null);
+      setAutoFocusId(id);
+    }
+    setFocusedId(null);
+    setRunningId(null);
+    setLoadedFor(lessonId);
+  }, [lessonId, loadedFor, canOpen, savedNotebook, codeDraft]);
+  const loaded = !!lessonId && loadedFor === lessonId;
 
-  // The version being run is in once the server's row has arrived.
-  useEffect(() => {
-    if (pending && (attempts?.length ?? 0) > pending.before) setPending(null);
-  }, [pending, attempts]);
-  // In case the row never comes (e.g. the server couldn't reach Convex).
-  useEffect(() => {
-    if (!pending?.answered) return;
-    const timer = setTimeout(() => setPending(null), 15_000);
-    return () => clearTimeout(timer);
-  }, [pending]);
-
-  // The document starts from the newer of the tab's copy and the server's
-  // draft (both shared with /course), else the latest version, else the
-  // starter code. Decided once per lesson; the editor is keyed by lesson.
-  const draftKey = lessonId ? codeStorageKey(lessonId, "python") : null;
-  const [initial, setInitial] = useState<{ key: string; code: string } | null>(null);
-  const initialCode = initial && initial.key === draftKey ? initial.code : null;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per lesson, when its draft and versions have arrived
-  useEffect(() => {
-    if (!activeQuestion || !draftKey || initialCode !== null) return;
-    if (!canOpen || codeDraft === undefined || attempts === undefined) return;
-    const tab = readTabCopy(draftKey);
-    const server = codeDraft ?? null;
-    const saved =
-      tab && server ? (server.updated_at > tab.at ? server.code : tab.code) : (tab?.code ?? server?.code ?? null);
-    const start = saved ?? attempts.at(-1)?.code ?? withStarterHint(activeQuestion.starter_code ?? "");
-    setInitial({ key: draftKey, code: start });
-    setCode(start);
-  }, [draftKey, initialCode, canOpen, codeDraft, attempts]);
-
-  // Autosave as on /course: to the tab and the server shortly after typing
-  // stops, and flushed on lesson change, unmount and when the page is hidden.
-  const pendingSaveRef = useRef<{ key: string; lessonId: Id<"questions">; code: string } | null>(null);
+  // Autosave, as /course saves its code: shortly after a change, and flushed
+  // on lesson change, unmount and when the page is hidden.
+  const pendingSaveRef = useRef<{ lessonId: Id<"questions">; cells: Cell[]; submit: SubmitOutput | null } | null>(
+    null,
+  );
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function flushSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -249,11 +222,23 @@ function Solve() {
     const save = pendingSaveRef.current;
     pendingSaveRef.current = null;
     if (!save) return;
-    try {
-      sessionStorage.setItem(save.key, JSON.stringify({ code: save.code, at: Date.now() }));
-    } catch {}
-    saveCodeDraft({ lessonId: save.lessonId, code: save.code }).catch(() => {});
+    saveNotebook({ lessonId: save.lessonId, cells: save.cells, ...(save.submit ? { submit: save.submit } : {}) }).catch(
+      () => {},
+    );
   }
+  const firstLoadRef = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: save whenever the notebook changes
+  useEffect(() => {
+    if (!loaded || !lessonId) return;
+    // Loading isn't an edit.
+    if (firstLoadRef.current !== lessonId) {
+      firstLoadRef.current = lessonId;
+      return;
+    }
+    pendingSaveRef.current = { lessonId, cells, submit };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(flushSave, 800);
+  }, [cells, submit, loaded]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: flushSave only touches refs
   useEffect(() => {
     const onHide = () => document.visibilityState === "hidden" && flushSave();
@@ -266,33 +251,34 @@ function Solve() {
     };
   }, [lessonId]);
 
-  // The chat's turns grouped into threads, in the order they were opened.
-  const threads = useMemo(() => {
-    const list: { id: string; messages: Message[] }[] = [];
-    const byId = new Map<string, (typeof list)[number]>();
-    let current: (typeof list)[number] | undefined;
-    for (const m of chat.messages) {
-      if (m.sender === "user") {
-        if (awaitingSave && !(m.id in threadOf)) break;
-        const id = threadOf[m.id] ?? m.id;
-        current = byId.get(id);
-        if (!current) {
-          current = { id, messages: [] };
-          byId.set(id, current);
-          list.push(current);
-        }
-      } else if (!current) {
-        current = { id: m.id, messages: [] };
-        byId.set(m.id, current);
-        list.push(current);
+  // A question's reply lands in the chat (saved there by the server): copy it
+  // to its cell. A failed send says why.
+  useEffect(() => {
+    const waiting = cells.filter((c) => c.output?.kind === "tutor" && c.output.status === "waiting");
+    if (!waiting.length) return;
+    const messages = chat.messages;
+    const error = messages.find((m) => m.id === "local-error");
+    let changed = false;
+    const next = cells.map((cell) => {
+      const out = cell.output;
+      if (out?.kind !== "tutor" || out.status !== "waiting") return cell;
+      const at = out.message_id ? messages.findIndex((m) => m.id === out.message_id) : -1;
+      const reply = at >= 0 ? messages.slice(at + 1).find((m) => m.sender === "assistant" && m.id !== "local-error") : null;
+      if (reply) {
+        changed = true;
+        return {
+          ...cell,
+          output: { ...out, status: "done" as const, reply: reply.content, reply_type: reply.responseType },
+        };
       }
-      current.messages.push(m);
-    }
-    return { list, active: current };
-  }, [chat.messages, threadOf, awaitingSave]);
-
-  const runShortcutRef = useRef<() => void>(() => {});
-  const askShortcutRef = useRef<() => void>(() => {});
+      if (!chat.isTyping && error) {
+        changed = true;
+        return { ...cell, output: { ...out, status: "error" as const, note: error.content } };
+      }
+      return cell;
+    });
+    if (changed) setCells(next);
+  }, [chat.messages, chat.isTyping, cells]);
 
   if (activeQuestion === undefined) return <LessonSkeleton />;
   if (activeQuestion === null) {
@@ -307,236 +293,223 @@ function Solve() {
   const example = exampleIndex >= 0 ? activeQuestion.testCases?.[exampleIndex] : undefined;
   const functionName =
     /def\s+(\w+)\s*\(/.exec(activeQuestion.starter_code ?? "")?.[1] ?? activeQuestion.problem_name;
-  const problem = {
+  const problem: ProblemData = {
     id: activeQuestion._id,
     title: activeQuestion.problem_name,
     description: activeQuestion.problem_description,
     functionName,
     example: example ? { input: example.input, expectedOutput: example.expectedOutput } : undefined,
   };
-
-  const latest = attempts?.at(-1);
-  const edited = !latest || latest.code !== code;
-  const nextVersion = (attempts?.length ?? 0) + 1;
+  const call = example ? formatCall(functionName, example.input) : undefined;
   const currentIndex = questions?.findIndex((q: any) => q._id === lessonId) ?? -1;
   const previousQuestion =
     currentIndex > 0 && questions?.[currentIndex - 1]?.week === activeQuestion.week
       ? questions[currentIndex - 1]
       : null;
   const nextQuestion = questions && currentIndex >= 0 ? questions[currentIndex + 1] : undefined;
+  const program = programOf(cells);
   // A passing Submit of exactly this code turns Submit into Next lesson.
-  const passed = !edited && latest?.kind === "submit" && latest.outcome === "passed";
-  const call = example ? formatCall(functionName, example.input) : undefined;
+  const passed = submit?.outcome === "passed" && submit.code === program;
+  const firstTutorCell = cells.find((c) => c.output?.kind === "tutor")?.id;
 
-  function handleChange(value: string) {
-    setCode(value);
-    if (!lessonId || !draftKey || initialCode === null) return;
-    pendingSaveRef.current = { key: draftKey, lessonId, code: value };
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(flushSave, 800);
+  // ── Cell edits ──────────────────────────────────────────────────────────
+  function updateCell(id: string, patch: Partial<Cell>) {
+    setCells((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+  function insertCell(at: number, type: CellType, source = "") {
+    const cell: Cell = { id: newCellId(), type, source };
+    setCells((prev) => [...prev.slice(0, at), cell, ...prev.slice(at)]);
+    setAutoFocusId(cell.id);
+    return cell;
+  }
+  function moveCell(id: string, by: -1 | 1) {
+    setCells((prev) => {
+      const i = prev.findIndex((c) => c.id === id);
+      const j = i + by;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  function deleteCell(id: string) {
+    const i = cells.findIndex((c) => c.id === id);
+    if (cells.length === 1 || i < 0) return;
+    setCells((prev) => prev.filter((c) => c.id !== id));
+    const neighbour = cells[i + 1] ?? cells[i - 1];
+    handles.current.get(neighbour.id)?.focus("start");
+  }
+  // The editor changes with the type; the text stays.
+  function toggleType(id: string) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    updateCell(id, { type: cell.type === "code" ? "markdown" : "code", output: undefined });
+    setAutoFocusId(id);
+  }
+  function leave(id: string, direction: -1 | 1) {
+    const i = cells.findIndex((c) => c.id === id);
+    const target = cells[i + direction];
+    if (target) handles.current.get(target.id)?.focus(direction === 1 ? "start" : "end");
+  }
+  // Shift+Enter: on to the next cell, or a new code cell at the end.
+  function advance(id: string) {
+    const i = cells.findIndex((c) => c.id === id);
+    const target = cells[i + 1];
+    if (target) handles.current.get(target.id)?.focus("start");
+    else insertCell(cells.length, "code");
   }
 
-  async function execute(kind: "run" | "submit") {
-    if (pending || !lessonId) return;
-    const source: string = editorRef.current?.getValue() ?? code;
-    setPending({ kind, before: attempts?.length ?? 0, answered: false });
-    setRunError(null);
+  // ── Run a code cell (with the code cells above it) ──────────────────────
+  async function runCell(cell: Cell) {
+    if (runningId || submitting || !lessonId) return;
+    const source = programOf(cells, cell.id);
+    const firstCode = cells.find((c) => c.type === "code")?.id === cell.id;
+    const prev_source =
+      cell.output?.kind === "run"
+        ? cell.output.source
+        : firstCode
+          ? withStarterHint(activeQuestion?.starter_code ?? "")
+          : undefined;
+    setRunningId(cell.id);
+    let output: RunOutput;
     try {
-      const { default: axios } = await import("axios");
-      const token = (await authClient.convex.token()).data?.token;
-      const { data } = await axios.post(
-        `${BACKEND_URL}/execute`,
-        {
-          code: source,
-          language_id: 71, // Python 3 (Judge0)
-          starter_code: activeQuestion?.starter_code,
-          solution_code: activeQuestion?.solution_code,
-          // Run calls the function once on the example; Submit grades every test.
-          test_cases: kind === "run" ? (example ? [example] : []) : (activeQuestion?.testCases ?? []),
-          lesson_id: lessonId,
-          action_type: kind,
-        },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-      );
-      // The server saves the version (codeAttempts) just after answering.
-      setPending((p) => p && { ...p, answered: true });
-      posthog.capture(kind === "run" ? "code_run" : "code_submitted", {
-        problem_id: lessonId,
-        success: !data?.error,
-        workspace: "solve",
-      });
+      const data = await execute("run", source);
+      output = {
+        kind: "run",
+        at: Date.now(),
+        source: cell.source,
+        prev_source,
+        call,
+        stdout: data?.stdout || undefined,
+        return_value: data?.return_value ?? undefined,
+        error: data?.stderr || undefined,
+      };
     } catch (error: any) {
-      posthog.captureException(error);
-      setRunError(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          `Couldn't reach the code runner (${error.message || "request failed"}). Try again in a moment.`,
-      );
-      setPending(null);
+      output = { kind: "run", at: Date.now(), source: cell.source, prev_source, error: runnerError(error) };
+    } finally {
+      setRunningId(null);
     }
+    updateCell(cell.id, { output });
   }
 
-  // Ask about the selected lines, or the cursor's line (Ctrl/⌘+I or the Ask button).
-  function openAsk() {
-    if (!chat.helpStarted || chat.isTyping || draft) return;
-    const editor = editorRef.current;
-    const selection = editor?.getSelection();
-    const line = selection?.endLineNumber ?? editor?.getPosition()?.lineNumber ?? END;
-    const about =
-      selection && !selection.isEmpty() && selection.startLineNumber !== selection.endLineNumber
-        ? `lines ${selection.startLineNumber}–${selection.endLineNumber}`
-        : `line ${line}`;
-    setDraft({ anchor: line, about, sending: null });
-  }
-
-  // Send a turn: into `threadId`, or as a new thread at the draft's line.
-  function send(text: string, threadId?: string, trigger?: "get_help" | "new_example") {
-    setAwaitingSave(true);
-    const onSaved = (messageId: string) => {
-      const thread = threadId ?? messageId;
-      setThreadOf((prev) => ({ ...prev, [messageId]: thread }));
-      if (!threadId) {
-        const line = notebookRef.current?.lineOf("draft") ?? END;
-        setThreadAnchor((prev) => ({ ...prev, [thread]: line }));
-        setDraft(null);
-      }
-      setAwaitingSave(false);
-    };
-    const done = () => {
-      setAwaitingSave(false);
-      // Never saved (e.g. the chat refused it): let the student try again.
-      setDraft((d) => (d?.sending ? { ...d, sending: null } : d));
-    };
-    if (trigger) {
-      const request = chat.requestExample(trigger, onSaved);
-      if (request) request.finally(done);
-      else done();
+  // ── Ask the tutor about a markdown cell ─────────────────────────────────
+  function askCell(cell: Cell) {
+    const question = cell.source.trim();
+    if (!question || chat.isTyping) return;
+    const at = Date.now();
+    if (!chat.helpStarted) {
+      const note =
+        chat.canGetHelp || chat.canNewExample
+          ? "The tutor opens with an example: press Get help below first."
+          : (chat.exampleStatus ?? "The tutor isn't open yet.");
+      updateCell(cell.id, { output: { kind: "tutor", at, question, status: "locked", note } });
       return;
     }
-    chat.sendMessage(text, undefined, onSaved).finally(done);
+    sendToTutor(cell.id, question, (onSaved) => chat.sendMessage(question, undefined, onSaved));
   }
 
-  function getHelp() {
-    setDraft({ anchor: END, about: "your code", sending: "Asking for an example…" });
-    send("", undefined, chat.exampleTrigger);
-  }
-
-  runShortcutRef.current = () => execute("run");
-  askShortcutRef.current = openAsk;
-
-  function handleEditorMount(editor: any, monaco: any) {
-    editorRef.current = editor;
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runShortcutRef.current());
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => askShortcutRef.current());
-  }
-
-  const blocks: NotebookBlock[] = [
-    {
-      id: "problem",
-      anchor: 0,
-      content: <ProblemBlock problem={problem} lessonId={activeQuestion._id} foldAll={foldAll} />,
-    },
-    ...(attempts ?? []).map((attempt, i) => ({
-      id: attempt._id,
-      // Under the last line of the code that ran.
-      anchor: lastCodeLine(attempt.code),
-      content: (
-        <div className="py-1.5">
-          <AttemptBlock
-            attempt={attempt}
-            version={i + 1}
-            call={call}
-            previousCode={attempts?.[i - 1]?.code ?? withStarterHint(activeQuestion.starter_code ?? "")}
-            defaultOpen={i === (attempts?.length ?? 0) - 1}
-            foldAll={foldAll}
-            onRestore={(c) => notebookRef.current?.replaceCode(c)}
-          />
-        </div>
-      ),
-    })),
-    ...threads.list.map((thread, i) => {
-      const isActive = thread === threads.active;
-      return {
-        id: `thread-${thread.id}`,
-        anchor: threadAnchor[thread.id] ?? END,
-        content: (
-          <div className="py-1.5">
-            <ThreadBlock
-              messages={thread.messages}
-              notice={i === 0}
-              progress={
-                isActive && chat.isTyping && !awaitingSave
-                  ? { steps: chat.progress, forExample: chat.waitingForExample }
-                  : null
-              }
-              foldAll={foldAll}
-              reply={
-                isActive && chat.helpStarted && !chat.isTyping && !draft
-                  ? {
-                      disabled: !chat.ready,
-                      placeholder: "Reply…",
-                      onSend: (text) => send(text, thread.id),
-                    }
-                  : null
-              }
-            />
-          </div>
+  /** Mark the cell as waiting, send, and remember the turn's id to find the reply. */
+  function sendToTutor(
+    cellId: string,
+    question: string,
+    send: (onSaved: (id: string) => void) => Promise<void> | null,
+  ) {
+    const waiting: TutorOutput = { kind: "tutor", at: Date.now(), question, status: "waiting" };
+    updateCell(cellId, { output: waiting });
+    const onSaved = (messageId: string) =>
+      setCells((prev) =>
+        prev.map((c) =>
+          c.id === cellId && c.output?.kind === "tutor" ? { ...c, output: { ...c.output, message_id: messageId } } : c,
         ),
-      };
-    }),
-  ];
-  if (draft) {
-    blocks.push({
-      id: "draft",
-      anchor: draft.anchor,
-      content: (
-        <div className="py-1.5">
-          <DraftThread
-            about={draft.about}
-            sending={draft.sending}
-            disabled={!chat.ready}
-            onSend={(text) => {
-              setDraft((d) => d && { ...d, sending: "Sending…" });
-              send(text);
-            }}
-            onCancel={() => {
-              setDraft(null);
-              editorRef.current?.focus();
-            }}
-          />
-        </div>
-      ),
-    });
-  }
-  if (pending) {
-    blocks.push({
-      id: "pending",
-      anchor: END,
-      content: (
-        <div className="py-1.5">
-          <div className="flex h-7 items-center gap-2 rounded-[4px] border border-dashed border-rule-strong px-2 font-sans text-[10px] uppercase tracking-[0.15em] text-ink-label">
-            <Loader2 className="size-3 animate-spin text-brass" />v{nextVersion} ·{" "}
-            {pending.answered ? "Saving" : pending.kind === "run" ? "Running" : "Submitting"}…
-          </div>
-        </div>
-      ),
-    });
-  }
-  if (runError) {
-    blocks.push({
-      id: `run-error-${runError}`,
-      anchor: END,
-      content: (
-        <div className="py-1.5">
-          <p className="rounded-[4px] border border-danger/40 bg-surface-panel px-3 py-2 font-sans text-xs text-danger">
-            {runError}
-          </p>
-        </div>
-      ),
-    });
+      );
+    const settle = () =>
+      // Never saved (e.g. the chat refused it): say so instead of waiting forever.
+      setCells((prev) =>
+        prev.map((c) =>
+          c.id === cellId && c.output?.kind === "tutor" && c.output.status === "waiting" && !c.output.message_id
+            ? { ...c, output: { ...c.output, status: "error", note: "Couldn't send this to the tutor. Try again." } }
+            : c,
+        ),
+      );
+    const request = send(onSaved);
+    if (request) request.finally(settle);
+    else settle();
   }
 
-  // Get help until help starts; then Ask and the ✦ Example button (same rules as the course chat).
+  // Get help / New example: the request goes in as a markdown cell at the end.
+  function getHelp() {
+    const trigger = chat.exampleTrigger;
+    const text = trigger === "get_help" || !chat.helpStarted ? GET_HELP_MESSAGE : NEW_EXAMPLE_MESSAGE;
+    const cell = insertCell(cells.length, "markdown", text);
+    sendToTutor(cell.id, text, (onSaved) => chat.requestExample(trigger, onSaved));
+  }
+
+  // ── Run / Submit through the server, as /course does ────────────────────
+  async function execute(kind: "run" | "submit", code: string) {
+    const { default: axios } = await import("axios");
+    const token = (await authClient.convex.token()).data?.token;
+    const { data } = await axios.post(
+      `${BACKEND_URL}/execute`,
+      {
+        code,
+        language_id: 71, // Python 3 (Judge0)
+        starter_code: activeQuestion?.starter_code,
+        solution_code: activeQuestion?.solution_code,
+        // Run calls the function once on the example; Submit grades every test.
+        test_cases: kind === "run" ? (example ? [example] : []) : (activeQuestion?.testCases ?? []),
+        lesson_id: lessonId,
+        action_type: kind,
+      },
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+    posthog.capture(kind === "run" ? "code_run" : "code_submitted", {
+      problem_id: lessonId,
+      success: !data?.error,
+      workspace: "solve",
+    });
+    return data;
+  }
+
+  function runnerError(error: any) {
+    posthog.captureException(error);
+    return (
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      `Couldn't reach the code runner (${error.message || "request failed"}). Try again in a moment.`
+    );
+  }
+
+  async function submitNotebook() {
+    if (runningId || submitting || !lessonId) return;
+    const code = program;
+    const base = { at: Date.now(), code, prev_code: submit?.code };
+    setSubmitting(true);
+    try {
+      const data = await execute("submit", code);
+      const results: any[] = data?.test_results ?? [];
+      const passedCount = results.filter((r) => r.passed).length;
+      // A syntax/runtime error shows its trace; else the first failed visible
+      // test. Hidden tests are never shown.
+      const codeError = data?.status?.id === 6 ? data?.stderr : results.find((r) => !r.hidden && r.stderr)?.stderr;
+      const failed = results.find((r) => !r.hidden && !r.passed);
+      const detail = failed
+        ? `${formatCall(functionName, failed.input ?? "")}: expected ${failed.expected ?? "?"}, got ${(failed.stdout ?? "").trim() || "nothing"}`
+        : undefined;
+      setSubmit({
+        ...base,
+        passed: passedCount,
+        total: results.length,
+        outcome: results.length > 0 && passedCount === results.length ? "passed" : "failed",
+        error: codeError || detail,
+      });
+    } catch (error: any) {
+      setSubmit({ ...base, passed: 0, total: 0, outcome: "error", error: runnerError(error) });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Get help until help starts; then the ✦ Example button (same rules as the course chat).
   const showGetHelp = !chat.helpStarted && !chat.isTyping && (chat.canGetHelp || chat.canNewExample);
 
   return (
@@ -582,127 +555,137 @@ function Solve() {
             </p>
           </div>
         ) : (
+          <div className="flex w-full flex-1 flex-col overflow-hidden bg-surface-editor">
+            <div className="editorial-scroll min-h-0 flex-1 overflow-y-auto py-4">
+              <ProblemBlock problem={problem} lessonId={activeQuestion._id} foldAll={foldAll} />
+              {!loaded ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="size-5 animate-spin text-brass" />
+                </div>
+              ) : (
+                <>
+                  {cells.map((cell, i) => {
+                    const out = cell.output;
+                    return (
+                      <div key={cell.id}>
+                        <InsertBar onInsert={(type) => insertCell(i, type)} />
+                        <NotebookCell
+                          cell={cell}
+                          index={i + 1}
+                          count={cells.length}
+                          focused={focusedId === cell.id}
+                          autoFocus={autoFocusId === cell.id}
+                          theme={editorTheme}
+                          busy={
+                            cell.type === "code"
+                              ? runningId === cell.id
+                              : out?.kind === "tutor" && out.status === "waiting"
+                          }
+                          onChange={(source) => updateCell(cell.id, { source })}
+                          onFocus={() => setFocusedId(cell.id)}
+                          onMove={(by) => moveCell(cell.id, by)}
+                          onDelete={() => deleteCell(cell.id)}
+                          handleRef={(handle) => {
+                            if (handle) handles.current.set(cell.id, handle);
+                            else handles.current.delete(cell.id);
+                          }}
+                          onRun={(next) => {
+                            if (cell.type === "code") runCell(cell);
+                            else askCell(cell);
+                            if (next) advance(cell.id);
+                          }}
+                          onToggleType={() => toggleType(cell.id)}
+                          onLeave={(direction) => leave(cell.id, direction)}
+                          onAsk={() => insertCell(i + 1, "markdown")}
+                          output={
+                            out?.kind === "run" ? (
+                              <RunOutputBlock output={out} foldAll={foldAll} />
+                            ) : out?.kind === "tutor" ? (
+                              <TutorOutputBlock
+                                output={out}
+                                notice={cell.id === firstTutorCell}
+                                progress={
+                                  out.status === "waiting" && chat.isTyping
+                                    ? { steps: chat.progress, forExample: chat.waitingForExample }
+                                    : null
+                                }
+                                foldAll={foldAll}
+                              />
+                            ) : null
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+                  <InsertBar onInsert={(type) => insertCell(cells.length, type)} />
+                  {submit && (
+                    <div className="mt-2 mr-4 ml-[3.75rem] pl-3">
+                      <SubmitBlock submit={submit} foldAll={foldAll} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
-        <div className="flex w-full flex-1 flex-col overflow-hidden bg-surface-editor">
-          <div className="min-h-0 flex-1">
-            {initialCode === null ? (
-              <div className="flex h-full items-center justify-center">
-                <Loader2 className="size-5 animate-spin text-brass" />
-              </div>
-            ) : (
-              <Suspense fallback={<div className="h-full" />}>
-                <NotebookEditor
-                  key={lessonId}
-                  theme={editorTheme}
-                  defaultValue={initialCode}
-                  onChange={handleChange}
-                  onMount={handleEditorMount}
-                  blocks={blocks}
-                  handleRef={notebookRef}
-                />
-              </Suspense>
-            )}
-          </div>
-
-          {/* Footer: the course editor's bar, with the tutor's controls on the left. */}
-          <div className="flex h-[52px] flex-shrink-0 items-center gap-2 border-t border-rule-strong bg-surface-void px-4 select-none">
-            {showGetHelp ? (
-              <button
-                type="button"
-                onClick={getHelp}
-                disabled={!chat.exampleEnabled || !!draft}
-                className={FILLED_BUTTON}
-              >
-                <Sparkles className="size-3.5" />
-                Get help
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={openAsk}
-                  disabled={!chat.helpStarted || chat.isTyping || !!draft}
-                  title={
-                    chat.helpStarted
-                      ? "Ask about the selected lines (Ctrl+I, or ⌘+I on Mac)"
-                      : (chat.exampleStatus ?? undefined)
-                  }
-                  aria-keyshortcuts="Control+I Meta+I"
-                  className={OUTLINE_BUTTON}
-                >
-                  <MessageSquare className="size-3.5" />
-                  Ask
+            {/* Footer: the course editor's bar, with the tutor's controls on the left. */}
+            <div className="flex h-[52px] flex-shrink-0 items-center gap-2 border-t border-rule-strong bg-surface-void px-4 select-none">
+              {showGetHelp ? (
+                <button type="button" onClick={getHelp} disabled={!chat.exampleEnabled} className={FILLED_BUTTON}>
+                  <Sparkles className="size-3.5" />
+                  Get help
                 </button>
-                {chat.helpStarted && !chat.isControl && (
+              ) : (
+                chat.helpStarted &&
+                !chat.isControl && (
                   <button
                     type="button"
                     onClick={getHelp}
-                    disabled={!chat.exampleEnabled || chat.exhausted || chat.isTyping || !!draft}
+                    disabled={!chat.exampleEnabled || chat.exhausted || chat.isTyping}
                     title={chat.exampleStatus ?? "New example"}
                     className={OUTLINE_BUTTON}
                   >
                     <Sparkles className="size-3.5" />
                     Example
                   </button>
-                )}
-              </>
-            )}
-            <span
-              className={cn(
-                "ml-2 hidden min-w-0 truncate text-[10px] uppercase tracking-[0.15em] sm:block",
-                edited ? "text-ink-label" : "text-ink-faint",
+                )
               )}
-            >
-              {edited ? `v${nextVersion} · not run yet` : `v${nextVersion - 1} · saved`}
-            </span>
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFoldAll((f) => ({ open: !f.open, n: f.n + 1 }))}
-                title={foldAll.open ? "Fold every version and thread" : "Unfold every version and thread"}
-                className={cn(OUTLINE_BUTTON, "text-ink-label")}
-              >
-                {foldAll.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
-                {foldAll.open ? "Collapse all" : "Expand all"}
-              </button>
-              <button
-                type="button"
-                onClick={() => execute("run")}
-                disabled={!!pending}
-                title="Run (Ctrl+Enter, or ⌘+Enter on Mac)"
-                aria-keyshortcuts="Control+Enter Meta+Enter"
-                className={OUTLINE_BUTTON}
-              >
-                {pending?.kind === "run" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+              <span className="ml-2 hidden min-w-0 truncate text-[10px] text-ink-label md:block">
+                Ctrl/⌘+Enter run · Shift+Enter run and next · Ctrl/⌘+M code ⇄ markdown
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFoldAll((f) => ({ open: !f.open, n: f.n + 1 }))}
+                  title={foldAll.open ? "Fold every output and the problem" : "Unfold every output and the problem"}
+                  className={cn(OUTLINE_BUTTON, "text-ink-label")}
+                >
+                  {foldAll.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
+                  {foldAll.open ? "Collapse all" : "Expand all"}
+                </button>
+                {passed && nextQuestion ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/solve", search: { problemId: nextQuestion._id } })}
+                    className={FILLED_BUTTON}
+                  >
+                    Next lesson
+                    <ArrowRight className="size-3.5" />
+                  </button>
                 ) : (
-                  <Play className="size-3 fill-current" />
+                  <button
+                    type="button"
+                    onClick={submitNotebook}
+                    disabled={!loaded || submitting || !!runningId}
+                    title="Grade all the code cells together"
+                    className={FILLED_BUTTON}
+                  >
+                    {submitting && <Loader2 className="size-3.5 animate-spin" />}
+                    Submit
+                  </button>
                 )}
-                Run
-              </button>
-              {passed && nextQuestion ? (
-                <button
-                  type="button"
-                  onClick={() => navigate({ to: "/solve", search: { problemId: nextQuestion._id } })}
-                  className={FILLED_BUTTON}
-                >
-                  Next lesson
-                  <ArrowRight className="size-3.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => execute("submit")}
-                  disabled={!!pending}
-                  className={FILLED_BUTTON}
-                >
-                  {pending?.kind === "submit" && <Loader2 className="size-3.5 animate-spin" />}
-                  Submit
-                </button>
-              )}
+              </div>
             </div>
           </div>
-        </div>
         )}
       </div>
     </div>

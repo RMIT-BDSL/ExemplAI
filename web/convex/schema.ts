@@ -33,6 +33,45 @@ export const rejectedDraft = v.object({
 
 // How a Run or Submit ended (server/services: error_kind / submit_outcome).
 // "ran" = a Run that finished without an error (Runs aren't graded).
+// A Solve notebook cell (web/src/components/solve/notebook.ts) and its last output.
+const notebookOutput = v.union(
+  v.object({
+    kind: v.literal("run"),
+    at: v.number(),
+    source: v.string(),
+    prev_source: v.optional(v.string()),
+    call: v.optional(v.string()),
+    stdout: v.optional(v.string()),
+    return_value: v.optional(v.string()),
+    error: v.optional(v.string()),
+  }),
+  v.object({
+    kind: v.literal("tutor"),
+    at: v.number(),
+    question: v.string(),
+    status: v.union(v.literal("waiting"), v.literal("done"), v.literal("locked"), v.literal("error")),
+    reply: v.optional(v.string()),
+    reply_type: v.optional(v.string()),
+    note: v.optional(v.string()),
+    message_id: v.optional(v.string()),
+  }),
+);
+export const notebookCell = v.object({
+  id: v.string(),
+  type: v.union(v.literal("code"), v.literal("markdown")),
+  source: v.string(),
+  output: v.optional(notebookOutput),
+});
+export const notebookSubmit = v.object({
+  at: v.number(),
+  code: v.string(),
+  prev_code: v.optional(v.string()),
+  passed: v.number(),
+  total: v.number(),
+  outcome: v.union(v.literal("passed"), v.literal("failed"), v.literal("error")),
+  error: v.optional(v.string()),
+});
+
 export const attemptOutcome = v.union(
   v.literal("passed"),
   v.literal("ran"),
@@ -196,6 +235,17 @@ export default defineSchema({
     // A lesson, or a quick-check problem.
     lessonId: v.union(v.id("questions"), v.id("checkProblems")),
     code: v.string(),
+    updated_at: v.number(),
+  }).index("by_user_lesson", ["userId", "lessonId"]),
+  // The Solve workspace's notebook (/solve, convex/solveNotebooks.ts): the
+  // student's code and markdown cells for a lesson, with each cell's last
+  // output, saved as they work. A working copy, not research data: every Run
+  // and Submit is also in codeAttempts and every question in chatMessages.
+  solveNotebooks: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("questions"),
+    cells: v.array(notebookCell),
+    submit: v.optional(notebookSubmit),
     updated_at: v.number(),
   }).index("by_user_lesson", ["userId", "lessonId"]),
   // Quick-check problems (convex/quickChecks.ts): two parallel forms per

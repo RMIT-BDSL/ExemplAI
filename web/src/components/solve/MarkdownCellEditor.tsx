@@ -16,9 +16,10 @@ import {
 import { tags } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 
-// A markdown box with Obsidian-style live preview: the text is rendered as
+// A markdown cell with Obsidian-style live preview: the text is rendered as
 // you write it (headings, bold, code, lists…), and a line's markdown syntax
-// only shows while the cursor is on that line.
+// only shows while the cursor is on that line (none when the cell is not
+// being edited).
 
 // Markers hidden off the cursor's line.
 const HIDDEN_MARKS = new Set(["HeaderMark", "EmphasisMark", "CodeMark", "LinkMark", "URL", "QuoteMark"]);
@@ -34,6 +35,7 @@ class BulletWidget extends WidgetType {
 
 function activeLines(view: EditorView) {
   const lines = new Set<number>();
+  if (!view.hasFocus) return lines;
   for (const r of view.state.selection.ranges) {
     const from = view.state.doc.lineAt(r.from).number;
     const to = view.state.doc.lineAt(r.to).number;
@@ -106,6 +108,7 @@ const livePreviewPlugin = ViewPlugin.fromClass(
         update.docChanged ||
         update.viewportChanged ||
         update.selectionSet ||
+        update.focusChanged ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {
         this.decorations = livePreview(update.view);
@@ -134,10 +137,10 @@ const highlight = HighlightStyle.define([
 ]);
 
 const theme = EditorView.theme({
-  "&": { fontSize: "12px", color: "var(--color-ink)", backgroundColor: "transparent" },
+  "&": { fontSize: "14px", color: "var(--color-ink)", backgroundColor: "transparent" },
   "&.cm-focused": { outline: "none" },
-  ".cm-scroller": { fontFamily: "var(--font-sans)", lineHeight: "1.6", maxHeight: "240px", overflow: "auto" },
-  ".cm-content": { padding: "6px 0", caretColor: "var(--color-brass)" },
+  ".cm-scroller": { fontFamily: "var(--font-sans)", lineHeight: "1.6" },
+  ".cm-content": { padding: "8px 0", caretColor: "var(--color-brass)" },
   ".cm-line": { padding: "0" },
   ".cm-placeholder": { color: "var(--color-ink-label)" },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
@@ -164,60 +167,77 @@ const theme = EditorView.theme({
   ".cm-md-bullet": { color: "var(--color-brass)", padding: "0 2px" },
 });
 
-interface MarkdownInputProps {
-  placeholder: string;
-  disabled?: boolean;
-  autoFocus?: boolean;
-  /** Ctrl/⌘+Enter (and the send button) with the text so far; the box then clears. */
-  onSend: (text: string) => void;
-  onCancel?: () => void;
-  /** Keeps the box's text for the send button outside it. */
-  onTextChange?: (text: string) => void;
-  /** Lets the parent read and clear the text (the send button). */
-  viewRef?: React.MutableRefObject<EditorView | null>;
+/** What a cell's editor can be asked to do from outside (the notebook). */
+export interface CellEditorHandle {
+  focus: (at: "start" | "end") => void;
 }
 
-/** A small CodeMirror editor for markdown with live preview (Obsidian-style). */
-export default function MarkdownInput({
+/** The notebook keys shared by code and markdown cells. */
+export interface CellKeys {
+  /** Ctrl/⌘+Enter runs the cell; Shift+Enter runs it and moves to the next one. */
+  onRun: (advance: boolean) => void;
+  /** Ctrl/⌘+M switches the cell between code and markdown. */
+  onToggleType: () => void;
+  /** Arrow up on the first line / down on the last line moves to the next cell. */
+  onLeave: (direction: -1 | 1) => void;
+  /** Ctrl/⌘+I in code asks about it; Esc leaves a markdown cell. */
+  onAsk?: () => void;
+}
+
+/** A key binding that always handles its key. */
+const handled = (fn: (view: EditorView) => void) => (view: EditorView) => {
+  fn(view);
+  return true;
+};
+
+interface MarkdownCellEditorProps extends CellKeys {
+  initialValue: string;
+  placeholder: string;
+  autoFocus?: boolean;
+  onChange: (text: string) => void;
+  onFocus: () => void;
+  handleRef: (handle: CellEditorHandle | null) => void;
+}
+
+/** A markdown cell's editor (CodeMirror 6, live preview). */
+export default function MarkdownCellEditor({
+  initialValue,
   placeholder,
-  disabled,
   autoFocus,
-  onSend,
-  onCancel,
-  onTextChange,
-  viewRef,
-}: MarkdownInputProps) {
+  onChange,
+  onFocus,
+  handleRef,
+  ...keys
+}: MarkdownCellEditorProps) {
   const host = useRef<HTMLDivElement | null>(null);
-  const view = useRef<EditorView | null>(null);
   // Latest callbacks, so the editor is made once.
-  const props = useRef({ onSend, onCancel, onTextChange, disabled });
-  props.current = { onSend, onCancel, onTextChange, disabled };
+  const props = useRef({ onChange, onFocus, keys });
+  props.current = { onChange, onFocus, keys };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: made once; callbacks are read through the ref
   useEffect(() => {
     if (!host.current) return;
-    const send = (v: EditorView) => {
-      const text = v.state.doc.toString().trim();
-      if (!text || props.current.disabled) return true;
-      props.current.onSend(text);
-      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: "" } });
+    const atEdge = (v: EditorView, direction: -1 | 1) => {
+      const { main } = v.state.selection;
+      if (!main.empty) return false;
+      const line = v.state.doc.lineAt(main.head).number;
+      if (direction === -1 ? line !== 1 : line !== v.state.doc.lines) return false;
+      props.current.keys.onLeave(direction);
       return true;
     };
     const editor = new EditorView({
       parent: host.current,
       state: EditorState.create({
+        doc: initialValue,
         extensions: [
           history(),
           keymap.of([
-            { key: "Mod-Enter", run: send },
-            {
-              key: "Escape",
-              run: () => {
-                if (!props.current.onCancel) return false;
-                props.current.onCancel();
-                return true;
-              },
-            },
+            { key: "Mod-Enter", run: handled(() => props.current.keys.onRun(false)) },
+            { key: "Shift-Enter", run: handled(() => props.current.keys.onRun(true)) },
+            { key: "Mod-m", run: handled(() => props.current.keys.onToggleType()) },
+            { key: "ArrowUp", run: (v) => atEdge(v, -1) },
+            { key: "ArrowDown", run: (v) => atEdge(v, 1) },
+            { key: "Escape", run: handled((v) => v.contentDOM.blur()) },
             ...defaultKeymap,
             ...historyKeymap,
           ]),
@@ -229,27 +249,26 @@ export default function MarkdownInput({
           EditorView.lineWrapping,
           placeholderExt(placeholder),
           theme,
-          EditorView.contentAttributes.of({ "aria-label": "Ask the tutor (markdown)" }),
+          EditorView.contentAttributes.of({ "aria-label": "Markdown cell" }),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) props.current.onTextChange?.(u.state.doc.toString());
+            if (u.docChanged) props.current.onChange(u.state.doc.toString());
+            if (u.focusChanged && u.view.hasFocus) props.current.onFocus();
           }),
         ],
       }),
     });
-    view.current = editor;
-    if (viewRef) viewRef.current = editor;
+    handleRef({
+      focus: (at) => {
+        editor.focus();
+        editor.dispatch({ selection: { anchor: at === "start" ? 0 : editor.state.doc.length } });
+      },
+    });
     if (autoFocus) editor.focus();
     return () => {
+      handleRef(null);
       editor.destroy();
-      view.current = null;
-      if (viewRef) viewRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    if (!view.current) return;
-    view.current.contentDOM.contentEditable = disabled ? "false" : "true";
-  }, [disabled]);
 
   return <div ref={host} className="min-w-0 flex-1" />;
 }
