@@ -55,6 +55,8 @@ def test_falls_back_to_browser_conversation_when_convex_has_no_history():
     chat = _chat(conversation=[{"sender": "user", "content": "from browser"}])
     assert _contents(build_initial_state(chat, None)["messages"][1:]) == ["from browser"]
     assert _contents(build_initial_state(_chat(), [])["messages"][1:]) == ["hi!"]
+    long = _chat(conversation=[{"sender": "user", "content": "x" * 5_000}])
+    assert _contents(build_initial_state(long, None)["messages"][1:]) == ["x" * 4_000]
 
 
 class _FakeLlm:

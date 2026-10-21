@@ -23,6 +23,9 @@ CONVEX_OP_TIMEOUT = 5.0
 # any lesson's answer (~500 lines). Chat messages have their own cap in Convex
 # (web/convex/chatLimits.ts).
 MAX_STUDENT_CODE_CHARS = 20_000
+# Same as MAX_CHAT_MESSAGE_CHARS in web/convex/chatLimits.ts, for the browser-sent
+# conversation, which skips Convex's cap.
+MAX_CHAT_MESSAGE_CHARS = 4_000
 
 
 def _convex_client(auth_token: str) -> ConvexClient:
@@ -50,7 +53,8 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
     """
     if history is None:
         log.warning("chat history missing from Convex context; using browser conversation")
-        history = chat.conversation
+        history = [{**msg, "content": msg.get("content", "")[:MAX_CHAT_MESSAGE_CHARS]}
+                   for msg in chat.conversation]
 
     langgraph_messages = []
     for msg in history:
