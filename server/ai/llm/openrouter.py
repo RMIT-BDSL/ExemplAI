@@ -10,6 +10,9 @@ Roles with their own speed settings (config.py, OPENROUTER_*):
 - "faded": the Faded example agent: the agent's model and cap, with its own
   reasoning effort (OPENROUTER_FADED_REASONING, by default the agent's);
 - "check": the input guardrail and the Dean, which only classify.
+
+Each role also names a backup model (OPENROUTER_FALLBACK_MODEL) that OpenRouter
+switches to when the role's model is down.
 """
 
 from typing import Literal
@@ -21,10 +24,28 @@ from config import settings
 Role = Literal["agent", "faded", "check"]
 
 
+def model_for(role: Role) -> str:
+    """The model a role asks for first."""
+    if role == "check" and settings.OPENROUTER_CHECK_MODEL:
+        return settings.OPENROUTER_CHECK_MODEL
+    return settings.OPENROUTER_MODEL
+
+
+def fallback_for(model: str) -> str | None:
+    """The backup model for ``model``: OPENROUTER_FALLBACK_MODEL, or
+    OPENROUTER_MODEL when ``model`` is already the backup; None if neither differs."""
+    backup = settings.OPENROUTER_FALLBACK_MODEL
+    if not backup:
+        return None
+    if backup == model:
+        backup = settings.OPENROUTER_MODEL
+    return backup if backup and backup != model else None
+
+
 def request_options(role: Role) -> dict:
-    """OpenRouter request fields for a role: provider routing, reasoning effort
-    and output cap. Sent as extra body fields; max_tokens goes here because
-    ChatOpenAI would send it as max_completion_tokens."""
+    """OpenRouter request fields for a role: fallback models, provider routing,
+    reasoning effort and output cap. Sent as extra body fields; max_tokens goes
+    here because ChatOpenAI would send it as max_completion_tokens."""
     s = settings
     writes = role != "check"
     if role == "faded":
@@ -34,6 +55,10 @@ def request_options(role: Role) -> dict:
     max_tokens = s.OPENROUTER_AGENT_MAX_TOKENS if writes else s.OPENROUTER_CHECK_MAX_TOKENS
 
     options: dict = {}
+    # OpenRouter tries these in order, moving on when a model is down or errors.
+    backup = fallback_for(model_for(role))
+    if backup:
+        options["models"] = [model_for(role), backup]
     provider: dict = {}
     if s.OPENROUTER_PROVIDER_SORT:
         provider["sort"] = s.OPENROUTER_PROVIDER_SORT
@@ -50,11 +75,8 @@ def request_options(role: Role) -> dict:
 
 def build_llm(role: Role = "agent") -> ChatOpenAI:
     """Build the OpenRouter-backed chat model for a role from central settings."""
-    model = settings.OPENROUTER_MODEL
-    if role == "check" and settings.OPENROUTER_CHECK_MODEL:
-        model = settings.OPENROUTER_CHECK_MODEL
     return ChatOpenAI(
-        model=model,
+        model=model_for(role),
         api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
         base_url="https://openrouter.ai/api/v1",
         extra_body=request_options(role) or None,

@@ -34,7 +34,33 @@ def test_empty_settings_fall_back_to_openrouter_defaults(monkeypatch):
     monkeypatch.setattr(settings, "OPENROUTER_REQUIRE_PARAMETERS", False)
     monkeypatch.setattr(settings, "OPENROUTER_CHECK_REASONING", "")
     monkeypatch.setattr(settings, "OPENROUTER_CHECK_MAX_TOKENS", 0)
+    monkeypatch.setattr(settings, "OPENROUTER_FALLBACK_MODEL", "")
     assert openrouter.request_options("check") == {}
+
+
+def test_each_role_falls_back_to_the_other_model(monkeypatch):
+    assert openrouter.request_options("agent")["models"] == [
+        "deepseek/deepseek-v4.1-flash", "openai/gpt-oss-120b"]
+    assert openrouter.request_options("faded")["models"] == [
+        "deepseek/deepseek-v4.1-flash", "openai/gpt-oss-120b"]
+    # The checks already run on the backup, so they fall back to the agent's model.
+    assert openrouter.request_options("check")["models"] == [
+        "openai/gpt-oss-120b", "deepseek/deepseek-v4.1-flash"]
+    monkeypatch.setattr(settings, "OPENROUTER_FALLBACK_MODEL", "")
+    assert "models" not in openrouter.request_options("agent")
+
+
+def test_no_fallback_when_every_model_is_the_same(monkeypatch):
+    monkeypatch.setattr(settings, "OPENROUTER_MODEL", "openai/gpt-oss-120b")
+    assert "models" not in openrouter.request_options("agent")
+    assert "models" not in openrouter.request_options("check")
+
+
+def test_fallback_list_reaches_the_request_body(monkeypatch):
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", settings.OPENROUTER_API_KEY.__class__("k"))
+    payload = openrouter.build_llm("agent")._get_request_payload([("user", "hi")])
+    assert payload["model"] == "deepseek/deepseek-v4.1-flash"
+    assert payload["extra_body"]["models"] == ["deepseek/deepseek-v4.1-flash", "openai/gpt-oss-120b"]
 
 
 def test_check_role_uses_its_own_model(monkeypatch):

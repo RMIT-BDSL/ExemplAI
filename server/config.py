@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # as the best models, in ~0.6 s against ~1.9 s for V4.1 Flash (server/eval,
     # 2026-10-07).
     OPENROUTER_CHECK_MODEL: str = "openai/gpt-oss-120b"
+    # Backup model OpenRouter switches to when a role's model is down or errors
+    # ("" = no backup). A role already on this model backs up to
+    # OPENROUTER_MODEL instead. Each reply's usage records the model that
+    # actually answered (ai/usage.py).
+    OPENROUTER_FALLBACK_MODEL: str = "openai/gpt-oss-120b"
 
     # ── Chat features ──────────────────────────────────────────────────
     # Runnable code blocks in the chat (web: VITE_RUNNABLE_CHAT_CODE). Off: the
