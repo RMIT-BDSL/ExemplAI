@@ -47,7 +47,7 @@ function CodeBlock({ code }: { code: string }) {
 // Module-level so the renderers keep their identity across re-renders;
 // otherwise every new message would remount each RunnableCodeBlock and
 // wipe the student's edits and output.
-const markdownComponents: Components = {
+export const markdownComponents: Components = {
   // Unwrap <pre> so the CodeBlock isn't nested in another <pre>.
   pre(props) {
     return <>{props.children}</>;

@@ -3,16 +3,28 @@ import { usePostHog } from "@posthog/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery as useConvexQuery } from "convex/react";
-import { ArrowRight, Loader2, Lock, MessageSquare, Play, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Play,
+  Sparkles,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import AttemptBlock, { type Version } from "#/components/solve/AttemptBlock";
+import { type FoldAll, useFold } from "#/components/solve/fold";
 import type { NotebookBlock, NotebookHandle } from "#/components/solve/NotebookEditor";
 import ThreadBlock, { DraftThread } from "#/components/solve/ThreadBlock";
 import LessonIndex from "#/components/student/LessonIndex";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import type { Message } from "#/components/student/problem/ChatBox";
-import Problem, { formatCall } from "#/components/student/problem/Problem";
+import Problem, { formatCall, type ProblemData } from "#/components/student/problem/Problem";
 import { useTutorChat } from "#/components/student/problem/useTutorChat";
 import StatusBar from "#/components/student/StatusBar";
 import { codeStorageKey, readTabCopy, withStarterHint } from "#/components/student/lessonCode";
@@ -71,6 +83,37 @@ const OUTLINE_BUTTON =
 const FILLED_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-[2px] border border-brass-fill bg-brass-fill px-3 text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass";
 
+/** The problem above the code; folds to its title. */
+function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; lessonId: string; foldAll: FoldAll }) {
+  const [open, setOpen] = useFold(true, foldAll);
+  return (
+    <div className="mb-3 rounded-[4px] border border-rule-strong bg-surface-panel">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex h-8 w-full items-center gap-2 px-3 text-left font-sans text-[10px] select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
+      >
+        {open ? <ChevronDown className="size-3 text-ink-label" /> : <ChevronRight className="size-3 text-ink-label" />}
+        <span className="font-semibold uppercase tracking-[0.15em] text-brass">Problem</span>
+        {!open && <span className="min-w-0 truncate text-[11px] text-ink-muted">{problem.title}</span>}
+      </button>
+      {open && (
+        <div className="editorial-prose border-t border-rule px-6 pt-4 pb-5">
+          <Problem problem={problem} />
+          <p className="mt-4 font-sans text-[11px] text-ink-label">
+            Runs and Submits are saved in the code as versions you can't change, each with what you changed. Select
+            lines and press Ctrl+I to ask the tutor about them.{" "}
+            <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
+              Classic workspace
+            </Link>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function lastCodeLine(code: string) {
   const lines = code.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) if (lines[i].trim()) return i + 1;
@@ -122,6 +165,7 @@ function Solve() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isIndexOpen, setIsIndexOpen] = useState(false);
+  const [foldAll, setFoldAll] = useState<FoldAll>({ open: true, n: 0 });
 
   // Threads: which thread each student turn belongs to (a thread is named by
   // its first turn) and the line each thread was opened at. This visit only,
@@ -390,18 +434,7 @@ function Solve() {
     {
       id: "problem",
       anchor: 0,
-      content: (
-        <div className="editorial-prose mb-3 rounded-[4px] border border-rule-strong bg-surface-panel px-6 py-5">
-          <Problem problem={problem} />
-          <p className="mt-4 font-sans text-[11px] text-ink-label">
-            Runs and Submits are saved in the code as versions you can't change. Select lines and press
-            Ctrl+I to ask the tutor about them.{" "}
-            <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
-              Classic workspace
-            </Link>
-          </p>
-        </div>
-      ),
+      content: <ProblemBlock problem={problem} lessonId={activeQuestion._id} foldAll={foldAll} />,
     },
     ...(attempts ?? []).map((attempt, i) => ({
       id: attempt._id,
@@ -413,8 +446,9 @@ function Solve() {
             attempt={attempt}
             version={i + 1}
             call={call}
-            previousCode={attempts?.[i - 1]?.code}
+            previousCode={attempts?.[i - 1]?.code ?? withStarterHint(activeQuestion.starter_code ?? "")}
             defaultOpen={i === (attempts?.length ?? 0) - 1}
+            foldAll={foldAll}
             onRestore={(c) => notebookRef.current?.replaceCode(c)}
           />
         </div>
@@ -430,7 +464,12 @@ function Solve() {
             <ThreadBlock
               messages={thread.messages}
               notice={i === 0}
-              progress={isActive && chat.isTyping && !awaitingSave ? chat.progress : null}
+              progress={
+                isActive && chat.isTyping && !awaitingSave
+                  ? { steps: chat.progress, forExample: chat.waitingForExample }
+                  : null
+              }
+              foldAll={foldAll}
               reply={
                 isActive && chat.helpStarted && !chat.isTyping && !draft
                   ? {
@@ -544,7 +583,7 @@ function Solve() {
           </div>
         ) : (
 
-        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden border-x border-rule-strong bg-surface-editor">
+        <div className="flex w-full flex-1 flex-col overflow-hidden bg-surface-editor">
           <div className="min-h-0 flex-1">
             {initialCode === null ? (
               <div className="flex h-full items-center justify-center">
@@ -617,6 +656,15 @@ function Solve() {
               {edited ? `v${nextVersion} · not run yet` : `v${nextVersion - 1} · saved`}
             </span>
             <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFoldAll((f) => ({ open: !f.open, n: f.n + 1 }))}
+                title={foldAll.open ? "Fold every version and thread" : "Unfold every version and thread"}
+                className={cn(OUTLINE_BUTTON, "text-ink-label")}
+              >
+                {foldAll.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
+                {foldAll.open ? "Collapse all" : "Expand all"}
+              </button>
               <button
                 type="button"
                 onClick={() => execute("run")}

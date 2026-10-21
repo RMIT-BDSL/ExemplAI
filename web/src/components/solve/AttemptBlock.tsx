@@ -1,9 +1,13 @@
 import { ChevronDown, ChevronRight, Lock, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { cn } from "#/lib/utils.ts";
 import type { FunctionReturnType } from "convex/server";
+import { cn } from "#/lib/utils.ts";
 import type { api } from "../../../convex/_generated/api";
-import { diffStats, lineDiff } from "./lineDiff";
+import { type FoldAll, useFold } from "./fold";
+import { type DiffLine, diffStats, lineDiff } from "./lineDiff";
+
+/** One saved Run or Submit (a codeAttempts row, as convex/codeAttempts.listMine returns it). */
+export type Version = FunctionReturnType<typeof api.codeAttempts.listMine>[number];
 
 function timeOf(ms: number) {
   const d = new Date(ms);
@@ -11,9 +15,6 @@ function timeOf(ms: number) {
   if (d.toDateString() === new Date().toDateString()) return time;
   return `${d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${time}`;
 }
-
-/** One saved Run or Submit (a codeAttempts row, as convex/codeAttempts.listMine returns it). */
-export type Version = FunctionReturnType<typeof api.codeAttempts.listMine>[number];
 
 function lastLine(text: string) {
   return text.trim().split("\n").at(-1) ?? "";
@@ -35,6 +36,29 @@ function summary(attempt: Version) {
   return { ok: null, text: attempt.stdout ? lastLine(attempt.stdout) : "no output" };
 }
 
+// Lines of context kept around each change.
+const CONTEXT = 1;
+
+/** The changed lines with a little context; runs of unchanged lines become a count. */
+function hunks(diff: DiffLine[]) {
+  const keep = diff.map(() => false);
+  diff.forEach((line, i) => {
+    if (line.kind === "same") return;
+    for (let j = Math.max(0, i - CONTEXT); j <= Math.min(diff.length - 1, i + CONTEXT); j++) keep[j] = true;
+  });
+  const out: (DiffLine | { skipped: number })[] = [];
+  let skipped = 0;
+  diff.forEach((line, i) => {
+    if (keep[i]) {
+      if (skipped) out.push({ skipped });
+      skipped = 0;
+      out.push(line);
+    } else skipped++;
+  });
+  if (skipped) out.push({ skipped });
+  return out;
+}
+
 const BUTTON =
   "flex h-6 items-center gap-1 rounded-[2px] px-1.5 text-[10px] font-medium tracking-[0.02em] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-brass";
 
@@ -43,16 +67,18 @@ interface AttemptBlockProps {
   version: number;
   /** A Run's example call, e.g. `add(1, 2)`. */
   call?: string;
-  /** The attempt before this one, for "what changed". */
-  previousCode?: string;
+  /** The code this version changed: the version before it, or the starter code for v1. */
+  previousCode: string;
   /** Only the latest version starts unfolded. */
   defaultOpen: boolean;
+  foldAll: FoldAll;
   onRestore: (code: string) => void;
 }
 
 /**
- * One Run or Submit in the notebook, frozen: what came back, and on request
- * what changed since the version before. Restore puts its code back.
+ * One Run or Submit in the notebook, frozen: what the student changed since
+ * the version before (the code is saved with every version), and what came
+ * back. Restore puts its code back.
  */
 export default function AttemptBlock({
   attempt,
@@ -60,19 +86,16 @@ export default function AttemptBlock({
   call,
   previousCode,
   defaultOpen,
+  foldAll,
   onRestore,
 }: AttemptBlockProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [showChanges, setShowChanges] = useState(false);
-  const diff = useMemo(
-    () => (previousCode === undefined ? null : lineDiff(previousCode, attempt.code)),
-    [previousCode, attempt.code],
-  );
-  const stats = diff ? diffStats(diff) : null;
-  const changed = !stats || stats.added + stats.removed > 0;
+  const [open, setOpen] = useFold(defaultOpen, foldAll);
+  const [fullCode, setFullCode] = useState(false);
+  const diff = useMemo(() => lineDiff(previousCode, attempt.code), [previousCode, attempt.code]);
+  const stats = diffStats(diff);
+  const changed = stats.added + stats.removed > 0;
   const { ok, text } = summary(attempt);
-  // A Submit's result is already in the header; the body adds what failed.
-  const hasBody = attempt.kind === "run" || !!attempt.error_message;
+  const hasOutput = attempt.kind === "run" || !!attempt.error_message;
 
   return (
     <section
@@ -92,12 +115,16 @@ export default function AttemptBlock({
           <span className="uppercase tracking-[0.15em] text-ink-label">
             {attempt.kind === "submit" ? "Submit" : "Run"} · {timeOf(attempt._creationTime)}
           </span>
-          {stats && changed && (
-            <span className="tabular-nums">
-              <span className="text-success">+{stats.added}</span>{" "}
-              <span className="text-danger">−{stats.removed}</span>
-            </span>
-          )}
+          <span className="tabular-nums">
+            {changed ? (
+              <>
+                <span className="text-success">+{stats.added}</span>{" "}
+                <span className="text-danger">−{stats.removed}</span>
+              </>
+            ) : (
+              <span className="text-ink-faint">no changes</span>
+            )}
+          </span>
           <span
             className={cn(
               "min-w-0 truncate font-mono text-[11px]",
@@ -109,14 +136,15 @@ export default function AttemptBlock({
             {text}
           </span>
         </button>
-        {diff && changed && (
+        {open && (
           <button
             type="button"
-            onClick={() => setShowChanges(!showChanges)}
-            aria-pressed={showChanges}
-            className={cn(BUTTON, showChanges ? "text-brass" : "text-ink-label hover:text-ink")}
+            onClick={() => setFullCode(!fullCode)}
+            aria-pressed={fullCode}
+            title={fullCode ? "Show only what changed" : `Show all of v${version}'s code`}
+            className={cn(BUTTON, fullCode ? "text-brass" : "text-ink-label hover:text-ink")}
           >
-            Changes
+            Full code
           </button>
         )}
         <button
@@ -130,35 +158,54 @@ export default function AttemptBlock({
         </button>
       </header>
 
-      {showChanges && diff && (
+      {open && (
         <pre className="border-t border-rule bg-surface-editor py-2 font-mono text-xs leading-[1.6]">
-          {diff.map((line, i) => (
-            <div
+          {fullCode ? (
+            attempt.code.split("\n").map((line, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: a frozen list, never reordered
-              key={i}
-              className={cn(
-                "px-3 whitespace-pre-wrap break-words",
-                line.kind === "add" && "bg-success/10 text-success",
-                line.kind === "del" && "bg-danger/10 text-danger line-through decoration-danger/40",
-                line.kind === "same" && "text-ink-muted",
-              )}
-            >
-              <span className="mr-3 inline-block w-2 select-none text-ink-faint">
-                {line.kind === "add" ? "+" : line.kind === "del" ? "−" : ""}
-              </span>
-              {line.text || " "}
-            </div>
-          ))}
+              <div key={i} className="flex px-3 whitespace-pre-wrap break-words text-ink">
+                <span className="mr-3 inline-block w-6 shrink-0 select-none text-right text-ink-faint">{i + 1}</span>
+                <span className="min-w-0">{line || " "}</span>
+              </div>
+            ))
+          ) : !changed ? (
+            <div className="px-3 font-sans text-ink-label">Same code as the version before.</div>
+          ) : (
+            hunks(diff).map((line, i) =>
+              "skipped" in line ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a frozen list, never reordered
+                <div key={i} className="px-3 font-sans text-[10px] text-ink-faint select-none">
+                  ⋯ {line.skipped} unchanged {line.skipped === 1 ? "line" : "lines"}
+                </div>
+              ) : (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a frozen list, never reordered
+                  key={i}
+                  className={cn(
+                    "px-3 whitespace-pre-wrap break-words",
+                    line.kind === "add" && "bg-success/10 text-success",
+                    line.kind === "del" && "bg-danger/10 text-danger line-through decoration-danger/40",
+                    line.kind === "same" && "text-ink-muted",
+                  )}
+                >
+                  <span className="mr-3 inline-block w-2 select-none text-ink-faint">
+                    {line.kind === "add" ? "+" : line.kind === "del" ? "−" : ""}
+                  </span>
+                  {line.text || " "}
+                </div>
+              ),
+            )
+          )}
         </pre>
       )}
 
-      {open && hasBody && (
+      {open && hasOutput && (
         <div className="space-y-1 border-t border-rule px-3 py-2 font-mono text-xs leading-[1.6]">
           {attempt.stdout && (
             <pre className="whitespace-pre-wrap break-words text-ink">{attempt.stdout.replace(/\n$/, "")}</pre>
           )}
           {call && attempt.return_value != null && !(attempt.return_value === "None" && attempt.stdout) && (
-            <pre className="whitespace-pre-wrap break-words">
+            <pre className="whitespace-pre-wrap break-words text-ink">
               <span className="text-ink-label">{call} →</span> {attempt.return_value}
             </pre>
           )}
