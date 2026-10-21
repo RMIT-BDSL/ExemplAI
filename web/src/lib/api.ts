@@ -82,7 +82,7 @@ export async function scratchpadExecute(
 }
 
 /** How long the chat waits for the tutor before giving up (also shown to students). */
-export const CHAT_TIMEOUT_MS = 120_000;
+export const CHAT_TIMEOUT_MS = 30_000;
 
 /** The tutor server answered, but with an error (bad status or an error event). */
 export class ChatServerError extends Error {}
