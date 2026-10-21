@@ -12,6 +12,8 @@ interface LessonIndexProps {
   unlocked: Set<string> | null | undefined;
   /** Side effects to run when a lesson is picked (navigation is handled by the Link). */
   onSelectLesson: (id: string) => void;
+  /** The workspace a picked lesson opens in. */
+  lessonPath?: "/course" | "/solve";
 }
 
 /**
@@ -27,6 +29,7 @@ export default function LessonIndex({
   lessonProgress,
   unlocked,
   onSelectLesson,
+  lessonPath = "/course",
 }: LessonIndexProps) {
   const currentRef = useRef<HTMLAnchorElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -119,7 +122,7 @@ export default function LessonIndex({
                     <li key={q._id}>
                       <Link
                         ref={isCurrent ? currentRef : undefined}
-                        to="/course"
+                        to={lessonPath}
                         search={{ problemId: q._id }}
                         onClick={() => {
                           onSelectLesson(q._id);

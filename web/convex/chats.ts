@@ -144,13 +144,13 @@ export const addMessage = authenticatedMutation({
       }
     }
 
-    await ctx.db.insert("chatMessages", {
+    const id = await ctx.db.insert("chatMessages", {
       chatId: args.chatId,
       sender: args.sender,
       content: args.content,
       ...(args.trigger ? { trigger: args.trigger } : {}),
     });
-    return { success: true };
+    return { success: true, id };
   },
 });
 

@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as SignOutRouteImport } from './routes/sign-out'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedCourseRouteImport } from './routes/_authenticated.course'
+import { Route as AuthenticatedSolveRouteImport } from './routes/_authenticated.solve'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 
@@ -41,6 +42,11 @@ const AuthenticatedCourseRoute = AuthenticatedCourseRouteImport.update({
   path: '/course',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSolveRoute = AuthenticatedSolveRouteImport.update({
+  id: '/solve',
+  path: '/solve',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/sign-out': typeof SignOutRoute
   '/course': typeof AuthenticatedCourseRoute
+  '/solve': typeof AuthenticatedSolveRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/sign-out': typeof SignOutRoute
   '/course': typeof AuthenticatedCourseRoute
+  '/solve': typeof AuthenticatedSolveRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/sign-out': typeof SignOutRoute
   '/_authenticated/course': typeof AuthenticatedCourseRoute
+  '/_authenticated/solve': typeof AuthenticatedSolveRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -81,15 +90,29 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth' | '/sign-out' | '/course' | '/api/auth/$' | '/api/v1/$'
+    | '/'
+    | '/auth'
+    | '/sign-out'
+    | '/course'
+    | '/solve'
+    | '/api/auth/$'
+    | '/api/v1/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/sign-out' | '/course' | '/' | '/api/auth/$' | '/api/v1/$'
+  to:
+    | '/auth'
+    | '/sign-out'
+    | '/course'
+    | '/solve'
+    | '/'
+    | '/api/auth/$'
+    | '/api/v1/$'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/sign-out'
     | '/_authenticated/course'
+    | '/_authenticated/solve'
     | '/_authenticated/'
     | '/api/auth/$'
     | '/api/v1/$'
@@ -140,6 +163,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCourseRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/solve': {
+      id: '/_authenticated/solve'
+      path: '/solve'
+      fullPath: '/solve'
+      preLoaderRoute: typeof AuthenticatedSolveRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -159,11 +189,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCourseRoute: typeof AuthenticatedCourseRoute
+  AuthenticatedSolveRoute: typeof AuthenticatedSolveRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCourseRoute: AuthenticatedCourseRoute,
+  AuthenticatedSolveRoute: AuthenticatedSolveRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

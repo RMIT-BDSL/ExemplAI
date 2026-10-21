@@ -274,6 +274,8 @@ export const recordCodeExecution = authenticatedMutation({
         testsTotal: v.optional(v.number()),
         hiddenFailed: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
+        stdout: v.optional(v.string()),
+        returnValue: v.optional(v.string()),
         appVersion: v.optional(v.string()),
       }),
     ),
@@ -398,6 +400,8 @@ export const recordCodeExecution = authenticatedMutation({
         ...(a.testsTotal !== undefined ? { tests_total: a.testsTotal } : {}),
         ...(a.hiddenFailed !== undefined ? { hidden_failed: a.hiddenFailed } : {}),
         ...(a.errorMessage ? { error_message: a.errorMessage.slice(0, ATTEMPT_ERROR_CHARS) } : {}),
+        ...(a.stdout ? { stdout: a.stdout.slice(0, ATTEMPT_ERROR_CHARS) } : {}),
+        ...(a.returnValue !== undefined ? { return_value: a.returnValue.slice(0, ATTEMPT_ERROR_CHARS) } : {}),
         first_graded: shouldRecordBkt,
         ...(shouldRecordBkt && args.priorMastery !== undefined
           ? { mastery_before: Math.min(1, Math.max(0, args.priorMastery)) }

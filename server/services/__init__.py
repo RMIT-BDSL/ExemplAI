@@ -110,7 +110,8 @@ def submit_outcome(results: list[dict]) -> str:
 
 
 def build_attempt(code: str, outcome: str, results: Optional[list[dict]] = None,
-                  error_message: Optional[str] = None) -> dict:
+                  error_message: Optional[str] = None, stdout: Optional[str] = None,
+                  return_value: Optional[str] = None) -> dict:
     """The codeAttempts fields the server knows; Convex adds the student's
     group, topic and mastery in the same transaction (recordCodeExecution)."""
     attempt: dict = {
@@ -124,6 +125,11 @@ def build_attempt(code: str, outcome: str, results: Optional[list[dict]] = None,
         attempt["hiddenFailed"] = sum(1 for r in results if r.get("hidden") and not r.get("passed"))
     if error_message:
         attempt["errorMessage"] = error_message[:_ATTEMPT_ERROR_CHARS]
+    # Run only: what the Solve workspace shows under the version.
+    if stdout:
+        attempt["stdout"] = stdout[:_ATTEMPT_ERROR_CHARS]
+    if return_value is not None:
+        attempt["returnValue"] = return_value[:_ATTEMPT_ERROR_CHARS]
     return attempt
 
 
@@ -562,7 +568,10 @@ async def execute_code(
         outcome = "ran" if status_id == 3 else (error_kind(status_id, result.get("stderr")) or "runtime_error")
         background_tasks.add_task(
             _record_code_execution, auth_token, lesson_id, "run", not result["error"], None,
-            build_attempt(student_code.code, outcome, error_message=result.get("stderr")),
+            build_attempt(
+                student_code.code, outcome, error_message=result.get("stderr"),
+                stdout=result.get("stdout"), return_value=result.get("return_value"),
+            ),
         )
         return result
 

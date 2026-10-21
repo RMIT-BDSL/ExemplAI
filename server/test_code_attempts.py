@@ -85,6 +85,24 @@ def test_run_logs_its_code_and_outcome(monkeypatch):
     assert "testsTotal" not in attempt  # Runs aren't graded
 
 
+def test_run_logs_its_prints_and_return_value(monkeypatch):
+    async def fake_submit(code, language_id, stdin=None, **_):
+        stdout = f"hello\n{services.RUN_RETURN_SENTINEL}\n42\n"
+        return {"status": {"id": 3}, "stdout": stdout, "stderr": ""}
+
+    monkeypatch.setattr(services, "_judge0_submit", fake_submit)
+    monkeypatch.setattr(services.settings, "JUDGE0_ENDPOINT", "http://judge0.invalid")
+    body = StudentCode(code="def f(x):\n    print('hello')\n    return 42\n", starter_code="def f(x):\n    pass",
+                       test_cases=[LessonTestCase(input="1", expectedOutput="42")], action_type="run")
+    tasks = BackgroundTasks()
+    asyncio.run(services.execute_code(body, tasks))
+
+    attempt = _attempt_from(tasks)
+    assert attempt["outcome"] == "ran"
+    assert attempt["stdout"] == "hello\n"
+    assert attempt["returnValue"] == "42"
+
+
 def test_submit_logs_counts_without_hidden_details(monkeypatch):
     async def fake_case(client, code, language_id, tc, exec_url, headers, expected=None):
         passed = tc.input != "-1"

@@ -25,17 +25,7 @@ import { authClient } from "#/lib/auth-client";
 import { useLessonVisit } from "#/lib/useLessonVisit";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-
-
-// Shown above a lesson's starter code in the editor (on first load and on
-// Reset). Display only: grading reads the function name from the lesson's
-// starter_code, and a comment doesn't change what the code does.
-const STARTER_HINT = "# replace 'pass' with your function code";
-
-function withStarterHint(starter: string): string {
-  if (!/\bpass\b/.test(starter) || starter.startsWith(STARTER_HINT)) return starter;
-  return `${STARTER_HINT}\n${starter}`;
-}
+import { codeStorageKey, readTabCopy, withStarterHint } from "#/components/student/lessonCode";
 
 // Resizable lesson columns (≥1100px): minimum widths so no column gets too small.
 const WIDE_PX = 1100;
@@ -69,24 +59,6 @@ export const Route = createFileRoute("/_authenticated/course")({
     );
   },
 });
-
-/** sessionStorage key for a lesson's code in this tab. */
-const codeStorageKey = (lessonId: string, language: string) => `exemplai_code_${lessonId}_${language}`;
-
-/** The tab's copy of a lesson's code and when it was saved (older tabs stored the code alone). */
-function readTabCopy(key: string): { code: string; at: number } | null {
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (raw === null) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed?.code === "string" && typeof parsed?.at === "number") return parsed;
-    } catch {}
-    return { code: raw, at: 0 };
-  } catch {
-    return null;
-  }
-}
 
 const CODE_TEMPLATES = {
   python: `def main():\n    # Write your Python code here\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    main()`,

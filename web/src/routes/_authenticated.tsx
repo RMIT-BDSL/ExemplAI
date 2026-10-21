@@ -42,7 +42,9 @@ function AuthenticatedLayout() {
   const { session } = Route.useRouteContext();
   const { code /*, magic */ } = Route.useSearch();
   const navigate = useNavigate();
-  const isWorkspace = useMatches().some((m) => m.routeId === "/_authenticated/course");
+  const isWorkspace = useMatches().some(
+    (m) => m.routeId === "/_authenticated/course" || m.routeId === "/_authenticated/solve",
+  );
   const posthog = usePostHog();
   const createUserAndUseCode = useMutation(api.invitationCodes.createUserAndUseCode);
 

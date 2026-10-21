@@ -294,6 +294,10 @@ export default defineSchema({
     hidden_failed: v.optional(v.number()),
     // A failed Submit's summary (as the tutor sees it) or a Run's error trace.
     error_message: v.optional(v.string()),
+    // Run only: the student's prints and the example call's repr(), as the
+    // Solve workspace shows them (capped like error_message).
+    stdout: v.optional(v.string()),
+    return_value: v.optional(v.string()),
     // The one Submit per lesson that updated BKT, with mastery around it.
     first_graded: v.boolean(),
     mastery_before: v.optional(v.number()),

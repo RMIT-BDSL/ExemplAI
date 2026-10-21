@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
+import type * as codeAttempts from "../codeAttempts.js";
 import type * as codeDrafts from "../codeDrafts.js";
 import type * as cohorts from "../cohorts.js";
 import type * as courses from "../courses.js";
@@ -43,6 +44,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   chats: typeof chats;
+  codeAttempts: typeof codeAttempts;
   codeDrafts: typeof codeDrafts;
   cohorts: typeof cohorts;
   courses: typeof courses;
