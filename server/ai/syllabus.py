@@ -41,7 +41,15 @@ SYLLABUS: list[tuple[str, int, str]] = [
     ("advanced_topics", 12, "any Python feature"),
 ]
 
-# Every lesson is a "write a function" exercise, so this shape is allowed from week 1.
+# Every lesson is graded as a function. Writing functions is taught in week 7,
+# so before that students fill in a given wrapper (web/convex/seed.ts) and the
+# examples use the same one; from week 7 they write the whole function.
+LESSON_WRAPPER_SHAPE = (
+    "the lesson's given wrapper, as in the student's code: the def line, then code that stores "
+    "the answer in result, then return result (a lesson that prints has no result). Students don't "
+    "learn to write functions until week 7, so present the def and return lines as given, don't "
+    "explain them, and talk about the given values and result, not functions, parameters or return"
+)
 LESSON_FUNCTION_SHAPE = (
     "a function definition in the same form as the lesson's starter code "
     "(def name(parameters): ... return ...)"
@@ -57,7 +65,8 @@ def allowed_python(knowledge_component: Optional[str]) -> str:
     if knowledge_component not in topics:
         return ""
     upto = topics.index(knowledge_component) + 1
-    lines = [f"- {LESSON_FUNCTION_SHAPE}"]
+    shape = LESSON_FUNCTION_SHAPE if upto > topics.index("functions") else LESSON_WRAPPER_SHAPE
+    lines = [f"- {shape}"]
     lines += [f"- {features} (week {week})" for _, week, features in SYLLABUS[:upto]]
     return "\n".join(lines)
 
@@ -76,7 +85,8 @@ def close_analog_allowed(knowledge_component: Optional[str]) -> bool:
 # Logic bugs an Erroneous example may plant, per topic: the bug must exercise the
 # lesson's own topic (not just loops), and stay within the allowed features.
 TOPIC_BUGS: dict[str, str] = {
-    "intro_setup": "printing a value instead of returning it; a wrong or misspelled string literal",
+    "intro_setup": "storing the answer in a different variable, so result stays None; "
+    "a wrong or misspelled string literal",
     "variables_expressions": "/ instead of // (or the reverse); % where // is needed (or the reverse); "
     "operator precedence (missing brackets); converting to int too early so the value is truncated; "
     "an off-by-one in a formula (e.g. rounding up when dividing)",

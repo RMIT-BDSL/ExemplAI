@@ -9,6 +9,11 @@ type SeedProblem = {
   knowledge_component: string;
   topic: string;
   problem_description: string;
+  // Writing functions isn't taught until week 7, so weeks 1–6 give students a
+  // wrapper to fill in: the def and return lines are given and the answer goes
+  // in result (result = None until they set it, so a blank answer never passes
+  // a test); a lesson that prints keeps the def line and pass. Descriptions
+  // there talk about the given values and result, not functions or return.
   starter_code: string;
   solution_code: string;
   // Hidden tests run on Submit only; students and the tutor see just a count.
@@ -27,8 +32,8 @@ const csedmProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `helloWorld()` that returns the string 'Hello World!'.",
-    starter_code: "def helloWorld():\n    pass",
+    problem_description: "Set `result` to the string 'Hello World!'.",
+    starter_code: "def helloWorld():\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def helloWorld():\n    return 'Hello World!'",
     testCases: [
       { input: "", expectedOutput: "Hello World!" },
@@ -40,8 +45,8 @@ const csedmProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `raiseToPower(base, exponent)` that returns the `base` raised to the power of `exponent`.",
-    starter_code: "def raiseToPower(base, exponent):\n    pass",
+    problem_description: "`base` and `exponent` are given to you. Set `result` to `base` raised to the power of `exponent`.",
+    starter_code: "def raiseToPower(base, exponent):\n    # base and exponent are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def raiseToPower(base, exponent):\n    return base ** exponent",
     testCases: [
       { input: "2 3", expectedOutput: "8" },
@@ -59,8 +64,8 @@ const csedmProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `convertToDegrees(radians)` that converts an angle from radians to degrees and returns it rounded to 2 decimal places. Assume pi = 3.14159 (formula: degrees = radians * 180 / pi).",
-    starter_code: "def convertToDegrees(radians):\n    pass",
+    problem_description: "`radians` is given to you: an angle in radians. Convert it to degrees and set `result` to the answer rounded to 2 decimal places. Assume pi = 3.14159 (formula: degrees = radians * 180 / pi).",
+    starter_code: "def convertToDegrees(radians):\n    # radians is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def convertToDegrees(radians):\n    return round(radians * 180 / 3.14159, 2)",
     testCases: [
       { input: "3.14159", expectedOutput: "180.0" },
@@ -78,8 +83,8 @@ const csedmProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `howManyEggCartons(eggs)` that takes the total number of eggs and returns the number of 12-egg cartons needed to store them (a carton can be partially full).",
-    starter_code: "def howManyEggCartons(eggs):\n    pass",
+    problem_description: "`eggs` is given to you: the total number of eggs. Set `result` to the number of 12-egg cartons needed to store them (a carton can be partially full).",
+    starter_code: "def howManyEggCartons(eggs):\n    # eggs is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def howManyEggCartons(eggs):\n    return (eggs + 11) // 12",
     testCases: [
       { input: "24", expectedOutput: "2" },
@@ -97,8 +102,8 @@ const csedmProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `kthDigit(x, k)` that takes a non-negative integer `x` and a positive integer `k`, and returns the k-th digit of `x` counting from the right, where k = 1 is the ones digit. If `x` has fewer than `k` digits, return 0.",
-    starter_code: "def kthDigit(x, k):\n    pass",
+    problem_description: "`x` and `k` are given to you: a non-negative integer `x` and a positive integer `k`. Set `result` to the k-th digit of `x` counting from the right, where k = 1 is the ones digit. If `x` has fewer than `k` digits, `result` is 0.",
+    starter_code: "def kthDigit(x, k):\n    # x and k are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def kthDigit(x, k):\n    return (x // 10 ** (k - 1)) % 10",
     testCases: [
       { input: "1234, 1", expectedOutput: "4" },
@@ -116,8 +121,8 @@ const csedmProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Bus stops are on every 8th street (streets 0, 8, 16, 24, ...). Write a function `nearestBusStop(street)` that takes a non-negative integer street number and returns the street of the nearest bus stop. If the street is exactly halfway between two stops, return the lower one.",
-    starter_code: "def nearestBusStop(street):\n    pass",
+    problem_description: "Bus stops are on every 8th street (streets 0, 8, 16, 24, ...). `street` is given to you: a non-negative integer street number. Set `result` to the street of the nearest bus stop. If the street is exactly halfway between two stops, use the lower one.",
+    starter_code: "def nearestBusStop(street):\n    # street is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def nearestBusStop(street):\n    return ((street + 3) // 8) * 8",
     testCases: [
       { input: "10", expectedOutput: "8" },
@@ -135,8 +140,8 @@ const csedmProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `hasTwoDigits(n)` that returns True if the given positive integer `n` has exactly two digits, and False otherwise.",
-    starter_code: "def hasTwoDigits(n):\n    pass",
+    problem_description: "`n` is given to you: a positive integer. Set `result` to True if `n` has exactly two digits, and False otherwise.",
+    starter_code: "def hasTwoDigits(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def hasTwoDigits(n):\n    return 10 <= n <= 99",
     testCases: [
       { input: "10", expectedOutput: "True" },
@@ -154,8 +159,8 @@ const csedmProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `canDrinkAlcohol(age, isDriving)` that returns True if a person may drink alcohol: they must be at least 21 years old and not driving. `isDriving` is a boolean.",
-    starter_code: "def canDrinkAlcohol(age, isDriving):\n    pass",
+    problem_description: "`age` and `isDriving` (True or False) are given to you. Set `result` to True if the person may drink alcohol, and False otherwise: they must be at least 21 years old and not driving.",
+    starter_code: "def canDrinkAlcohol(age, isDriving):\n    # age and isDriving are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def canDrinkAlcohol(age, isDriving):\n    if age >= 21 and not isDriving:\n        return True\n    return False",
     testCases: [
       { input: "25, false", expectedOutput: "True" },
@@ -175,8 +180,8 @@ const csedmProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `isEvenPositiveInt(x)` that takes an integer `x` and returns True if it is both positive and even (i.e. strictly greater than 0 and divisible by 2), and False otherwise.",
-    starter_code: "def isEvenPositiveInt(x):\n    pass",
+    problem_description: "`x` is given to you: an integer. Set `result` to True if it is both positive and even (i.e. strictly greater than 0 and divisible by 2), and False otherwise.",
+    starter_code: "def isEvenPositiveInt(x):\n    # x is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def isEvenPositiveInt(x):\n    return x > 0 and x % 2 == 0",
     testCases: [
       { input: "4", expectedOutput: "True" },
@@ -215,8 +220,8 @@ const csedmProblems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `isPunctuation(c)` that takes a single character and returns True if it is a punctuation character (any character in `string.punctuation`, e.g. ! ? . , # @), and False otherwise. Remember to `import string`.",
-    starter_code: "def isPunctuation(c):\n    pass",
+    problem_description: "`c` is given to you: a single character. Set `result` to True if it is a punctuation character (any character in `string.punctuation`, e.g. ! ? . , # @), and False otherwise. Remember to `import string`.",
+    starter_code: "def isPunctuation(c):\n    # c is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "import string\n\ndef isPunctuation(c):\n    return c in string.punctuation",
     testCases: [
       { input: "\"!\"", expectedOutput: "True" },
@@ -234,8 +239,8 @@ const csedmProblems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `firstAndLast(s)` that takes a string `s` of at least length 1 and returns a new string containing only the first and last characters of `s`.",
-    starter_code: "def firstAndLast(s):\n    pass",
+    problem_description: "`s` is given to you: a string at least 1 character long. Set `result` to a new string containing only the first and last characters of `s`.",
+    starter_code: "def firstAndLast(s):\n    # s is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def firstAndLast(s):\n    if len(s) == 1:\n        return s + s\n    return s[0] + s[-1]",
     testCases: [
       { input: "[\"hello\"]", expectedOutput: "ho" },
@@ -253,8 +258,8 @@ const csedmProblems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `backwardsCombine(s1, s2)` that takes two strings and returns them joined in reverse order: `s2` followed by `s1`.",
-    starter_code: "def backwardsCombine(s1, s2):\n    pass",
+    problem_description: "`s1` and `s2` are given to you: two strings. Set `result` to them joined in reverse order: `s2` followed by `s1`.",
+    starter_code: "def backwardsCombine(s1, s2):\n    # s1 and s2 are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def backwardsCombine(s1, s2):\n    return s2 + s1",
     testCases: [
       { input: "\"abc\", \"def\"", expectedOutput: "defabc" },
@@ -270,8 +275,8 @@ const csedmProblems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `singlePigLatin(word)` that takes a lowercase word containing only letters. If the word starts with a vowel (a,e,i,o,u), return the word with 'yay' appended. Otherwise, move the first letter to the end and append 'ay'.",
-    starter_code: "def singlePigLatin(word):\n    pass",
+    problem_description: "`word` is given to you: a lowercase word containing only letters. If the word starts with a vowel (a, e, i, o, u), set `result` to the word with 'yay' added to the end. Otherwise, set `result` to the word with its first letter moved to the end and 'ay' added.",
+    starter_code: "def singlePigLatin(word):\n    # word is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def singlePigLatin(word):\n    vowels = 'aeiou'\n    if word[0] in vowels:\n        return word + 'yay'\n    else:\n        return word[1:] + word[0] + 'ay'",
     testCases: [
       { input: "[\"apple\"]", expectedOutput: "appleyay" },
@@ -289,8 +294,8 @@ const csedmProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `oneToN(n)` that returns a string of the numbers from 1 to `n` (inclusive) joined together with no spaces, e.g. oneToN(5) returns '12345'. If `n` is less than 1, return an empty string. Use a loop.",
-    starter_code: "def oneToN(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to a string of the numbers from 1 to `n` (inclusive) joined together with no spaces; for example, when `n` is 5, `result` is '12345'. If `n` is less than 1, `result` is an empty string. Use a loop.",
+    starter_code: "def oneToN(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def oneToN(n):\n    result = ''\n    for i in range(1, n + 1):\n        result += str(i)\n    return result",
     testCases: [
       { input: "5", expectedOutput: "12345" },
@@ -312,8 +317,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `helloClass()` that prints the string 'Hello Class!' to the console.",
-    starter_code: "def helloClass():\n    pass",
+    problem_description: "Write code that prints the string 'Hello Class!' to the console.",
+    starter_code: "def helloClass():\n    # Write your code below, in place of pass.\n    # (Leave the def line as it is.)\n    pass",
     solution_code: "def helloClass():\n    print('Hello Class!')",
     testCases: [
       { input: "", expectedOutput: "Hello Class!" },
@@ -325,8 +330,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `sumOfSquares(a, b)` that returns the sum of the squares of `a` and `b`.",
-    starter_code: "def sumOfSquares(a, b):\n    pass",
+    problem_description: "`a` and `b` are given to you. Set `result` to the sum of the squares of `a` and `b`.",
+    starter_code: "def sumOfSquares(a, b):\n    # a and b are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def sumOfSquares(a, b):\n    return (a ** 2) + (b ** 2)",
     testCases: [
       { input: "2 3", expectedOutput: "13" },
@@ -342,8 +347,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `convertToRadians(degrees)` that takes an angle in degrees and converts it to radians. (Assume pi = 3.14159, formula: radians = degrees * pi / 180, return rounded to 4 decimal places).",
-    starter_code: "def convertToRadians(degrees):\n    pass",
+    problem_description: "`degrees` is given to you: an angle in degrees. Convert it to radians and set `result` to the answer rounded to 4 decimal places. Assume pi = 3.14159 (formula: radians = degrees * pi / 180).",
+    starter_code: "def convertToRadians(degrees):\n    # degrees is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def convertToRadians(degrees):\n    return round(degrees * 3.14159 / 180, 4)",
     testCases: [
       { input: "180", expectedOutput: "3.1416" },
@@ -359,8 +364,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `howManyVans(people)` that takes the total number of people and returns the number of 8-person vans needed to transport them (a van can be partially full).",
-    starter_code: "def howManyVans(people):\n    pass",
+    problem_description: "`people` is given to you: the total number of people. Set `result` to the number of 8-person vans needed to transport them (a van can be partially full).",
+    starter_code: "def howManyVans(people):\n    # people is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def howManyVans(people):\n    return (people + 7) // 8",
     testCases: [
       { input: "16", expectedOutput: "2" },
@@ -377,8 +382,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "There are water fountains every 10 meters (at meter 0, 10, 20, etc.). Write a function `nearestWaterFountain(position)` that takes a position in meters and returns the position of the nearest water fountain. If it's a tie, round up.",
-    starter_code: "def nearestWaterFountain(position):\n    pass",
+    problem_description: "There are water fountains every 10 meters (at meter 0, 10, 20, etc.). `position` is given to you: a position in meters. Set `result` to the position of the nearest water fountain. If it's a tie, round up.",
+    starter_code: "def nearestWaterFountain(position):\n    # position is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def nearestWaterFountain(position):\n    return ((position + 5) // 10) * 10",
     testCases: [
       { input: "3", expectedOutput: "0" },
@@ -396,8 +401,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `hasThreeDigits(n)` that returns True if the given positive integer `n` has exactly three digits, and False otherwise.",
-    starter_code: "def hasThreeDigits(n):\n    pass",
+    problem_description: "`n` is given to you: a positive integer. Set `result` to True if `n` has exactly three digits, and False otherwise.",
+    starter_code: "def hasThreeDigits(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def hasThreeDigits(n):\n    return 100 <= n <= 999",
     testCases: [
       { input: "100", expectedOutput: "True" },
@@ -414,8 +419,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `isOddNegativeInt(n)` that takes an integer `n` and returns True if it is both negative and odd (i.e. strictly less than 0 and not divisible by 2), and False otherwise.",
-    starter_code: "def isOddNegativeInt(n):\n    pass",
+    problem_description: "`n` is given to you: an integer. Set `result` to True if it is both negative and odd (i.e. strictly less than 0 and not divisible by 2), and False otherwise.",
+    starter_code: "def isOddNegativeInt(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def isOddNegativeInt(n):\n    return n < 0 and n % 2 != 0",
     testCases: [
       { input: "-3", expectedOutput: "True" },
@@ -450,8 +455,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `isVowel(c)` that takes a single character string and returns True if it is a lowercase vowel ('a', 'e', 'i', 'o', 'u'), and False otherwise.",
-    starter_code: "def isVowel(c):\n    pass",
+    problem_description: "`c` is given to you: a single-character string. Set `result` to True if it is a lowercase vowel ('a', 'e', 'i', 'o', 'u'), and False otherwise.",
+    starter_code: "def isVowel(c):\n    # c is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     // REVISED 2026-10-07: membership in a string, not a list (lists are week 8).
     solution_code: "def isVowel(c):\n    return c in 'aeiou'",
     testCases: [
@@ -469,8 +474,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `firstThree(s)` that takes a string `s` of at least length 3 and returns a new string containing only the first three characters of `s`.",
-    starter_code: "def firstThree(s):\n    pass",
+    problem_description: "`s` is given to you: a string at least 3 characters long. Set `result` to a new string containing only the first three characters of `s`.",
+    starter_code: "def firstThree(s):\n    # s is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def firstThree(s):\n    return s[:3]",
     testCases: [
       { input: "[\"hello\"]", expectedOutput: "hel" },
@@ -486,8 +491,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `reverseAndCapitalize(s)` that takes a string, reverses it, and converts it entirely to uppercase.",
-    starter_code: "def reverseAndCapitalize(s):\n    pass",
+    problem_description: "`s` is given to you: a string. Set `result` to `s` reversed and converted entirely to uppercase.",
+    starter_code: "def reverseAndCapitalize(s):\n    # s is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def reverseAndCapitalize(s):\n    return s[::-1].upper()",
     testCases: [
       { input: "[\"abc\"]", expectedOutput: "CBA" },
@@ -503,8 +508,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `secretCode(word)` that takes a string, reverses it, and appends 'xyz' to the end.",
-    starter_code: "def secretCode(word):\n    pass",
+    problem_description: "`word` is given to you: a string. Set `result` to `word` reversed, with 'xyz' added to the end.",
+    starter_code: "def secretCode(word):\n    # word is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def secretCode(word):\n    return word[::-1] + 'xyz'",
     testCases: [
       { input: "[\"apple\"]", expectedOutput: "elppaxyz" },
@@ -521,8 +526,8 @@ const csedm2Problems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `nToOne(n)` that returns a string of the numbers counting down from `n` to 1 joined together with no spaces, e.g. nToOne(5) returns '54321'. If `n` is less than 1, return an empty string. Use a loop.",
-    starter_code: "def nToOne(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to a string of the numbers counting down from `n` to 1 joined together with no spaces; for example, when `n` is 5, `result` is '54321'. If `n` is less than 1, `result` is an empty string. Use a loop.",
+    starter_code: "def nToOne(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def nToOne(n):\n    result = ''\n    for i in range(n, 0, -1):\n        result += str(i)\n    return result",
     testCases: [
       { input: "5", expectedOutput: "54321" },
@@ -549,8 +554,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 3,
     knowledge_component: "strings_formatting",
     topic: "String and Formatting",
-    problem_description: "Write a function `isSubstring(s, t)` that returns True if `s` appears inside `t`. If either `s` or `t` is not a string, return False.",
-    starter_code: "def isSubstring(s, t):\n    pass",
+    problem_description: "`s` and `t` are given to you. Set `result` to True if `s` appears inside `t`, and False otherwise. If either `s` or `t` is not a string, `result` is False.",
+    starter_code: "def isSubstring(s, t):\n    # s and t are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def isSubstring(s, t):\n    return type(s) == str and type(t) == str and s in t",
     testCases: [
       { input: "\"cat\", \"concatenate\"", expectedOutput: "True" },
@@ -568,8 +573,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `stockChange(percentChange)` that takes a stock's percentage change and returns 'Up' if it is positive, 'Down' if it is negative, and 'No Change' if it is zero.",
-    starter_code: "def stockChange(percentChange):\n    pass",
+    problem_description: "`percentChange` is given to you: a stock's percentage change. Set `result` to 'Up' if it is positive, 'Down' if it is negative, and 'No Change' if it is zero.",
+    starter_code: "def stockChange(percentChange):\n    # percentChange is given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def stockChange(percentChange):\n    if percentChange > 0:\n        return 'Up'\n    elif percentChange < 0:\n        return 'Down'\n    else:\n        return 'No Change'",
     testCases: [
       { input: "2.5", expectedOutput: "Up" },
@@ -588,8 +593,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `carefulSquareRoot(x)` that returns the square root of `x`, or the string 'Error' if `x` is negative. Work out the square root as `x ** 0.5`.",
-    starter_code: "def carefulSquareRoot(x):\n    pass",
+    problem_description: "`x` is given to you: a number. Set `result` to the square root of `x`, or to the string 'Error' if `x` is negative. Work out the square root as `x ** 0.5`.",
+    starter_code: "def carefulSquareRoot(x):\n    # x is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def carefulSquareRoot(x):\n    if x < 0:\n        return 'Error'\n    return x ** 0.5",
     testCases: [
       { input: "16", expectedOutput: "4.0" },
@@ -607,8 +612,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `isPrime(n)` that takes a positive integer `n` and returns True if it is prime and False otherwise. A prime number is greater than 1 and divisible only by 1 and itself, so 1 is not prime.",
-    starter_code: "def isPrime(n):\n    pass",
+    problem_description: "`n` is given to you: a positive integer. Set `result` to True if it is prime, and False otherwise. A prime number is greater than 1 and divisible only by 1 and itself, so 1 is not prime.",
+    starter_code: "def isPrime(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def isPrime(n):\n    if n < 2:\n        return False\n    for i in range(2, n):\n        if n % i == 0:\n            return False\n    return True",
     testCases: [
       { input: "7", expectedOutput: "True" },
@@ -627,8 +632,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `sumOfDigits(n)` that takes a non-negative integer `n` and returns the sum of its digits, e.g. sumOfDigits(123) returns 6. Use a loop with % and //.",
-    starter_code: "def sumOfDigits(n):\n    pass",
+    problem_description: "`n` is given to you: a non-negative integer. Set `result` to the sum of its digits; for example, when `n` is 123, `result` is 6. Use a loop with % and //.",
+    starter_code: "def sumOfDigits(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def sumOfDigits(n):\n    total = 0\n    while n > 0:\n        total += n % 10\n        n //= 10\n    return total",
     testCases: [
       { input: "123", expectedOutput: "6" },
@@ -646,8 +651,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `anyLowercase(s)` that returns True if the string `s` contains at least one lowercase letter, and False otherwise. Loop over the characters.",
-    starter_code: "def anyLowercase(s):\n    pass",
+    problem_description: "`s` is given to you: a string. Set `result` to True if `s` contains at least one lowercase letter, and False otherwise. Loop over the characters.",
+    starter_code: "def anyLowercase(s):\n    # s is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def anyLowercase(s):\n    for c in s:\n        if c.islower():\n            return True\n    return False",
     testCases: [
       { input: "\"HELLO\"", expectedOutput: "False" },
@@ -665,8 +670,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `factorial(n)` that takes a non-negative integer `n` and returns n! (1 \u00d7 2 \u00d7 ... \u00d7 n). By definition, factorial(0) is 1.",
-    starter_code: "def factorial(n):\n    pass",
+    problem_description: "`n` is given to you: a non-negative integer. Set `result` to n! (1 × 2 × ... × n). By definition, 0! is 1.",
+    starter_code: "def factorial(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result",
     testCases: [
       { input: "5", expectedOutput: "120" },
@@ -684,8 +689,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `fibonacci(n)` that returns the n-th Fibonacci number, where fibonacci(0) is 0, fibonacci(1) is 1, and each later number is the sum of the two before it (0, 1, 1, 2, 3, 5, 8, ...).",
-    starter_code: "def fibonacci(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to the n-th Fibonacci number, where the 0th is 0, the 1st is 1, and each later number is the sum of the two before it (0, 1, 1, 2, 3, 5, 8, ...).",
+    starter_code: "def fibonacci(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def fibonacci(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a",
     testCases: [
       { input: "0", expectedOutput: "0" },
@@ -704,8 +709,8 @@ const csedmUnseededProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `gcd(x, y)` that takes two positive integers and returns their greatest common divisor, the largest number that divides both.",
-    starter_code: "def gcd(x, y):\n    pass",
+    problem_description: "`x` and `y` are given to you: two positive integers. Set `result` to their greatest common divisor, the largest number that divides both.",
+    starter_code: "def gcd(x, y):\n    # x and y are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def gcd(x, y):\n    while y != 0:\n        x, y = y, x % y\n    return x",
     testCases: [
       { input: "12, 18", expectedOutput: "6" },
@@ -809,8 +814,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `averageAsInt(a, b, c)` that returns the average of the three numbers as a whole number, using `int()` so the decimal part is dropped (not rounded). For example, averageAsInt(1, 2, 2) returns 1, because the average is 1.67.",
-    starter_code: "def averageAsInt(a, b, c):\n    pass",
+    problem_description: "`a`, `b` and `c` are given to you. Set `result` to their average as a whole number, using `int()` so the decimal part is dropped (not rounded). For example, when `a`, `b` and `c` are 1, 2 and 2, `result` is 1, because the average is 1.67.",
+    starter_code: "def averageAsInt(a, b, c):\n    # a, b and c are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def averageAsInt(a, b, c):\n    return int((a + b + c) / 3)",
     testCases: [
       { input: "1, 2, 3", expectedOutput: "2" },
@@ -827,8 +832,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `percentAsInt(part, whole)` that returns what percentage `part` is of `whole`, as a whole number with the decimal part dropped (use `int()`). Multiply `part` by 100 before dividing. For example, percentAsInt(1, 3) returns 33.",
-    starter_code: "def percentAsInt(part, whole):\n    pass",
+    problem_description: "`part` and `whole` are given to you. Set `result` to what percentage `part` is of `whole`, as a whole number with the decimal part dropped (use `int()`). Multiply `part` by 100 before dividing. For example, when `part` is 1 and `whole` is 3, `result` is 33.",
+    starter_code: "def percentAsInt(part, whole):\n    # part and whole are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def percentAsInt(part, whole):\n    return int(part * 100 / whole)",
     testCases: [
       { input: "1, 3", expectedOutput: "33" },
@@ -845,8 +850,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `removeKthDigit(x, k)` that takes a non-negative integer `x` and a positive integer `k`, and returns `x` with its k-th digit from the right removed, where k = 1 is the ones digit. For example, removeKthDigit(12345, 2) returns 1235. If `x` has fewer than `k` digits, return `x` unchanged. Use //, % and **.",
-    starter_code: "def removeKthDigit(x, k):\n    pass",
+    problem_description: "`x` and `k` are given to you: a non-negative integer `x` and a positive integer `k`. Set `result` to `x` with its k-th digit from the right removed, where k = 1 is the ones digit. For example, when `x` is 12345 and `k` is 2, `result` is 1235. If `x` has fewer than `k` digits, `result` is `x` unchanged. Use //, % and **.",
+    starter_code: "def removeKthDigit(x, k):\n    # x and k are given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def removeKthDigit(x, k):\n    return (x // 10 ** k) * 10 ** (k - 1) + x % 10 ** (k - 1)",
     testCases: [
       { input: "12345, 2", expectedOutput: "1235" },
@@ -863,8 +868,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `makeChange(cents)` that returns the fewest coins needed to make `cents` using 25, 10, 5 and 1 cent coins. For example, makeChange(68) returns 7 (two 25s, one 10, one 5 and three 1s). Work out each coin in turn with // and %.",
-    starter_code: "def makeChange(cents):\n    pass",
+    problem_description: "`cents` is given to you. Set `result` to the fewest coins needed to make `cents` using 25, 10, 5 and 1 cent coins. For example, when `cents` is 68, `result` is 7 (two 25s, one 10, one 5 and three 1s). Work out each coin in turn with // and %.",
+    starter_code: "def makeChange(cents):\n    # cents is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def makeChange(cents):\n    quarters = cents // 25\n    cents = cents % 25\n    dimes = cents // 10\n    cents = cents % 10\n    nickels = cents // 5\n    pennies = cents % 5\n    return quarters + dimes + nickels + pennies",
     testCases: [
       { input: "68", expectedOutput: "7" },
@@ -882,8 +887,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 2,
     knowledge_component: "variables_expressions",
     topic: "Variables and Expressions",
-    problem_description: "Write a function `countNotes(amount)` that returns the fewest banknotes needed to pay `amount` dollars using $20, $10, $5 and $1 notes. For example, countNotes(37) returns 5 (one 20, one 10, one 5 and two 1s). Work out each note in turn with // and %.",
-    starter_code: "def countNotes(amount):\n    pass",
+    problem_description: "`amount` is given to you: a number of dollars. Set `result` to the fewest banknotes needed to pay `amount` using $20, $10, $5 and $1 notes. For example, when `amount` is 37, `result` is 5 (one 20, one 10, one 5 and two 1s). Work out each note in turn with // and %.",
+    starter_code: "def countNotes(amount):\n    # amount is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def countNotes(amount):\n    twenties = amount // 20\n    amount = amount % 20\n    tens = amount // 10\n    amount = amount % 10\n    fives = amount // 5\n    ones = amount % 5\n    return twenties + tens + fives + ones",
     testCases: [
       { input: "37", expectedOutput: "5" },
@@ -901,8 +906,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `favouriteNumber()` that returns the number 7.",
-    starter_code: "def favouriteNumber():\n    pass",
+    problem_description: "Set `result` to the number 7.",
+    starter_code: "def favouriteNumber():\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def favouriteNumber():\n    return 7",
     testCases: [
       { input: "", expectedOutput: "7" },
@@ -914,8 +919,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `courseCode()` that returns the string 'COSC3104'.",
-    starter_code: "def courseCode():\n    pass",
+    problem_description: "Set `result` to the string 'COSC3104'.",
+    starter_code: "def courseCode():\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def courseCode():\n    return 'COSC3104'",
     testCases: [
       { input: "", expectedOutput: "COSC3104" },
@@ -927,8 +932,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `approximatePi()` that returns the number 3.14.",
-    starter_code: "def approximatePi():\n    pass",
+    problem_description: "Set `result` to the number 3.14.",
+    starter_code: "def approximatePi():\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def approximatePi():\n    return 3.14",
     testCases: [
       { input: "", expectedOutput: "3.14" },
@@ -940,8 +945,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `printTwoLines()` that prints 'Hello' on one line and 'World' on the next line.",
-    starter_code: "def printTwoLines():\n    pass",
+    problem_description: "Write code that prints 'Hello' on one line and 'World' on the next line.",
+    starter_code: "def printTwoLines():\n    # Write your code below, in place of pass.\n    # (Leave the def line as it is.)\n    pass",
     solution_code: "def printTwoLines():\n    print('Hello')\n    print('World')",
     testCases: [
       { input: "", expectedOutput: "Hello\nWorld" },
@@ -953,8 +958,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 1,
     knowledge_component: "intro_setup",
     topic: "Introduction & Environment Setup",
-    problem_description: "Write a function `printBox()` that prints this small box, one line at a time:\n\n```\n+---+\n|   |\n+---+\n```",
-    starter_code: "def printBox():\n    pass",
+    problem_description: "Write code that prints this small box, one line at a time:\n\n```\n+---+\n|   |\n+---+\n```",
+    starter_code: "def printBox():\n    # Write your code below, in place of pass.\n    # (Leave the def line as it is.)\n    pass",
     solution_code: "def printBox():\n    print('+---+')\n    print('|   |')\n    print('+---+')",
     testCases: [
       { input: "", expectedOutput: "+---+\n|   |\n+---+" },
@@ -972,8 +977,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `checkGuess(guess, secret)` for a number-guessing game. It returns 'Too high' if `guess` is greater than `secret`, 'Too low' if `guess` is less than `secret`, and 'Correct' if they are equal.",
-    starter_code: "def checkGuess(guess, secret):\n    pass",
+    problem_description: "A number-guessing game: `guess` and `secret` are given to you. Set `result` to 'Too high' if `guess` is greater than `secret`, 'Too low' if `guess` is less than `secret`, and 'Correct' if they are equal.",
+    starter_code: "def checkGuess(guess, secret):\n    # guess and secret are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def checkGuess(guess, secret):\n    if guess > secret:\n        return 'Too high'\n    elif guess < secret:\n        return 'Too low'\n    else:\n        return 'Correct'",
     testCases: [
       { input: "7, 4", expectedOutput: "Too high" },
@@ -990,8 +995,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `markToGrade(mark)` that takes a whole-number mark from 0 to 100 and returns its grade: 'NN' for 0 to 49, 'PA' for 50 to 59, 'CR' for 60 to 69, 'DI' for 70 to 79, and 'HD' for 80 to 100. Each range includes both of its end marks.",
-    starter_code: "def markToGrade(mark):\n    pass",
+    problem_description: "`mark` is given to you: a whole-number mark from 0 to 100. Set `result` to its grade: 'NN' for 0 to 49, 'PA' for 50 to 59, 'CR' for 60 to 69, 'DI' for 70 to 79, and 'HD' for 80 to 100. Each range includes both of its end marks.",
+    starter_code: "def markToGrade(mark):\n    # mark is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def markToGrade(mark):\n    if mark >= 80:\n        return 'HD'\n    elif mark >= 70:\n        return 'DI'\n    elif mark >= 60:\n        return 'CR'\n    elif mark >= 50:\n        return 'PA'\n    else:\n        return 'NN'",
     testCases: [
       { input: "70", expectedOutput: "DI" },
@@ -1012,8 +1017,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `timeOfDay(hour)` that takes an hour on the 24-hour clock (a whole number from 0 to 23) and returns 'Morning' for 5 to 11, 'Afternoon' for 12 to 17, 'Evening' for 18 to 21, and 'Night' for every other hour (22, 23 and 0 to 4).",
-    starter_code: "def timeOfDay(hour):\n    pass",
+    problem_description: "`hour` is given to you: an hour on the 24-hour clock (a whole number from 0 to 23). Set `result` to 'Morning' for 5 to 11, 'Afternoon' for 12 to 17, 'Evening' for 18 to 21, and 'Night' for every other hour (22, 23 and 0 to 4).",
+    starter_code: "def timeOfDay(hour):\n    # hour is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def timeOfDay(hour):\n    if 5 <= hour <= 11:\n        return 'Morning'\n    elif 12 <= hour <= 17:\n        return 'Afternoon'\n    elif 18 <= hour <= 21:\n        return 'Evening'\n    else:\n        return 'Night'",
     testCases: [
       { input: "12", expectedOutput: "Afternoon" },
@@ -1034,8 +1039,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `canFlyDrone(wind_speed, is_raining)` that returns True if it is safe to fly a drone, and False otherwise. It is safe when the wind speed is at most 30 km/h and it is not raining. `is_raining` is a boolean.",
-    starter_code: "def canFlyDrone(wind_speed, is_raining):\n    pass",
+    problem_description: "`wind_speed` (in km/h) and `is_raining` (True or False) are given to you. Set `result` to True if it is safe to fly a drone, and False otherwise. It is safe when the wind speed is at most 30 km/h and it is not raining.",
+    starter_code: "def canFlyDrone(wind_speed, is_raining):\n    # wind_speed and is_raining are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def canFlyDrone(wind_speed, is_raining):\n    if wind_speed <= 30 and not is_raining:\n        return True\n    return False",
     testCases: [
       { input: "20, false", expectedOutput: "True" },
@@ -1052,8 +1057,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `canSwim(day, temperature)` that returns True if you can swim at the outdoor pool, and False otherwise. You can swim when `day` is 'Saturday' or 'Sunday' and the temperature is at least 25 degrees.",
-    starter_code: "def canSwim(day, temperature):\n    pass",
+    problem_description: "`day` and `temperature` are given to you. Set `result` to True if you can swim at the outdoor pool, and False otherwise. You can swim when `day` is 'Saturday' or 'Sunday' and the temperature is at least 25 degrees.",
+    starter_code: "def canSwim(day, temperature):\n    # day and temperature are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def canSwim(day, temperature):\n    if (day == 'Saturday' or day == 'Sunday') and temperature >= 25:\n        return True\n    return False",
     testCases: [
       { input: "\"Saturday\", 30", expectedOutput: "True" },
@@ -1070,8 +1075,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 4,
     knowledge_component: "branching",
     topic: "Branching",
-    problem_description: "Write a function `needsJacket(weather, temperature)` that returns True if you need a jacket, and False otherwise. You need one when `weather` is 'rainy' or 'windy' and the temperature is below 20 degrees.",
-    starter_code: "def needsJacket(weather, temperature):\n    pass",
+    problem_description: "`weather` and `temperature` are given to you. Set `result` to True if you need a jacket, and False otherwise. You need one when `weather` is 'rainy' or 'windy' and the temperature is below 20 degrees.",
+    starter_code: "def needsJacket(weather, temperature):\n    # weather and temperature are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def needsJacket(weather, temperature):\n    if (weather == 'rainy' or weather == 'windy') and temperature < 20:\n        return True\n    return False",
     testCases: [
       { input: "\"rainy\", 15", expectedOutput: "True" },
@@ -1088,8 +1093,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `countVowels(word)` that returns how many vowels (a, e, i, o, u) are in `word`, counting both lowercase and uppercase. Loop over the letters and keep a count.",
-    starter_code: "def countVowels(word):\n    pass",
+    problem_description: "`word` is given to you. Set `result` to how many vowels (a, e, i, o, u) are in `word`, counting both lowercase and uppercase. Loop over the letters and keep a count.",
+    starter_code: "def countVowels(word):\n    # word is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def countVowels(word):\n    count = 0\n    for letter in word.lower():\n        if letter in 'aeiou':\n            count += 1\n    return count",
     testCases: [
       { input: "\"banana\"", expectedOutput: "3" },
@@ -1106,8 +1111,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 5,
     knowledge_component: "loops",
     topic: "Loops",
-    problem_description: "Write a function `sumMultiples(n)` that returns the sum of all the numbers from 1 up to (but not including) `n` that are divisible by 3 or by 5.",
-    starter_code: "def sumMultiples(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to the sum of all the numbers from 1 up to (but not including) `n` that are divisible by 3 or by 5.",
+    starter_code: "def sumMultiples(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def sumMultiples(n):\n    total = 0\n    for k in range(1, n):\n        if k % 3 == 0 or k % 5 == 0:\n            total += k\n    return total",
     testCases: [
       { input: "10", expectedOutput: "23" },
@@ -1124,8 +1129,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `countSameParityPairs(n)` that counts the pairs of numbers (i, j) with 1 <= i < j <= n where i and j are both even or both odd. Use two loops, one inside the other.",
-    starter_code: "def countSameParityPairs(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to the number of pairs of numbers (i, j) with 1 <= i < j <= n where i and j are both even or both odd. Use two loops, one inside the other.",
+    starter_code: "def countSameParityPairs(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def countSameParityPairs(n):\n    count = 0\n    for i in range(1, n + 1):\n        for j in range(i + 1, n + 1):\n            if i % 2 == j % 2:\n                count += 1\n    return count",
     testCases: [
       { input: "4", expectedOutput: "2" },
@@ -1142,8 +1147,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `firstRepeatedChar(s)` that returns the first character of `s` that appears again later in the string, or an empty string if no character repeats. For example, firstRepeatedChar('hello') returns 'l'.",
-    starter_code: "def firstRepeatedChar(s):\n    pass",
+    problem_description: "`s` is given to you: a string. Set `result` to the first character of `s` that appears again later in the string, or an empty string if no character repeats. For example, when `s` is 'hello', `result` is 'l'.",
+    starter_code: "def firstRepeatedChar(s):\n    # s is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def firstRepeatedChar(s):\n    for i in range(len(s)):\n        for j in range(i + 1, len(s)):\n            if s[i] == s[j]:\n                return s[i]\n    return ''",
     testCases: [
       { input: "\"hello\"", expectedOutput: "l" },
@@ -1160,8 +1165,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `countPrimesUpTo(n)` that returns how many prime numbers there are from 2 up to `n` (inclusive). For each number, use an inner loop to look for a divisor and `break` as soon as you find one.",
-    starter_code: "def countPrimesUpTo(n):\n    pass",
+    problem_description: "`n` is given to you. Set `result` to how many prime numbers there are from 2 up to `n` (inclusive). For each number, use an inner loop to look for a divisor and `break` as soon as you find one.",
+    starter_code: "def countPrimesUpTo(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def countPrimesUpTo(n):\n    count = 0\n    for k in range(2, n + 1):\n        is_prime = True\n        for d in range(2, k):\n            if k % d == 0:\n                is_prime = False\n                break\n        if is_prime:\n            count += 1\n    return count",
     testCases: [
       { input: "10", expectedOutput: "4" },
@@ -1178,8 +1183,8 @@ const exemplaiProblems: SeedProblem[] = [
     week: 6,
     knowledge_component: "advanced_loops",
     topic: "Advanced Loops",
-    problem_description: "Write a function `digitalRoot(n)` that takes a non-negative integer and keeps adding up its digits until only one digit is left, then returns it. For example, 942 gives 9 + 4 + 2 = 15, then 1 + 5 = 6, so digitalRoot(942) returns 6.",
-    starter_code: "def digitalRoot(n):\n    pass",
+    problem_description: "`n` is given to you: a non-negative integer. Keep adding up its digits until only one digit is left, and set `result` to that digit. For example, 942 gives 9 + 4 + 2 = 15, then 1 + 5 = 6, so when `n` is 942, `result` is 6.",
+    starter_code: "def digitalRoot(n):\n    # n is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     solution_code: "def digitalRoot(n):\n    while n >= 10:\n        total = 0\n        while n > 0:\n            total += n % 10\n            n //= 10\n        n = total\n    return n",
     testCases: [
       { input: "942", expectedOutput: "6" },

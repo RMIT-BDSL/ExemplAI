@@ -18,7 +18,7 @@ import LessonExposition from "#/components/student/LessonExposition";
 import ResizeHandle from "#/components/ide/ResizeHandle";
 import { formatCall, type SubmitRecord } from "#/components/student/problem/Problem";
 import { defineEditorThemes } from "#/lib/editorThemes";
-import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
+import { type ConsoleRun, givesResultWrapper } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
@@ -29,11 +29,12 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 // Shown above a lesson's starter code in the editor (on first load and on
 // Reset). Display only: grading reads the function name from the lesson's
-// starter_code, and a comment doesn't change what the code does.
+// starter_code, and a comment doesn't change what the code does. Starter code
+// with its own comments (the weeks 1–6 wrapper, convex/seed.ts) gets none.
 const STARTER_HINT = "# replace 'pass' with your function code";
 
 function withStarterHint(starter: string): string {
-  if (!/\bpass\b/.test(starter) || starter.startsWith(STARTER_HINT)) return starter;
+  if (!/\bpass\b/.test(starter) || starter.includes("#")) return starter;
   return `${STARTER_HINT}\n${starter}`;
 }
 
@@ -505,6 +506,7 @@ function Course() {
           stdout: data?.stdout ?? "",
           stderr,
           inputNote: /EOFError/.test(stderr) && /\binput\s*\(/.test(submissionCode),
+          resultWrapper: givesResultWrapper(activeQuestion?.starter_code),
         });
       } else {
         const results: any[] = data?.test_results ?? [];

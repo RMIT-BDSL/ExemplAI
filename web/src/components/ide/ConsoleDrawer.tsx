@@ -15,6 +15,13 @@ export interface ConsoleRun {
   stderr: string;
   /** The code called input(), which isn't available here (EOFError). */
   inputNote: boolean;
+  /** The lesson gives the weeks 1–6 wrapper (answer in result), so notes avoid function terms. */
+  resultWrapper?: boolean;
+}
+
+/** Weeks 1–6 starter code: the def and return lines are given and the answer goes in result. */
+export function givesResultWrapper(starterCode: string | undefined): boolean {
+  return /\breturn result\b/.test(starterCode ?? "");
 }
 
 interface ConsoleDrawerProps {
@@ -116,7 +123,9 @@ export default function ConsoleDrawer({
               <pre className="whitespace-pre-wrap break-words">
                 {run.returnValue === "None" ? (
                   <span className="text-ink-label">
-                    {run.call} returned None — it didn't print or return anything
+                    {run.resultWrapper
+                      ? `${run.call} gave no answer — result is still None. Store your answer in result.`
+                      : `${run.call} returned None — it didn't print or return anything`}
                   </span>
                 ) : (
                   <>
@@ -135,8 +144,9 @@ export default function ConsoleDrawer({
                 <b className="mr-2 text-[9px] font-semibold uppercase tracking-[0.15em] text-brass">
                   Note
                 </b>
-                input() doesn't work here: your function gets its value as an
-                argument. To try a value, call it, e.g.{" "}
+                {run.resultWrapper
+                  ? "input() doesn't work here: the values are given to your code, as in the Example. To try other values, add a line at the very end, not indented, such as "
+                  : "input() doesn't work here: your function gets its value as an argument. To try a value, call it, e.g. "}
                 <span className="font-mono text-ink">
                   {run.call ? `print(${run.call})` : "print(yourFunction(42))"}
                 </span>

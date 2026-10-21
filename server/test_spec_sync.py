@@ -71,7 +71,13 @@ def test_allowed_features_are_cumulative():
     loops = allowed_python("loops")
     assert "if / elif / else" in loops and "for loops" in loops
     assert "lists and list methods" not in loops
-    assert "def name(parameters)" in week2  # lessons are functions from week 1
+    # Before week 7 examples use the lessons' given wrapper; from week 7, whole functions.
+    for topic in ("intro_setup", "variables_expressions", "advanced_loops"):
+        assert "the lesson's given wrapper" in allowed_python(topic), topic
+        assert "def name(parameters)" not in allowed_python(topic), topic
+    for topic in ("functions", "collections"):
+        assert "def name(parameters)" in allowed_python(topic), topic
+        assert "given wrapper" not in allowed_python(topic), topic
     assert allowed_python("unknown_topic") == "" and allowed_python(None) == ""
 
 
@@ -79,7 +85,7 @@ def test_allowed_features_are_cumulative():
 
 def test_context_carries_allowed_features_and_asks_for_a_reply_to_the_latest_message():
     text = student_context({"current_knowledge_component": "branching", "original_problem": "p"})
-    assert "<allowed_python>\n- a function definition" in text
+    assert "<allowed_python>\n- the lesson's given wrapper" in text
     assert "if / elif / else" in text and "for loops" not in text
     assert text.endswith("reply to their latest message.")
     for tag in ("original_problem", "knowledge_component", "allowed_python", "student_code", "error_trace"):
