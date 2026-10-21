@@ -35,6 +35,12 @@ export interface Cell {
   type: CellType;
   source: string;
   output?: RunOutput | TutorOutput;
+  /**
+   * A solution cell: the student's answer, which Submit grades on its own.
+   * Each new one starts from the last, so earlier ones stay as a record; they
+   * can't be deleted or turned into markdown.
+   */
+  solution?: boolean;
 }
 
 /** The last Submit: the whole program, graded. */
@@ -64,6 +70,26 @@ export function programOf(cells: Cell[], upTo?: string) {
     if (cell.id === upTo) break;
   }
   return parts.join("\n\n");
+}
+
+/** The newest solution cell (the last one in the notebook), if there is one. */
+export function latestSolution(cells: Cell[]) {
+  for (let i = cells.length - 1; i >= 0; i--) if (cells[i].solution) return cells[i];
+  return undefined;
+}
+
+/** What Submit grades: the newest solution cell, else all the code cells. */
+export function gradedProgram(cells: Cell[]) {
+  const solution = latestSolution(cells);
+  return solution ? solution.source.replace(/\s+$/, "") : programOf(cells);
+}
+
+/**
+ * What a new solution cell starts from: the newest solution cell, else the
+ * code last submitted, else the starter code.
+ */
+export function solutionSeed(cells: Cell[], submit: SubmitOutput | null, starter: string) {
+  return latestSolution(cells)?.source ?? submit?.code ?? starter;
 }
 
 /** A saved notebook with replies that can no longer arrive marked as lost. */

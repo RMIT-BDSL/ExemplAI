@@ -61,6 +61,8 @@ export const notebookCell = v.object({
   type: v.union(v.literal("code"), v.literal("markdown")),
   source: v.string(),
   output: v.optional(notebookOutput),
+  // The student's answer cell, graded on its own by Submit.
+  solution: v.optional(v.boolean()),
 });
 export const notebookSubmit = v.object({
   at: v.number(),

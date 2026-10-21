@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Flag,
   Loader2,
   Lock,
   Sparkles,
@@ -23,11 +24,14 @@ import {
   afterReload,
   type Cell,
   type CellType,
+  gradedProgram,
+  latestSolution,
   newCellId,
   programOf,
   type RunOutput,
   type SubmitOutput,
   type TutorOutput,
+  solutionSeed,
 } from "#/components/solve/notebook";
 import { codeStorageKey, readTabCopy, withStarterHint } from "#/components/student/lessonCode";
 import LessonIndex from "#/components/student/LessonIndex";
@@ -93,8 +97,9 @@ function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; le
           <p className="mt-4 font-sans text-[11px] leading-relaxed text-ink-label">
             Work in cells: code, or markdown for notes and questions. Ctrl/⌘+Enter runs a code cell (after the code
             cells above it) or asks the tutor about a markdown cell; Shift+Enter does the same and moves on; Ctrl/⌘+M
-            switches a cell between code and markdown. Submit grades all your code cells together, so leave test
-            prints out of them.{" "}
+            switches a cell between code and markdown. New solution adds a solution cell that starts from your last
+            one; Submit grades your newest solution cell on its own (all your code cells together while you have
+            none), and solution cells are kept as a record of your tries.{" "}
             <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
               Classic workspace
             </Link>
@@ -307,7 +312,8 @@ function Solve() {
       ? questions[currentIndex - 1]
       : null;
   const nextQuestion = questions && currentIndex >= 0 ? questions[currentIndex + 1] : undefined;
-  const program = programOf(cells);
+  const program = gradedProgram(cells);
+  const hasSolution = !!latestSolution(cells);
   // A passing Submit of exactly this code turns Submit into Next lesson.
   const passed = submit?.outcome === "passed" && submit.code === program;
   const firstTutorCell = cells.find((c) => c.output?.kind === "tutor")?.id;
@@ -334,7 +340,8 @@ function Solve() {
   }
   function deleteCell(id: string) {
     const i = cells.findIndex((c) => c.id === id);
-    if (cells.length === 1 || i < 0) return;
+    // Solution cells are the record of the student's tries: they stay.
+    if (cells.length === 1 || i < 0 || cells[i].solution) return;
     setCells((prev) => prev.filter((c) => c.id !== id));
     const neighbour = cells[i + 1] ?? cells[i - 1];
     handles.current.get(neighbour.id)?.focus("start");
@@ -342,7 +349,7 @@ function Solve() {
   // The editor changes with the type; the text stays.
   function toggleType(id: string) {
     const cell = cells.find((c) => c.id === id);
-    if (!cell) return;
+    if (!cell || cell.solution) return;
     updateCell(id, { type: cell.type === "code" ? "markdown" : "code", output: undefined });
     setAutoFocusId(id);
   }
@@ -359,10 +366,21 @@ function Solve() {
     else insertCell(cells.length, "code");
   }
 
+  // A solution cell at the end, starting from the student's last solution
+  // (else their last Submit, else the starter code).
+  function newSolution() {
+    const starter = withStarterHint(activeQuestion?.starter_code ?? "");
+    const cell: Cell = { id: newCellId(), type: "code", source: solutionSeed(cells, submit, starter), solution: true };
+    setCells((prev) => [...prev, cell]);
+    setAutoFocusId(cell.id);
+    posthog.capture("solution_cell_added", { problem_id: lessonId, workspace: "solve" });
+  }
+
   // ── Run a code cell (with the code cells above it) ──────────────────────
+  // A solution cell runs on its own, as Submit grades it.
   async function runCell(cell: Cell) {
     if (runningId || submitting || !lessonId) return;
-    const source = programOf(cells, cell.id);
+    const source = cell.solution ? cell.source : programOf(cells, cell.id);
     const firstCode = cells.find((c) => c.type === "code")?.id === cell.id;
     const prev_source =
       cell.output?.kind === "run"
@@ -618,6 +636,17 @@ function Solve() {
                     );
                   })}
                   <InsertBar onInsert={(type) => insertCell(cells.length, type)} />
+                  <div className="mt-2 mr-4 ml-[3.75rem] pl-3">
+                    <button
+                      type="button"
+                      onClick={newSolution}
+                      title="Add a solution cell with your last solution in it (the starter code if you have none)"
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-[4px] border border-dashed border-brass bg-brass/10 font-sans text-[12px] font-semibold tracking-[0.02em] text-brass transition-colors hover:bg-brass/20 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
+                    >
+                      <Flag className="size-3.5" />
+                      {hasSolution ? "New solution from your last one" : "New solution"}
+                    </button>
+                  </div>
                   {submit && (
                     <div className="mt-2 mr-4 ml-[3.75rem] pl-3">
                       <SubmitBlock submit={submit} foldAll={foldAll} />
@@ -676,7 +705,7 @@ function Solve() {
                     type="button"
                     onClick={submitNotebook}
                     disabled={!loaded || submitting || !!runningId}
-                    title="Grade all the code cells together"
+                    title={hasSolution ? "Grade your newest solution cell" : "Grade all the code cells together"}
                     className={FILLED_BUTTON}
                   >
                     {submitting && <Loader2 className="size-3.5 animate-spin" />}

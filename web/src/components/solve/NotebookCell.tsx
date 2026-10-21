@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Code2, Loader2, Pilcrow, Play, Sparkles, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Code2, Flag, Loader2, Pilcrow, Play, Sparkles, Trash2 } from "lucide-react";
 import { lazy, type ReactNode, Suspense } from "react";
 import { cn } from "#/lib/utils.ts";
 import type { CellEditorHandle, CellKeys } from "./MarkdownCellEditor";
@@ -47,13 +47,15 @@ export default function NotebookCell({
   ...keys
 }: NotebookCellProps) {
   const isCode = cell.type === "code";
+  const isSolution = !!cell.solution;
   const setType = (type: CellType) => type !== cell.type && keys.onToggleType();
 
   return (
     <div
       className={cn(
         "group relative border-l-2 py-1 pr-4",
-        focused ? "border-l-brass bg-surface-panel/40" : "border-l-transparent",
+        isSolution && "bg-brass/5",
+        focused ? "border-l-brass bg-surface-panel/40" : isSolution ? "border-l-brass/50" : "border-l-transparent",
       )}
     >
       {/* Tools: shown on hover and on the cell being edited. */}
@@ -63,33 +65,45 @@ export default function NotebookCell({
           focused ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100",
         )}
       >
-        <div className="mr-1 flex rounded-[2px] border border-rule">
-          {(["code", "markdown"] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              aria-pressed={cell.type === type}
-              onClick={() => setType(type)}
-              title={`${type === "code" ? "Code" : "Markdown"} cell (Ctrl/⌘+M switches)`}
-              className={cn(
-                "flex h-5 items-center gap-1 px-1.5 text-[10px] font-medium cursor-pointer",
-                cell.type === type ? "bg-surface-hover text-brass" : "text-ink-label hover:text-ink",
-              )}
-            >
-              {type === "code" ? <Code2 className="size-3" /> : <Pilcrow className="size-3" />}
-              {type === "code" ? "Code" : "Markdown"}
-            </button>
-          ))}
-        </div>
+        {isSolution ? (
+          <span
+            title="Submit grades your newest solution cell on its own"
+            className="mr-1 flex h-5 items-center gap-1 px-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-brass"
+          >
+            <Flag className="size-3" />
+            Solution
+          </span>
+        ) : (
+          <div className="mr-1 flex rounded-[2px] border border-rule">
+            {(["code", "markdown"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={cell.type === type}
+                onClick={() => setType(type)}
+                title={`${type === "code" ? "Code" : "Markdown"} cell (Ctrl/⌘+M switches)`}
+                className={cn(
+                  "flex h-5 items-center gap-1 px-1.5 text-[10px] font-medium cursor-pointer",
+                  cell.type === type ? "bg-surface-hover text-brass" : "text-ink-label hover:text-ink",
+                )}
+              >
+                {type === "code" ? <Code2 className="size-3" /> : <Pilcrow className="size-3" />}
+                {type === "code" ? "Code" : "Markdown"}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={() => keys.onRun(false)}
           disabled={busy}
           aria-label={isCode ? "Run cell" : "Ask the tutor"}
           title={
-            isCode
-              ? "Run this cell and the code cells above it (Ctrl/⌘+Enter; Shift+Enter runs and moves on)"
-              : "Ask the tutor this (Ctrl/⌘+Enter)"
+            isSolution
+              ? "Run this solution on its own, as Submit grades it (Ctrl/⌘+Enter)"
+              : isCode
+                ? "Run this cell and the code cells above it (Ctrl/⌘+Enter; Shift+Enter runs and moves on)"
+                : "Ask the tutor this (Ctrl/⌘+Enter)"
           }
           className={cn(TOOL, "text-brass")}
         >
@@ -116,8 +130,9 @@ export default function NotebookCell({
         <button
           type="button"
           onClick={onDelete}
-          disabled={count === 1}
+          disabled={count === 1 || isSolution}
           aria-label="Delete cell"
+          title={isSolution ? "Solution cells are kept" : undefined}
           className={cn(TOOL, "hover:text-danger")}
         >
           <Trash2 className="size-3.5" />
@@ -129,7 +144,7 @@ export default function NotebookCell({
           className="w-12 shrink-0 select-none pt-[9px] pr-1 text-right font-mono text-[10px] text-ink-faint"
           aria-hidden="true"
         >
-          {isCode ? `[${index}]` : "md"}
+          {isSolution ? <span className="text-brass">sol</span> : isCode ? `[${index}]` : "md"}
         </div>
         <Suspense fallback={<div className="h-[38px] flex-1" />}>
           {isCode ? (
