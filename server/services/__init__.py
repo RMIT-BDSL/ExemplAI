@@ -356,7 +356,7 @@ async def run_once(student_code: StudentCode) -> dict:
         student_code.solution_code,
         example.input if example else None,
     )
-    output = await _judge0_submit(program, student_code.language_id or 71)
+    output = await _judge0_submit(program, student_code.language_id or 100)
     status_info = output.get("status") or {}
     prints, return_value = split_run_stdout(output.get("stdout"))
     stderr = output.get("stderr") or output.get("compile_output") or ""
@@ -519,7 +519,7 @@ async def _judge0_submit(
 
 async def run_scratchpad(
     code: str,
-    language_id: int = 71,
+    language_id: int = 100,
     stdin: Optional[str] = None,
 ) -> dict:
     """Execute a scratchpad snippet in free-run mode.
@@ -551,7 +551,7 @@ async def execute_code(
     exec_url = _exec_url()
     headers = _judge0_headers()
 
-    language_id = student_code.language_id or 71
+    language_id = student_code.language_id or 100
     action_type = student_code.action_type or "run"
     lesson_id = student_code.lesson_id
 
@@ -780,7 +780,7 @@ async def submit_check(body: CheckSubmission, auth_token: str) -> dict:
     program = wrap_code_with_runner(body.code, info.get("starter_code"), None)
     async with httpx.AsyncClient() as http:
         results = await asyncio.gather(*[
-            run_single_test_case(http, program, 71, tc, _exec_url(), _judge0_headers())
+            run_single_test_case(http, program, 100, tc, _exec_url(), _judge0_headers())
             for tc in tests
         ])
     passed = sum(1 for r in results if r.get("passed"))

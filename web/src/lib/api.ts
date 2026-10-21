@@ -60,7 +60,7 @@ export interface ScratchpadRunResult {
 // Runs a snippet as-is: no test cases, no grading, no lesson progress.
 export async function scratchpadExecute(
   code: string,
-  languageId = 71,
+  languageId = 100,
   stdin = ""
 ): Promise<ScratchpadRunResult> {
   const tokenRes = await authClient.convex.token();

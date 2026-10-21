@@ -9,7 +9,7 @@ class TestCase(BaseModel):
 
 class StudentCode(BaseModel):
     code: str
-    language_id: Optional[int] = 71
+    language_id: Optional[int] = 100
     starter_code: Optional[str] = None
     solution_code: Optional[str] = None
     test_cases: Optional[List[TestCase]] = None

@@ -5,7 +5,7 @@ import { type ScratchpadRunResult, scratchpadExecute } from "#/lib/api.ts";
 
 // Judge0 status 3 is "Accepted": the program ran to the end.
 const JUDGE0_ACCEPTED = 3;
-const PYTHON_LANGUAGE_ID = 71;
+const PYTHON_LANGUAGE_ID = 100; // Python 3.12
 
 interface RunOutput {
   stdout: string;
