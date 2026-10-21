@@ -9,29 +9,29 @@
   "mistake": "In the final step of building the result, the student concatenates the strings in the original order (s1 + s2) instead of putting s2 first.",
   "model": "anthropic/claude-sonnet-5.5"
  },
- "boilingPoint": {
-  "code": "def boilingPoint(temp_celsius):\n    if temp_celsius > 100:\n        return True\n    else:\n        return False",
-  "mistake": "The comparison uses > instead of >= in the condition, so the boundary value 100 returns False instead of True.",
-  "model": "anthropic/claude-sonnet-5.5"
- },
  "canDrinkAlcohol": {
   "code": "def canDrinkAlcohol(age, isDriving):\n    if age > 21 and not isDriving:\n        return True\n    return False",
   "mistake": "In the age check of the condition, it uses > 21 instead of >= 21, so a person who is exactly 21 is wrongly refused.",
   "model": "anthropic/claude-sonnet-5.5"
  },
- "canVote": {
-  "code": "def canVote(age):\n    if age > 18:\n        return True\n    else:\n        return False",
-  "mistake": "In the comparison step, the student used > instead of >= so age 18 returns False instead of True.",
+ "canFlyDrone": {
+  "code": "def canFlyDrone(wind_speed, is_raining):\n    if wind_speed < 30 and not is_raining:\n        return True\n    return False",
+  "mistake": "In the condition step, the wind check uses < instead of <=, so a wind speed of exactly 30 km/h wrongly returns False.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "canSwim": {
+  "code": "def canSwim(day, temperature):\n    if (day == 'Saturday' or day == 'Sunday') and temperature > 25:\n        return True\n    return False",
+  "mistake": "In the step where the temperature condition is written, it uses > instead of >=, so a temperature of exactly 25 wrongly returns False.",
   "model": "anthropic/claude-sonnet-5.5"
  },
  "carefulSquareRoot": {
-  "code": "import math\n\ndef carefulSquareRoot(x):\n    if x <= 0:\n        return 'Error'\n    return math.sqrt(x)",
-  "mistake": "In the check for negative input, the condition uses <= instead of <, so x = 0 wrongly returns 'Error' instead of 0.0.",
+  "code": "def carefulSquareRoot(x):\n    if x <= 0:\n        return 'Error'\n    return x ** 0.5",
+  "mistake": "In the condition step, the boundary uses <= instead of <, so x = 0 wrongly returns 'Error' instead of 0.0.",
   "model": "anthropic/claude-sonnet-5.5"
  },
- "castString": {
-  "code": "def castString(s, asNumber):\n    if asNumber:\n        return int(s)",
-  "mistake": "The case where asNumber is False is missing, so the function falls off the end and returns None instead of returning s unchanged.",
+ "checkGuess": {
+  "code": "def checkGuess(guess, secret):\n    if guess >= secret:\n        return 'Too high'\n    elif guess < secret:\n        return 'Too low'\n    else:\n        return 'Correct'",
+  "mistake": "In the step where the 'Too high' condition is written, it uses >= instead of >, so equal numbers return 'Too high' and the 'Correct' branch can never run.",
   "model": "anthropic/claude-sonnet-5.5"
  },
  "convertToDegrees": {
@@ -80,8 +80,8 @@
   "model": "anthropic/claude-sonnet-5.5"
  },
  "isEvenPositiveInt": {
-  "code": "def isEvenPositiveInt(x):\n    if type(x) != int:\n        return False\n    return x >= 0 and x % 2 == 0",
-  "mistake": "In the final condition check, the student used x >= 0 instead of x > 0, so 0 is wrongly treated as positive and the function returns True for 0.",
+  "code": "def isEvenPositiveInt(x):\n    if x >= 0 and x % 2 == 0:\n        return True\n    else:\n        return False",
+  "mistake": "In the positivity check, the student wrote x >= 0 instead of x > 0, so 0 is wrongly treated as positive and returns True.",
   "model": "anthropic/claude-sonnet-5.5"
  },
  "isOddNegativeInt": {
@@ -114,6 +114,11 @@
   "mistake": "In the step that works out the cents left after the quarters, it uses // instead of %, so cents becomes the number of quarters rather than the remainder.",
   "model": "anthropic/claude-sonnet-5.5"
  },
+ "markToGrade": {
+  "code": "def markToGrade(mark):\n    if mark >= 80:\n        return 'HD'\n    elif mark > 70:\n        return 'DI'\n    elif mark >= 60:\n        return 'CR'\n    elif mark >= 50:\n        return 'PA'\n    else:\n        return 'NN'",
+  "mistake": "In the 'DI' condition the student wrote mark > 70 instead of mark >= 70, so a mark of exactly 70 falls through to 'CR' instead of 'DI' (a boundary comparison mistake).",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
  "nearestBusStop": {
   "code": "def nearestBusStop(street):\n    stops = (street + 4) // 8\n    return stops * 8",
   "mistake": "In the step where the offset is added before dividing by 8, it adds 4 instead of 3, so a street exactly halfway between two stops rounds up instead of down.",
@@ -124,9 +129,9 @@
   "mistake": "In the step that adds 5 before dividing by 10 to round to the nearest fountain, the brackets around position + 5 are missing, so 5 // 10 * 10 is evaluated first (giving 0) and the function just returns position.",
   "model": "anthropic/claude-sonnet-5.5"
  },
- "overNineThousand": {
-  "code": "def overNineThousand(power_level):\n    if power_level >= 9000:\n        return True\n    else:\n        return False",
-  "mistake": "The comparison uses >= instead of > in the condition, so the boundary case 9000 wrongly returns True instead of False.",
+ "needsJacket": {
+  "code": "def needsJacket(weather, temperature):\n    if weather == 'rainy' or weather == 'windy' and temperature < 20:\n        return True\n    return False",
+  "mistake": "In the step where the weather checks are combined with the temperature check, the brackets around the 'or' are missing, so 'and' is evaluated first and any rainy weather returns True whatever the temperature.",
   "model": "anthropic/claude-sonnet-5.5"
  },
  "percentAsInt": {
@@ -167,6 +172,11 @@
  "sumOfSquares": {
   "code": "def sumOfSquares(a, b):\n    return a + b ** 2",
   "mistake": "In the step where the expression is built, only b is squared because a is added unsquared, so the formula is not the sum of both squares.",
+  "model": "anthropic/claude-sonnet-5.5"
+ },
+ "timeOfDay": {
+  "code": "def timeOfDay(hour):\n    if 5 <= hour < 11:\n        return 'Morning'\n    elif 12 <= hour <= 17:\n        return 'Afternoon'\n    elif 18 <= hour <= 21:\n        return 'Evening'\n    else:\n        return 'Night'",
+  "mistake": "In the Morning condition the upper boundary uses < instead of <=, so hour 11 is excluded from 'Morning' and falls through to 'Night'.",
   "model": "anthropic/claude-sonnet-5.5"
  }
 }

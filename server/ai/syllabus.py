@@ -25,7 +25,9 @@ SYLLABUS: list[tuple[str, int, str]] = [
      "string indexing and slicing; len(); concatenation and repetition; string methods "
      "such as upper(), lower(), strip(), replace(), find(); the in operator on strings; "
      "f-strings"),
-    ("branching", 4, "comparisons; and, or, not; if / elif / else; nested if"),
+    ("branching", 4,
+     "comparisons, also chained (0 < x <= 100) and on strings (answer == 'y'); in / not in on strings; "
+     "and, or, not, with brackets to group them; if / elif / else; nested if"),
     ("loops", 5, "for loops with range(); for over a string; while loops; the accumulator pattern"),
     ("advanced_loops", 6, "nested loops; break and continue; loop flags and counters"),
     ("functions", 7,
@@ -81,6 +83,7 @@ TOPIC_BUGS: dict[str, str] = {
     "strings_formatting": "an off-by-one index or slice (e.g. s[1:] vs s[:-1]); concatenating in the "
     "wrong order; comparing without matching case (missing lower()); using the wrong string method",
     "branching": "> instead of >= (or < vs <=) at a boundary; and instead of or (or the reverse); "
+    "leaving out the brackets in (a or b) and c; "
     "conditions in the wrong order so a later branch never runs; a missing case",
     "loops": "an off-by-one range (e.g. range(n) vs range(1, n + 1)); the accumulator starting at the "
     "wrong value or not being updated; returning inside the loop too early; a while condition that "
