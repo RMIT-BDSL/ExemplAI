@@ -76,36 +76,42 @@ const OUTLINE_BUTTON =
 const FILLED_BUTTON =
   "flex h-8 shrink-0 items-center gap-1.5 rounded-[2px] border border-brass-fill bg-brass-fill px-3 text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass";
 
-/** The problem above the cells; folds to its title. */
+/**
+ * The problem above the cells. It stays at the top while the cells scroll
+ * under it (a long one scrolls inside its own box), and folds to its title.
+ */
 function ProblemBlock({ problem, lessonId, foldAll }: { problem: ProblemData; lessonId: string; foldAll: FoldAll }) {
   const [open, setOpen] = useFold(true, foldAll);
   return (
-    <div className="mx-4 mb-3 rounded-[4px] border border-rule-strong bg-surface-panel">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="flex h-8 w-full items-center gap-2 px-3 text-left font-sans text-[10px] select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
-      >
-        {open ? <ChevronDown className="size-3 text-ink-label" /> : <ChevronRight className="size-3 text-ink-label" />}
-        <span className="font-semibold uppercase tracking-[0.15em] text-brass">Problem</span>
-        {!open && <span className="min-w-0 truncate text-[11px] text-ink-muted">{problem.title}</span>}
-      </button>
-      {open && (
-        <div className="editorial-prose border-t border-rule px-6 pt-4 pb-5">
-          <Problem problem={problem} />
-          <p className="mt-4 font-sans text-[11px] leading-relaxed text-ink-label">
-            Work in cells: code, or markdown for notes and questions. Ctrl/⌘+Enter runs a code cell (after the code
-            cells above it) or asks the tutor about a markdown cell; Shift+Enter does the same and moves on; Ctrl/⌘+M
-            switches a cell between code and markdown. New solution adds a solution cell that starts from your last
-            one; Submit grades your newest solution cell on its own (all your code cells together while you have
-            none), and solution cells are kept as a record of your tries.{" "}
-            <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
-              Classic workspace
-            </Link>
-          </p>
-        </div>
-      )}
+    // The strip around the box hides cells passing underneath it.
+    <div className="sticky top-0 z-30 -mt-4 bg-surface-editor px-4 pt-4 pb-3">
+      <div className="rounded-[4px] border border-rule-strong bg-surface-panel shadow-sm">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="flex h-8 w-full items-center gap-2 px-3 text-left font-sans text-[10px] select-none cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
+        >
+          {open ? <ChevronDown className="size-3 text-ink-label" /> : <ChevronRight className="size-3 text-ink-label" />}
+          <span className="font-semibold uppercase tracking-[0.15em] text-brass">Problem</span>
+          {!open && <span className="min-w-0 truncate text-[11px] text-ink-muted">{problem.title}</span>}
+        </button>
+        {open && (
+          <div className="editorial-prose editorial-scroll max-h-[40vh] overflow-y-auto border-t border-rule px-6 pt-4 pb-5">
+            <Problem problem={problem} />
+            <p className="mt-4 font-sans text-[11px] leading-relaxed text-ink-label">
+              Work in cells: code, or markdown for notes and questions. Ctrl/⌘+Enter runs a code cell (after the code
+              cells above it) or asks the tutor about a markdown cell; Shift+Enter does the same and moves on; Ctrl/⌘+M
+              switches a cell between code and markdown. New solution adds a solution cell that starts from your last
+              one; Submit grades your newest solution cell on its own (all your code cells together while you have
+              none), and solution cells are kept as a record of your tries.{" "}
+              <Link to="/course" search={{ problemId: lessonId }} className="text-brass hover:underline">
+                Classic workspace
+              </Link>
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
