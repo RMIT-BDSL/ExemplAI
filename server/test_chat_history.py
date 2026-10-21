@@ -46,6 +46,11 @@ def test_convex_history_wins_over_browser_conversation():
                         {"role": "user", "content": "why?"}]
 
 
+def test_student_code_is_cut_to_the_cap():
+    assert build_initial_state(_chat(student_code="x" * 25_000), [])["student_code"] == "x" * 20_000
+    assert build_initial_state(_chat(student_code="def f(): pass"), [])["student_code"] == "def f(): pass"
+
+
 def test_falls_back_to_browser_conversation_when_convex_has_no_history():
     chat = _chat(conversation=[{"sender": "user", "content": "from browser"}])
     assert _contents(build_initial_state(chat, None)["messages"][1:]) == ["from browser"]

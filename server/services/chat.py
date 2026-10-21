@@ -18,6 +18,12 @@ log = logging.getLogger("rich")
 # Centralized timeout constants
 CONVEX_OP_TIMEOUT = 5.0
 
+# The editor contents sent with a chat message go into every model call for
+# the reply (agent and Dean), so a pasted huge file is cut to this. Far above
+# any lesson's answer (~500 lines). Chat messages have their own cap in Convex
+# (web/convex/chatLimits.ts).
+MAX_STUDENT_CODE_CHARS = 20_000
+
 
 def _convex_client(auth_token: str) -> ConvexClient:
     client = ConvexClient(settings.CONVEX_URL)
@@ -66,7 +72,7 @@ def build_initial_state(chat: Chat, history: Optional[list[dict]] = None) -> dic
         "original_problem": chat.original_problem,
         "unit_test_assertions": chat.unit_test_assertions,
         "current_knowledge_component": chat.current_knowledge_component,
-        "student_code": chat.student_code,
+        "student_code": chat.student_code[:MAX_STUDENT_CODE_CHARS],
         "error_trace": chat.error_trace,
         "trigger": chat.trigger,
         "button_turns": button_turns,
