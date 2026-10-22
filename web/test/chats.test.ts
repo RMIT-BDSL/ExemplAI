@@ -189,6 +189,25 @@ describe("chats API", () => {
     ]);
   });
 
+  it("addMessage cuts a message over the length cap", async () => {
+    const t = setup();
+    const { student, lessonId, chatId } = await setupLessonChat(t);
+    await student.mutation(api.courses.recordCodeExecution, {
+      backendSecret: "secret",
+      lessonId,
+      passed: false,
+      actionType: "submit",
+    });
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "help", trigger: "get_help" });
+    await insertTutorReply(t, chatId, "an example");
+
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "x".repeat(4000) });
+    await student.mutation(api.chats.addMessage, { chatId, sender: "user", content: "y".repeat(5000) });
+
+    const messages = await student.query(api.chats.getMessages, { lessonId });
+    expect(messages.map((m) => m.content.length)).toEqual([4, 10, 4000, 4000]);
+  });
+
   it("getChatContext returns the conversation, failure info, and only to its owner", async () => {
     const t = setup();
     const { admin, student, lessonId, chatId } = await setupLessonChat(t);

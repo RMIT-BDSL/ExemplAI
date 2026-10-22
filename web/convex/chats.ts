@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { capChatMessage } from "./chatLimits";
 import { allowanceForChat, buttonBlockedReason, lessonProgressFor } from "./examples";
 import { ensureCondition } from "./experiment";
 import { canOpenLesson } from "./lessonAccess";
@@ -147,7 +148,7 @@ export const addMessage = authenticatedMutation({
     await ctx.db.insert("chatMessages", {
       chatId: args.chatId,
       sender: args.sender,
-      content: args.content,
+      content: capChatMessage(args.content),
       ...(args.trigger ? { trigger: args.trigger } : {}),
     });
     return { success: true };

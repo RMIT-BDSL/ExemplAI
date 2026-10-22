@@ -11,6 +11,7 @@ import { cn } from "#/lib/utils.ts";
 import { EXAMPLE_WAIT_LINES, exampleWaitLine } from "#/lib/waitMessages.ts";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { MAX_CHAT_MESSAGE_CHARS } from "../../../../convex/chatLimits";
 import RunnableCodeBlock from "./RunnableCodeBlock";
 // Types for Chat
 export interface Message {
@@ -323,6 +324,7 @@ export function ChatInput({ onSendMessage, example }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           placeholder="Ask the tutor…"
           aria-label="Message the tutor"
+          maxLength={MAX_CHAT_MESSAGE_CHARS}
           rows={1}
           className="h-full min-w-0 flex-1 resize-none select-text bg-transparent py-[7px] font-sans text-xs leading-[16px] text-ink outline-none placeholder:text-ink-label"
         />
