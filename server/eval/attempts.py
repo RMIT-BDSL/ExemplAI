@@ -101,8 +101,10 @@ def main():
                  if l["week"] in weeks]
     attempts = load_attempts()
     todo = [n for n in names if args.force or n not in attempts]
+    # No temperature: none of Sonnet 5.5's OpenRouter endpoints take one, so with
+    # require_parameters every request would find no endpoint (404).
     llm = ChatOpenAI(model=MODEL, api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
-                     base_url="https://openrouter.ai/api/v1", temperature=0.7,
+                     base_url="https://openrouter.ai/api/v1",
                      extra_body={"provider": {"require_parameters": True}, "max_tokens": 4000})
     with ThreadPoolExecutor(6) as pool:
         made = dict(zip(todo, pool.map(lambda n: make(llm, lessons[n]), todo)))

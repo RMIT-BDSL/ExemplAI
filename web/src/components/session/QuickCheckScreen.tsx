@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { AuthButton } from "#/components/auth/AuthButton";
-import type { ConsoleRun } from "#/components/ide/ConsoleDrawer";
+import { type ConsoleRun, givesResultWrapper } from "#/components/ide/ConsoleDrawer";
 import Problem, { formatCall } from "#/components/student/problem/Problem";
 import { authClient } from "#/lib/auth-client";
 import { defineEditorThemes, editorThemeFor } from "#/lib/editorThemes";
@@ -274,6 +274,7 @@ function CheckWorkspace({
           stdout: data?.stdout ?? "",
           stderr: data?.stderr ?? "",
           inputNote: false,
+          resultWrapper: givesResultWrapper(problem.starter_code),
         },
       ]);
     } catch (err) {

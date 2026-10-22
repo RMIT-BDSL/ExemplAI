@@ -23,9 +23,10 @@ import { DEFAULT_CHECK_MINUTES } from "./studentIds";
  *   what's in the editor (auto).
  * - Scores don't touch BKT, lesson progress or unlocks.
  *
- * WEEK 4 CONTENT TO CONFIRM: the problems below were written from the rough
- * course outline (week 4 = branching: if/elif/else, comparisons, and/or).
- * Check them against the actual week-4 material before the session.
+ * The problems below were written from the rough course outline and checked
+ * against the week-4 lecture and exercise sheet on 2026-10-21. Like the weeks
+ * 1–6 lessons (convex/seed.ts), they give the def/return wrapper and store the
+ * answer in result, since writing functions isn't taught until week 7.
  */
 
 type Problem = Omit<Doc<"checkProblems">, "_id" | "_creationTime">;
@@ -38,8 +39,8 @@ export const WEEK4_CHECKS: Problem[] = [
     position: 1,
     problem_name: "shippingCost",
     problem_description:
-      "Write a function `shippingCost(weight)` that returns the shipping cost for a parcel: **5** if it weighs up to 2 kg, **10** if it weighs over 2 kg and up to 10 kg, and **20** if it weighs over 10 kg.",
-    starter_code: "def shippingCost(weight):\n    pass",
+      "`weight` is given to you: a parcel's weight in kg. Set `result` to its shipping cost: **5** if it weighs up to 2 kg, **10** if it weighs over 2 kg and up to 10 kg, and **20** if it weighs over 10 kg.",
+    starter_code: "def shippingCost(weight):\n    # weight is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     example: { input: "1", expectedOutput: "5" },
     tests: [
       { input: "1", expectedOutput: "5" },
@@ -55,8 +56,8 @@ export const WEEK4_CHECKS: Problem[] = [
     position: 2,
     problem_name: "canBorrow",
     problem_description:
-      "Write a function `canBorrow(age, has_card)` that returns `True` if a person can borrow books from the library, and `False` otherwise. Anyone aged 18 or older can borrow, and people with a library card can borrow from age 12.",
-    starter_code: "def canBorrow(age, has_card):\n    pass",
+      "`age` and `has_card` (True or False) are given to you. Set `result` to `True` if the person can borrow books from the library, and `False` otherwise. Anyone aged 18 or older can borrow, and people with a library card can borrow from age 12.",
+    starter_code: "def canBorrow(age, has_card):\n    # age and has_card are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     example: { input: "15, true", expectedOutput: "True" },
     tests: [
       { input: "15, true", expectedOutput: "True" },
@@ -72,8 +73,8 @@ export const WEEK4_CHECKS: Problem[] = [
     position: 1,
     problem_name: "parkingFee",
     problem_description:
-      "Write a function `parkingFee(hours)` that returns the parking fee: **0** for up to 1 hour, **3** for over 1 hour and up to 4 hours, and **8** for over 4 hours.",
-    starter_code: "def parkingFee(hours):\n    pass",
+      "`hours` is given to you: how many hours a car was parked. Set `result` to the parking fee: **0** for up to 1 hour, **3** for over 1 hour and up to 4 hours, and **8** for over 4 hours.",
+    starter_code: "def parkingFee(hours):\n    # hours is given to you. Write your code below\n    # and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     example: { input: "3", expectedOutput: "3" },
     tests: [
       { input: "3", expectedOutput: "3" },
@@ -89,8 +90,8 @@ export const WEEK4_CHECKS: Problem[] = [
     position: 2,
     problem_name: "canRide",
     problem_description:
-      "Write a function `canRide(height, with_adult)` that returns `True` if a child can go on a ride, and `False` otherwise. Children 140 cm or taller can ride alone, and children 120 cm or taller can ride with an adult.",
-    starter_code: "def canRide(height, with_adult):\n    pass",
+      "`height` (in cm) and `with_adult` (True or False) are given to you. Set `result` to `True` if the child can go on the ride, and `False` otherwise. Children 140 cm or taller can ride alone, and children 120 cm or taller can ride with an adult.",
+    starter_code: "def canRide(height, with_adult):\n    # height and with_adult are given to you.\n    # Write your code below and store the answer in result.\n    # (Leave the def and return lines as they are.)\n    result = None\n\n    return result",
     example: { input: "130, true", expectedOutput: "True" },
     tests: [
       { input: "130, true", expectedOutput: "True" },

@@ -85,7 +85,7 @@ function lastLine(text: string): string {
 function exampleOutput(result: NonNullable<LastSubmit["example"]>): string {
   return (
     result.stdout.trim() ||
-    (result.stderr ? lastLine(result.stderr) : "(nothing returned)")
+    (result.stderr ? lastLine(result.stderr) : "(no output)")
   );
 }
 
