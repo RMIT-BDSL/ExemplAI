@@ -150,7 +150,9 @@ function AuthPage() {
       // resetting before would orphan the event and, on a failed sign-out, would
       // wrongly de-identify a still-logged-in user.
       posthog.capture("user_signed_out");
-      await authClient.signOut();
+      // The client returns a failed sign-out as a value; it doesn't throw.
+      const { error } = await authClient.signOut();
+      if (error) throw new Error(error.message || "Sign out failed");
       clearSavedCode();
       posthog.reset();
       navigate({ to: "/auth" });
