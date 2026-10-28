@@ -22,6 +22,7 @@ import { type ConsoleRun, givesResultWrapper } from "#/components/ide/ConsoleDra
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { authClient } from "#/lib/auth-client";
+import { codeStorageKey } from "#/lib/codeStorage";
 import { useLessonVisit } from "#/lib/useLessonVisit";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -70,9 +71,6 @@ export const Route = createFileRoute("/_authenticated/course")({
     );
   },
 });
-
-/** sessionStorage key for a lesson's code in this tab. */
-const codeStorageKey = (lessonId: string, language: string) => `exemplai_code_${lessonId}_${language}`;
 
 /** The tab's copy of a lesson's code and when it was saved (older tabs stored the code alone). */
 function readTabCopy(key: string): { code: string; at: number } | null {
@@ -262,7 +260,8 @@ function Course() {
   // draft updates are our own saves. The editor is read-only until then, so
   // nothing typed meanwhile is overwritten.
   const [loadedCodeKey, setLoadedCodeKey] = useState<string | null>(null);
-  const codeKey = activeQuestionId ? codeStorageKey(activeQuestionId, language) : null;
+  const codeKey =
+    tokenIdentifier && activeQuestionId ? codeStorageKey(tokenIdentifier, activeQuestionId, language) : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once per lesson, when its draft has arrived
   useEffect(() => {
     if (!activeQuestion || !codeKey || loadedCodeKey === codeKey) return;
@@ -425,9 +424,9 @@ function Course() {
         [language]: value,
       }));
       // Not before the lesson's code has loaded (that setValue is not an edit).
-      if (activeQuestionId && loadedCodeKey === codeStorageKey(activeQuestionId, language)) {
+      if (activeQuestionId && codeKey && loadedCodeKey === codeKey) {
         pendingSaveRef.current = {
-          key: codeStorageKey(activeQuestionId, language),
+          key: codeKey,
           lessonId: activeQuestionId,
           code: value,
         };
