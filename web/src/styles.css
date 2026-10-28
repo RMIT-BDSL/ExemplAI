@@ -405,8 +405,10 @@ pre code {
   overflow-x: auto;
 }
 
-/* Program output reads better wrapped than horizontally scrolled. */
-.chat-code.chat-code-wrap {
+/* Program output reads better wrapped than horizontally scrolled. Listed with
+   the chat-scoped selector too, which would otherwise win and keep `pre`. */
+.chat-code.chat-code-wrap,
+.editorial-chat-container .prose .chat-code.chat-code-wrap {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

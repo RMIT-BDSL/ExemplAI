@@ -117,4 +117,32 @@ def test_get_help_carries_trigger_and_error_to_the_agent(monkeypatch):
     assert out["response_type"] == NEW_EXAMPLE
     context_message = calls[0][1].content
     assert "<error_trace>\nInput: 3\nExpected: 6\nGot: 5\n</error_trace>" in context_message
-    assert calls[0][-1].content == GET_HELP_TEXT
+    assert calls[0][-1] == {"role": "user", "content": "[The student pressed the Get help button.]"}
+
+
+def test_button_turns_reach_the_agent_as_presses_not_typed_text():
+    # "Please show me a different example" read as typed text made the agents
+    # refuse the New example button under the typed-message rule.
+    from ai.nodes.context import conversation
+
+    state = {
+        "messages": [
+            HumanMessage(content="Please provide me an example to help me with this"),
+            AIMessage(content="an example"),
+            HumanMessage(content="why?"),
+            AIMessage(content="because"),
+            HumanMessage(content="Please show me a different example"),
+        ],
+        "button_turns": [0, 4],
+    }
+    contents = [m["content"] if isinstance(m, dict) else m.content for m in conversation(state)]
+    assert contents == [
+        "[The student pressed the Get help button.]",
+        "an example",
+        "why?",
+        "because",
+        "[The student pressed the New example button.]",
+    ]
+    # A typed message with the same words, not marked as a button turn, stays typed.
+    state["button_turns"] = [0]
+    assert conversation(state)[-1].content == "Please show me a different example"

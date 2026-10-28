@@ -203,8 +203,24 @@ def conversation(state: TutorGraphState) -> list:
 
     Oldest first, ending with the student's latest message, so it goes AFTER
     the context message and the model replies to what the student just said.
+    Button turns are shown as button presses, not as the button's chat text:
+    "Please show me a different example" read as typed made the agents refuse
+    it under the typed-message rule.
     """
-    return list(state.get("messages", []))[-_AGENT_HISTORY_TURNS:]
+    msgs = list(state.get("messages", []))
+    start = max(0, len(msgs) - _AGENT_HISTORY_TURNS)
+    return [
+        {"role": "user", "content": _button_press(_content(msgs[i]))} if _is_button_turn(state, msgs, i) else msgs[i]
+        for i in range(start, len(msgs))
+    ]
+
+
+def _button_press(text: str) -> str:
+    if text.strip() == BUTTON_TURNS[0]:
+        return "[The student pressed the Get help button.]"
+    if text.strip() == BUTTON_TURNS[1]:
+        return "[The student pressed the New example button.]"
+    return "[The student pressed a button for a new example.]"
 ```
 
 The Control agent is not asked for a tag: it never gives examples, so every control reply is labelled `follow_up` and none counts against an example allowance. The label is only for logging.
@@ -254,7 +270,8 @@ their own code to pass.
 If the student replies with a follow-up question, answer it supportively while staying \
 within the analog problem domain. If they ask you to solve their actual problem, gently \
 redirect: "Let's keep working through this example first — the pattern will click."
-If the student asks for a DIFFERENT example, tell them the New example button gives one \
+If the student TYPES a request for a different example (there is no <student_action>), \
+tell them the New example button gives one \
 when it is available (each failed Submit earns one, up to three \
 per lesson), and keep helping with this example.
 </multi_turn>
@@ -385,7 +402,8 @@ the remaining blank. Do NOT fill it in.
 to help them see the gap.
 - If the student has tried the same blank twice without success: show them how to work \
 out that blank, including its answer, then let them continue with any remaining blank.
-- If they ask for a DIFFERENT example: tell them the New example button gives one \
+- If they TYPE a request for a DIFFERENT example (there is no <student_action>): tell \
+them the New example button gives one \
 when it is available (each failed Submit earns one, up to three \
 per lesson), and keep helping with this example.
 </multi_turn>
@@ -466,7 +484,8 @@ condition") without naming the line.
 - Suggest they test a fix themselves by editing the example's code in the chat and pressing Run.
 - After two unsuccessful tries: tell them which line has the bug. After one more: show \
 the fix and an input on which the original code went wrong.
-- If they ask for a DIFFERENT example: tell them the New example button gives one \
+- If they TYPE a request for a DIFFERENT example (there is no <student_action>): tell \
+them the New example button gives one \
 when it is available (each failed Submit earns one, up to three \
 per lesson), and keep helping with this example.
 </multi_turn>

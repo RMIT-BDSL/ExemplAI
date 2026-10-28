@@ -49,7 +49,8 @@ _STUDENT_ACTION = {
     "get_help": "The student pressed Get help after a failed Submit: present a new "
     "example that targets the failure in <error_trace>.",
     "new_example": "The student pressed New example: present a new example in a "
-    "different scenario from the examples earlier in this conversation.",
+    "different scenario from the examples earlier in this conversation. Their "
+    "latest message is the button's own text, not a typed request.",
 }
 
 _TAG_RE = re.compile(r"^\s*\**\[(NEW_EXAMPLE|FOLLOW_UP)\]\**[ \t]*\n?", re.IGNORECASE)
@@ -118,8 +119,24 @@ def conversation(state: TutorGraphState) -> list:
 
     Oldest first, ending with the student's latest message, so it goes AFTER
     the context message and the model replies to what the student just said.
+    Button turns are shown as button presses, not as the button's chat text:
+    "Please show me a different example" read as typed made the agents refuse
+    it under the typed-message rule.
     """
-    return list(state.get("messages", []))[-_AGENT_HISTORY_TURNS:]
+    msgs = list(state.get("messages", []))
+    start = max(0, len(msgs) - _AGENT_HISTORY_TURNS)
+    return [
+        {"role": "user", "content": _button_press(_content(msgs[i]))} if _is_button_turn(state, msgs, i) else msgs[i]
+        for i in range(start, len(msgs))
+    ]
+
+
+def _button_press(text: str) -> str:
+    if text.strip() == BUTTON_TURNS[0]:
+        return "[The student pressed the Get help button.]"
+    if text.strip() == BUTTON_TURNS[1]:
+        return "[The student pressed the New example button.]"
+    return "[The student pressed a button for a new example.]"
 
 
 def _role(msg) -> str:

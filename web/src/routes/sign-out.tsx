@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authClient } from "#/lib/auth-client";
+import { clearSavedCode } from "#/lib/codeStorage";
 
 export const Route = createFileRoute("/sign-out")({
   component: SignOutPage,
@@ -19,6 +20,7 @@ function SignOutPage() {
       try {
         posthog.capture("user_signed_out");
         await authClient.signOut();
+        clearSavedCode();
         posthog.reset();
         window.location.href = "/auth";
       } catch (err) {

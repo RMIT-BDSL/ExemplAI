@@ -12,6 +12,7 @@ import { StudentIdForm } from "#/components/auth/forms/StudentIdForm";
 // import { InvitationCodeModal } from "#/components/auth/InvitationCodeModal";
 // import { buildMagicLinkCallback } from "#/lib/auth-callback";
 import { authClient } from "#/lib/auth-client";
+import { clearSavedCode } from "#/lib/codeStorage";
 import { api } from "../../convex/_generated/api";
 import { getSession } from "#/lib/auth.functions";
 
@@ -150,6 +151,7 @@ function AuthPage() {
       // wrongly de-identify a still-logged-in user.
       posthog.capture("user_signed_out");
       await authClient.signOut();
+      clearSavedCode();
       posthog.reset();
       navigate({ to: "/auth" });
     } catch (err: any) {

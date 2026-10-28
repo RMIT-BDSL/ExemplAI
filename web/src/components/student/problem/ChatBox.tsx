@@ -244,7 +244,6 @@ export function MessageFeed({
       className="flex-1 space-y-5 overflow-y-auto px-6 py-6 editorial-scroll"
       aria-live="polite"
     >
-      <AccuracyNotice />
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}
@@ -255,27 +254,6 @@ export function MessageFeed({
 
       <div ref={bottomRef} />
     </div>
-  );
-}
-
-/**
- * The AI-accuracy notice the ethics approval requires every time the tutor is
- * opened (wording from the Participant Information and Consent Form).
- */
-function AccuracyNotice() {
-  return (
-    <details className="border-l-2 border-rule-strong pl-3 font-sans text-[11px] leading-relaxed text-ink-label">
-      <summary className="cursor-pointer select-none hover:text-ink">
-        The tutor is an AI and can be wrong. Think critically, and check with your instructor if you're unsure.
-      </summary>
-      <p className="mt-1.5">
-        Due to the statistical nature of large language models (LLMs), it may occasionally generate inaccurate,
-        misleading, or incomplete information. To avoid this, you are encouraged to think critically and not treat
-        the virtual tutor as a replacement for your instructors. If you are uncertain about the tutor's answers, you
-        should seek clarification and discuss them with your instructors. This helps ensure accuracy while supporting
-        deeper learning and independent problem-solving.
-      </p>
-    </details>
   );
 }
 
