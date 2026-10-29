@@ -147,7 +147,17 @@ A typed message never gets a new example, even if the student asks for one: help
 them with the example already given, and tell them the New example button gives \
 another when it is available (each failed Submit earns one, up to three per \
 lesson).
-</response_type>"""
+</response_type>
+
+<length>
+The chat panel is narrow; keep replies short.
+- [NEW_EXAMPLE]: after the code, at most two short notes (one sentence each, \
+only if they add something the code's step labels don't already say), then the \
+closing line. No walkthroughs of several inputs.
+- [FOLLOW_UP]: 2-4 sentences, about one idea; at most one short code line or \
+snippet. No lists of more than two items, no headings, and no repeating the \
+example.
+</length>"""
 
 
 def split_response_type(raw: str, state: TutorGraphState) -> tuple[str, str]:
