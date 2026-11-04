@@ -2,10 +2,11 @@ import { AlertCircle, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AuthButton } from "#/components/auth/AuthButton";
 import { cn } from "#/lib/utils";
-import type {
-  SurveyAnswers,
-  SurveyQuestion,
-  SurveySection,
+import {
+  NA,
+  type SurveyAnswers,
+  type SurveyQuestion,
+  type SurveySection,
 } from "../../../convex/surveys";
 import { SessionPage } from "./SessionPage";
 
@@ -280,6 +281,18 @@ function Question({
                   {n}
                 </button>
               ))}
+              {q.na && (
+                <button
+                  type="button"
+                  aria-pressed={value === NA}
+                  aria-label={`N/A, ${q.na}`}
+                  title={q.na}
+                  onClick={() => onChange(value === NA ? "" : NA)}
+                  className={cn(chip(value === NA), "ml-3 px-3")}
+                >
+                  N/A
+                </button>
+              )}
             </div>
             <div className="flex justify-between gap-6 text-[11px] text-ink-label">
               <span>{q.minLabel}</span>
