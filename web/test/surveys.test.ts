@@ -21,7 +21,7 @@ describe("surveys", () => {
   it("accepts a complete set of answers and leaves out skipped optional text", () => {
     const clean = cleanAnswers(PRE_SURVEY, minimal(PRE_SURVEY));
     expect(clean.ai_use_frequency).toBe("Never");
-    expect(clean.stuck_strategy).toBeUndefined();
+    expect(cleanAnswers(POST_SURVEY, minimal(POST_SURVEY)).most_helpful).toBeUndefined();
   });
 
   it("lets any question be skipped", () => {
@@ -42,8 +42,8 @@ describe("surveys", () => {
   });
 
   it("keeps only known options in a multi-choice answer, without duplicates", () => {
-    const clean = cleanAnswers(PRE_SURVEY, { ...minimal(PRE_SURVEY), languages_used: ["Java", "Java", "Rust"] });
-    expect(clean.languages_used).toEqual(["Java"]);
+    const survey = [{ title: "", questions: [{ id: "langs", label: "Languages", type: "multi", options: ["Python", "Java"] }] }] as const;
+    expect(cleanAnswers(survey, { langs: ["Java", "Java", "Rust"] }).langs).toEqual(["Java"]);
   });
 
   it("trims text, caps its length and drops unknown ids", () => {

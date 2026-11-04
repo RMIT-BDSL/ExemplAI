@@ -1,11 +1,14 @@
 // The study session's surveys (convex/cohorts.ts), shared by the student pages,
 // the Convex functions that validate answers and the admin export.
 //
-// Pre-survey (start of the session, about 3 minutes): prior experience and the
-// covariates the analysis needs (ResearchMethodology.md §5.1): everyday AI use
-// (the control group is a plain AI chat, so habitual chatbot users may do
-// better there) and confidence before the exercises. Year and program aren't
-// asked: a session's cohort is one class.
+// Pre-survey (start of the session, under 2 minutes): only what the analysis
+// needs (ResearchMethodology.md §5.1): prior programming (covariate), everyday
+// AI use (the control group is a plain AI chat, so habitual chatbot users may
+// do better there), whether they usually ask AI for the full solution
+// (exploratory), and confidence before the exercises. Year and program aren't
+// asked: a session's cohort is one class. Languages used, AI tools used, "AI
+// helps me learn", English comfort and "what do you do when stuck" were cut
+// on 2026-11-04 (no planned analysis used them).
 //
 // Post-survey (end of the session, about 4 minutes): cognitive load (Paas
 // 9-point scale; NASA-TLX Mental Demand and Frustration, §5.1), the
@@ -54,7 +57,7 @@ const CONFIDENCE = [
   { id: "confidence_python", label: "How confident are you writing Python code?", ...CONFIDENT },
   {
     id: "confidence_branching",
-    label: "How confident are you writing code that makes decisions with if, elif and else?",
+    label: "How confident are you writing code that makes decisions, using if statements and conditions like and/or?",
     ...CONFIDENT,
   },
 ] as const;
@@ -65,18 +68,11 @@ export const PRE_SURVEY: readonly SurveySection[] = [
   {
     title: "Your programming experience",
     questions: [
-      { id: "english_comfort", label: "How comfortable are you learning programming in English?", type: "scale", min: 1, max: 5, minLabel: "Not comfortable", maxLabel: "Very comfortable" },
       {
         id: "prior_programming",
         label: "How much programming had you done before this course?",
         type: "choice",
         options: ["None", "Less than 3 months", "3 to 12 months", "More than a year"],
-      },
-      {
-        id: "languages_used",
-        label: "Which programming languages have you used before? Choose all that apply.",
-        type: "multi",
-        options: ["Python", "Java", "C or C++", "JavaScript", "Scratch or block-based", "Other", "None"],
       },
       ...prefixed("pre"),
     ],
@@ -90,19 +86,7 @@ export const PRE_SURVEY: readonly SurveySection[] = [
         type: "choice",
         options: ["Never", "Less than once a week", "Once or twice a week", "Most days"],
       },
-      {
-        id: "ai_tools_used",
-        label: "Which AI tools have you used? Choose all that apply.",
-        type: "multi",
-        options: ["ChatGPT", "GitHub Copilot", "Gemini", "DeepSeek", "Claude", "Other", "None"],
-      },
-      { id: "ai_helps_learning", label: "AI tools help me learn programming.", ...AGREE },
       { id: "ai_gives_answers", label: "When I use AI for programming, I usually ask it for the full solution.", ...AGREE },
-      {
-        id: "stuck_strategy",
-        label: "What do you usually do when you get stuck on a programming exercise?",
-        type: "long",
-      },
     ],
   },
 ];
