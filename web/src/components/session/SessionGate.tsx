@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import { type ReactNode, useEffect, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { nextDeadline, stageAt } from "../../../convex/sessionFlow";
 import { POST_SURVEY, PRE_SURVEY } from "../../../convex/surveys";
@@ -19,6 +19,17 @@ function useTick(active: boolean) {
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [active]);
+}
+
+const ExercisesContext = createContext(false);
+
+/**
+ * True during a study session's exercises: students then see only their
+ * exercises, one after another, with no syllabus and no week (the home page
+ * opens their current exercise; the workspace hides the lesson index).
+ */
+export function useSessionExercises() {
+  return useContext(ExercisesContext);
 }
 
 /**
@@ -114,7 +125,7 @@ export function SessionGate({
       const endsAt =
         stage === "exercises" ? session.flow.timeline.exercisesEndsAt : null;
       screen = (
-        <>
+        <ExercisesContext.Provider value={stage === "exercises"}>
           {children}
           {endsAt !== null && (
             <SessionTimer
@@ -123,7 +134,7 @@ export function SessionGate({
               testingGroup={session.testingGroup}
             />
           )}
-        </>
+        </ExercisesContext.Provider>
       );
     }
   }

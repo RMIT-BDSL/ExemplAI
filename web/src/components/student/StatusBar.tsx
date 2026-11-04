@@ -9,11 +9,17 @@ interface StatusBarProps {
   topic: string | undefined;
   isIndexOpen: boolean;
   onOpenIndex: () => void;
+  /**
+   * In a study session's exercises: "Exercise N of M" in place of the week
+   * and topic, and no lesson index (students see only their exercises).
+   */
+  exercise?: { number: number; of: number } | null;
 }
 
 /**
  * The lesson workspace's only bar (replaces the global navbar on /course):
- * "Week N · Topic" on the left opens the lesson index; the account menu sits
+ * "Week N · Topic" on the left opens the lesson index (in a study session,
+ * "Exercise N of M" with no index); the account menu sits
  * on the right and also carries the theme switch and "What's new". During staff
  * testing a study-group toggle sits beside it (GroupToggle).
  */
@@ -22,6 +28,7 @@ export default function StatusBar({
   topic,
   isIndexOpen,
   onOpenIndex,
+  exercise,
 }: StatusBarProps) {
   const [whatsNewRequest, setWhatsNewRequest] = useState(0);
   const label = [week !== undefined ? `Week ${week}` : null, topic]
@@ -30,6 +37,11 @@ export default function StatusBar({
 
   return (
     <header className="flex h-9 flex-shrink-0 items-center justify-between border-b border-rule-strong bg-surface-void px-6 select-none">
+      {exercise ? (
+        <span className="text-[10px] uppercase tracking-[0.15em] text-ink-label tabular-nums">
+          Exercise {exercise.number} of {exercise.of}
+        </span>
+      ) : (
       <button
         type="button"
         onClick={onOpenIndex}
@@ -42,6 +54,7 @@ export default function StatusBar({
         <Menu className="size-3.5" />
         <span>{label || "Lessons"}</span>
       </button>
+      )}
 
       <div className="flex items-center">
         <GroupToggle />

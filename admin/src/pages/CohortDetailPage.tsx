@@ -8,7 +8,10 @@ import { api } from '../lib/webConvexApi';
 type Participant = {
   _id: string;
   studentId: string;
+  /** The tutor they get (the cohort's fixed group, else assigned_group). */
   group: 'experimental' | 'control';
+  /** Their randomized group, kept while the cohort is fixed to one tutor. */
+  assigned_group: 'experimental' | 'control';
   on_roster: boolean;
   metadata?: Record<string, string>;
   userId?: string;
@@ -41,6 +44,12 @@ type CheckScore = {
   score: number;
   problems: Array<{ problem: string; passed: number; total: number; answered: boolean; auto: boolean }>;
 };
+type GroupMode = 'random' | 'experimental' | 'control';
+const GROUP_MODES: Array<{ value: GroupMode; label: string; detail: string }> = [
+  { value: 'random', label: 'Randomized (study)', detail: 'each student keeps their assigned group' },
+  { value: 'experimental', label: 'Intelligent tutor for all', detail: 'everyone gets the adaptive tutor' },
+  { value: 'control', label: 'Standard tutor for all', detail: 'everyone gets the plain AI chat' },
+];
 type UsageSums = { replies: number; input_tokens: number; output_tokens: number; cost_usd: number };
 type Survey = Array<{ title: string; questions: Array<{ id: string; label: string }> }>;
 type Roster = {
@@ -54,6 +63,7 @@ type Roster = {
     exercise_minutes: number;
     check_minutes: number;
     exercises_end_at?: number;
+    group_mode: GroupMode;
   };
   participants: Participant[];
   preSurvey: Survey;
@@ -92,7 +102,7 @@ function toCsv(data: Roster): string {
   const iso = (t?: number) => (t ? new Date(t).toISOString() : '');
   const answer = (v?: string | string[]) => (Array.isArray(v) ? v.join('; ') : (v ?? ''));
   const header = [
-    'student_id', 'cohort', 'group', 'on_roster', ...metaKeys.map((k) => `meta_${k}`),
+    'student_id', 'cohort', 'group', 'assigned_group', 'on_roster', ...metaKeys.map((k) => `meta_${k}`),
     'first_sign_in', 'last_sign_in', 'session_visits', 'practice_visits',
     'consented', 'consent_at', 'consent_version', 'pre_survey_at', 'exercises_started_at',
     'exercises_ended_at', 'finished_early_at', 'post_survey_at',
@@ -107,7 +117,7 @@ function toCsv(data: Roster): string {
     ...pre.map((id) => `pre.${id}`), ...post.map((id) => `post.${id}`),
   ];
   const rows = data.participants.map((p) => [
-    p.studentId, data.cohort.code, p.group, String(p.on_roster), ...metaKeys.map((k) => p.metadata?.[k] ?? ''),
+    p.studentId, data.cohort.code, p.group, p.assigned_group, String(p.on_roster), ...metaKeys.map((k) => p.metadata?.[k] ?? ''),
     iso(p.joined_at), iso(p.last_login_at), String(p.session_visits ?? 0), String(p.practice_visits ?? 0),
     p.consented === undefined ? '' : String(p.consented), iso(p.consent_at), p.consent_version ?? '',
     iso(p.pre_survey_at), iso(p.timeline.exercisesStartAt ?? undefined),
@@ -147,6 +157,7 @@ const CohortDetailPage: Component = () => {
   const [typed, setTyped] = createSignal('');
   const [message, setMessage] = createSignal('');
   const [error, setError] = createSignal('');
+  const [tutorError, setTutorError] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [passcode, setPasscode] = createSignal<string | null>(null); // null: not being edited
   const [week, setWeek] = createSignal<string | null>(null);
@@ -180,6 +191,17 @@ const CohortDetailPage: Component = () => {
       await convex.mutation(api.cohorts.setExercisesEnded, { cohortId: c._id as any, ended });
     } catch (err: any) {
       setError(err.message || 'Failed to change the session');
+    }
+  };
+
+  const saveGroupMode = async (mode: GroupMode) => {
+    const c = roster.data()?.cohort;
+    if (!c || c.group_mode === mode) return;
+    setTutorError('');
+    try {
+      await convex.mutation(api.cohorts.setGroupMode, { cohortId: c._id as any, mode });
+    } catch (err: any) {
+      setTutorError(err.message || 'Failed to change the tutor');
     }
   };
 
@@ -230,7 +252,14 @@ const CohortDetailPage: Component = () => {
     setMessage('');
     try {
       const r = await convex.mutation(api.cohorts.addParticipants, { cohortId: params.id as any, participants: rows });
-      const parts = [`Added ${r.added} (${r.experimental} experimental, ${r.control} control).`];
+      // In a fixed-tutor cohort the split is the randomized assignment, not the tutor they get.
+      const mode = roster.data()?.cohort.group_mode;
+      const tutor = GROUP_MODES.find((m) => m.value === mode);
+      const parts = [
+        mode && mode !== 'random'
+          ? `Added ${r.added}. All get the tutor set below (${tutor?.label}); assigned groups for the study: ${r.experimental} experimental, ${r.control} control.`
+          : `Added ${r.added} (${r.experimental} experimental, ${r.control} control).`,
+      ];
       if (r.skipped.length) parts.push(`${r.skipped.length} already in this cohort: ${r.skipped.slice(0, 8).join(', ')}${r.skipped.length > 8 ? '…' : ''}.`);
       if (r.invalid.length) parts.push(`${r.invalid.length} not valid IDs: ${r.invalid.slice(0, 8).join(', ')}${r.invalid.length > 8 ? '…' : ''}.`);
       setMessage(parts.join(' '));
@@ -422,6 +451,35 @@ const CohortDetailPage: Component = () => {
               </section>
 
               <section class="rounded-md border border-line bg-white p-6 space-y-4">
+                <h2 class="font-display text-xl text-ink">Tutor</h2>
+                <p class="text-sm text-body">
+                  For the study, keep it <strong>randomized</strong>: each student gets the tutor of the group they
+                  were assigned, balanced across the cohort. For a test session, give everyone one tutor. The change
+                  applies at once, also to students already signed in (from their next tutor reply), and their assigned
+                  group is kept for when you switch back.
+                </p>
+                <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Tutor">
+                  <For each={GROUP_MODES}>
+                    {(m) => (
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={data().cohort.group_mode === m.value}
+                        onClick={() => saveGroupMode(m.value)}
+                        title={m.detail}
+                        class={`rounded-md border px-4 py-2 text-sm transition-colors ${data().cohort.group_mode === m.value ? 'border-garnet bg-garnet/10 text-garnet' : 'border-line text-body hover:text-ink'}`}
+                      >
+                        {m.label}
+                      </button>
+                    )}
+                  </For>
+                </div>
+                <Show when={tutorError()}>
+                  <p class="text-sm text-garnet">{tutorError()}</p>
+                </Show>
+              </section>
+
+              <section class="rounded-md border border-line bg-white p-6 space-y-4">
                 <h2 class="font-display text-xl text-ink">Add participants</h2>
                 <p class="text-sm text-body">
                   Type student IDs, one per line, or upload a CSV. The ID column is the one headed <code>id</code>,{' '}
@@ -502,7 +560,12 @@ const CohortDetailPage: Component = () => {
                             </Show>
                           </td>
                           <For each={metadataKeys()}>{(k) => <td class="px-4 py-2.5 text-body">{p.metadata?.[k] ?? ''}</td>}</For>
-                          <td class="px-4 py-2.5">{p.group}</td>
+                          <td class="px-4 py-2.5">
+                            {p.group}
+                            <Show when={p.assigned_group !== p.group}>
+                              <span class="block text-[11px] text-muted">assigned {p.assigned_group}</span>
+                            </Show>
+                          </td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{when(p.joined_at)}</td>
                           <td class="px-4 py-2.5 tabular-nums text-body">{when(p.last_login_at)}</td>
                           <td class="px-4 py-2.5 text-right tabular-nums">{p.session_visits ?? 0}</td>

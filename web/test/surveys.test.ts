@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanAnswers, POST_SURVEY, PRE_SURVEY, type SurveyAnswers, surveyQuestions } from "../convex/surveys";
+import { cleanAnswers, NA, POST_SURVEY, PRE_SURVEY, type SurveyAnswers, surveyQuestions } from "../convex/surveys";
 
 /** A full set of valid answers: the first option, the lowest scale point, no text. */
 function minimal(survey: typeof PRE_SURVEY): SurveyAnswers {
@@ -34,6 +34,11 @@ describe("surveys", () => {
   it("rejects an answer that isn't an option or is off the scale", () => {
     expect(() => cleanAnswers(PRE_SURVEY, { ...minimal(PRE_SURVEY), ai_use_frequency: "Hourly" })).toThrow();
     expect(() => cleanAnswers(POST_SURVEY, { ...minimal(POST_SURVEY), paas_mental_effort: "10" })).toThrow();
+  });
+
+  it("takes N/A only on the questions that offer it", () => {
+    expect(cleanAnswers(POST_SURVEY, { tutor_clarity: NA }).tutor_clarity).toBe(NA);
+    expect(() => cleanAnswers(POST_SURVEY, { paas_mental_effort: NA })).toThrow();
   });
 
   it("keeps only known options in a multi-choice answer, without duplicates", () => {

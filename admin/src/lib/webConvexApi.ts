@@ -18,6 +18,12 @@ export type PublicApiType = {
       any
     >;
     setExercisesEnded: FunctionReference<"mutation", "public", { cohortId: Id<"cohorts">; ended: boolean }, any>;
+    setGroupMode: FunctionReference<
+      "mutation",
+      "public",
+      { cohortId: Id<"cohorts">; mode: "random" | "experimental" | "control" },
+      any
+    >;
     resetSession: FunctionReference<"mutation", "public", { participantId: Id<"cohortParticipants"> }, any>;
     addParticipants: FunctionReference<
       "mutation",

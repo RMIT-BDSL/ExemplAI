@@ -105,7 +105,10 @@ export const getQuestionById = authenticatedQuery({
   handler: async (ctx, args) => {
     const id = ctx.db.normalizeId("questions", args.id);
     if (!id) return null;
-    return await ctx.db.get(id);
+    const lesson = await ctx.db.get(id);
+    // A study session shows only its week (as getAllCourses).
+    const sessionWeek = await sessionWeekFor(ctx, ctx.customUser ?? null);
+    return lesson && (sessionWeek === null || lesson.week === sessionWeek) ? lesson : null;
   },
 });
 

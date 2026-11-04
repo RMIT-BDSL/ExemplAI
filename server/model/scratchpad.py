@@ -3,5 +3,5 @@ from typing import Optional
 
 class ScratchpadCode(BaseModel):
     code: str
-    language_id: Optional[int] = 71
+    language_id: Optional[int] = 100
     stdin: Optional[str] = None

@@ -10,7 +10,8 @@
 // Post-survey (end of the session, about 4 minutes): cognitive load (Paas
 // 9-point scale; NASA-TLX Mental Demand and Frustration, §5.1), the
 // pre-survey's confidence items again (pre/post change), perceptions of the
-// tutor (from the approved survey question set, worded for both groups),
+// tutor (from the approved survey question set, worded for both groups, with
+// N/A for students who didn't use it),
 // interest in using it for the rest of the course, and two open questions for
 // the thematic analysis (§7.2).
 //
@@ -31,6 +32,8 @@ export type SurveyQuestion =
       max: number;
       minLabel: string;
       maxLabel: string;
+      /** Adds an "N/A" choice, saved as NA, explained by this text. */
+      na?: string;
     }
   | { id: string; label: string; type: "text" | "long" };
 
@@ -38,7 +41,12 @@ export type SurveySection = { title: string; questions: readonly SurveyQuestion[
 
 export type SurveyAnswers = Record<string, string | string[]>;
 
+/** The saved answer for a scale question's "N/A" choice. */
+export const NA = "N/A";
+
 const AGREE = { type: "scale", min: 1, max: 5, minLabel: "Strongly disagree", maxLabel: "Strongly agree" } as const;
+// The tutor items have N/A, for students who never used it (its use is in the logs).
+const NO_TUTOR = { na: "I didn't use the tutor" } as const;
 const CONFIDENT = { type: "scale", min: 1, max: 5, minLabel: "Not at all confident", maxLabel: "Very confident" } as const;
 
 // Asked before and after, under the same ids with a pre_/post_ prefix.
@@ -137,12 +145,6 @@ export const POST_SURVEY: readonly SurveySection[] = [
     title: "The tutor",
     questions: [
       {
-        id: "tutor_used",
-        label: "How much did you use the tutor (the chat beside the exercise)?",
-        type: "choice",
-        options: ["Not at all", "Once or twice", "Several times", "On most exercises"],
-      },
-      {
         id: "tutor_clarity",
         label: "How clear were the tutor's explanations and guidance?",
         type: "scale",
@@ -150,9 +152,10 @@ export const POST_SURVEY: readonly SurveySection[] = [
         max: 5,
         minLabel: "Very unclear",
         maxLabel: "Very clear",
+        ...NO_TUTOR,
       },
-      { id: "tutor_helped_understand", label: "The tutor helped me understand the ideas behind the exercises.", ...AGREE },
-      { id: "tutor_made_me_think", label: "The tutor made me think for myself instead of giving me the answer.", ...AGREE },
+      { id: "tutor_helped_understand", label: "The tutor helped me understand the ideas behind the exercises.", ...AGREE, ...NO_TUTOR },
+      { id: "tutor_made_me_think", label: "The tutor made me think for myself instead of giving me the answer.", ...AGREE, ...NO_TUTOR },
       {
         id: "use_rest_of_course",
         label: "Would you be interested in using the tutor for help for the rest of Python Programming Bootcamp?",
@@ -194,7 +197,7 @@ export function cleanAnswers(survey: readonly SurveySection[], answers: SurveyAn
     const value = (typeof raw === "string" ? raw : "").trim();
     if (!value) continue;
     if (q.type === "choice" && !q.options.includes(value)) throw new Error(`Not a valid answer: ${q.label}`);
-    if (q.type === "scale") {
+    if (q.type === "scale" && !(q.na && value === NA)) {
       const n = Number(value);
       if (!Number.isInteger(n) || n < q.min || n > q.max) throw new Error(`Not a valid answer: ${q.label}`);
     }
