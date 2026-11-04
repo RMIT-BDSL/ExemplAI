@@ -85,7 +85,7 @@ export function SessionGate({
           storageKey={`exemplai-pre-survey-${userId}`}
           step={stepLabel(1)}
           title="About you"
-          intro="A few questions about your background and experience. It takes about three minutes. There are no right or wrong answers."
+          intro="A few questions about your background and experience. There are no right or wrong answers."
           sections={PRE_SURVEY}
           submitLabel="Continue"
           serverDraft={session.drafts.pre}

@@ -81,7 +81,7 @@ const time = (t?: number) => (t ? new Date(t).toLocaleTimeString([], { timeStyle
 function stage(p: Participant, ended: boolean): string {
   if (!p.userId) return 'Not signed in';
   if (p.consented === undefined) return 'Consent';
-  if (p.consented && !p.pre_survey) return 'Pre-survey';
+  if (p.consented && !p.pre_survey) return 'Introduction';
   if (p.post_survey) return 'Done';
   if (!p.consented) return 'Declined';
   if (p.post_check_started_at) return 'Post check / post-survey';
@@ -318,7 +318,7 @@ const CohortDetailPage: Component = () => {
                     {ps().length} participants · {count((p) => p.group === 'experimental')} experimental /{' '}
                     {count((p) => p.group === 'control')} control · {count((p) => !!p.userId)} signed in ·{' '}
                     {count((p) => p.consented === true)} consented · {count((p) => p.consented === false)} declined ·{' '}
-                    {count((p) => !!p.pre_survey)} pre-survey · {count((p) => !!p.post_survey)} post-survey ·{' '}
+                    {count((p) => !!p.pre_survey)} introduction · {count((p) => !!p.post_survey)} post-survey ·{' '}
                     {count((p) => !p.on_roster)} not on roster
                   </p>
                 </div>
@@ -367,7 +367,7 @@ const CohortDetailPage: Component = () => {
               <section class="rounded-md border border-line bg-white p-6 space-y-4">
                 <h2 class="font-display text-xl text-ink">Session</h2>
                 <p class="text-sm text-body">
-                  While the cohort has a passcode, students go through consent, the pre-survey, a quick check (two
+                  While the cohort has a passcode, students go through consent, the introduction questions, a quick check (two
                   problems, tutor off), the exercises, another quick check and the post-survey, in order. They see only
                   the session week's lessons. Each student's exercise time starts when they finish the first quick
                   check; when it runs out (or you end the exercises for everyone) they move on to the second. Half of
@@ -538,7 +538,7 @@ const CohortDetailPage: Component = () => {
                       <th class="px-4 py-3 text-right" title="Visits after the passcode was cleared">Practice visits</th>
                       <th class="px-4 py-3">Stage</th>
                       <th class="px-4 py-3">Consent</th>
-                      <th class="px-4 py-3">Pre-survey</th>
+                      <th class="px-4 py-3">Introduction</th>
                       <th class="px-4 py-3" title="Quick check before the exercises: score 0–100 (form)">Pre check</th>
                       <th class="px-4 py-3" title="Started (after the pre check) and finished">Exercises</th>
                       <th class="px-4 py-3" title="Quick check after the exercises: score 0–100 (form)">Post check</th>
