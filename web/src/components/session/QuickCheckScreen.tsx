@@ -254,7 +254,7 @@ function CheckWorkspace({
         `${BACKEND}/execute`,
         {
           code: currentCode(),
-          language_id: 71,
+          language_id: 100,
           starter_code: problem.starter_code,
           test_cases: [{ ...problem.example, hidden: false }],
           action_type: "run",

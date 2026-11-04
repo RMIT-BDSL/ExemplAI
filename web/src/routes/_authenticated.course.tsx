@@ -480,7 +480,7 @@ function Course() {
         `${url}/execute`,
         {
           code: submissionCode,
-          language_id: 71, // Python 3 (Judge0)
+          language_id: 100, // Python 3.12 (Judge0)
           starter_code: activeQuestion?.starter_code,
           solution_code: activeQuestion?.solution_code,
           // Run calls the function once on the Description's example; Submit grades every test.
