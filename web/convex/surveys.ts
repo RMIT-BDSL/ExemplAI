@@ -57,7 +57,7 @@ const CONFIDENCE = [
   { id: "confidence_python", label: "How confident are you writing Python code?", ...CONFIDENT },
   {
     id: "confidence_branching",
-    label: "How confident are you writing code that makes decisions with if, elif and else?",
+    label: "How confident are you writing code that makes decisions, using if statements and conditions like and/or?",
     ...CONFIDENT,
   },
 ] as const;
