@@ -298,6 +298,9 @@ function Question({
               <span>{q.minLabel}</span>
               <span className="text-right">{q.maxLabel}</span>
             </div>
+            {q.na && (
+              <p className="text-[11px] text-ink-label">N/A: {q.na}</p>
+            )}
           </div>
         </div>
       )}

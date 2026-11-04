@@ -91,7 +91,12 @@ export const setMyCondition = authenticatedMutation({
   handler: async (ctx, args) => {
     if (!conditionToggleEnabled()) throw new Error("The group toggle is turned off");
     if (!ctx.customUser) throw new Error("User not found");
-    await ctx.db.patch(ctx.customUser._id, {
+    // A cohort fixed to one tutor (cohorts.setGroupMode) keeps it.
+    const userId = ctx.customUser._id;
+    const p = await ctx.db.query("cohortParticipants").withIndex("by_user", (q) => q.eq("userId", userId)).first();
+    const cohort = p && (await ctx.db.get(p.cohortId));
+    if (cohort?.group_mode && cohort.group_mode !== "random") throw new Error("This cohort uses one tutor for everyone");
+    await ctx.db.patch(userId, {
       experiment_condition: args.condition,
       condition_assigned_at: Date.now(),
       condition_source: "toggle",

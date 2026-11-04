@@ -157,6 +157,7 @@ const CohortDetailPage: Component = () => {
   const [typed, setTyped] = createSignal('');
   const [message, setMessage] = createSignal('');
   const [error, setError] = createSignal('');
+  const [tutorError, setTutorError] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [passcode, setPasscode] = createSignal<string | null>(null); // null: not being edited
   const [week, setWeek] = createSignal<string | null>(null);
@@ -196,10 +197,11 @@ const CohortDetailPage: Component = () => {
   const saveGroupMode = async (mode: GroupMode) => {
     const c = roster.data()?.cohort;
     if (!c || c.group_mode === mode) return;
+    setTutorError('');
     try {
       await convex.mutation(api.cohorts.setGroupMode, { cohortId: c._id as any, mode });
     } catch (err: any) {
-      setError(err.message || 'Failed to change the tutor');
+      setTutorError(err.message || 'Failed to change the tutor');
     }
   };
 
@@ -250,7 +252,14 @@ const CohortDetailPage: Component = () => {
     setMessage('');
     try {
       const r = await convex.mutation(api.cohorts.addParticipants, { cohortId: params.id as any, participants: rows });
-      const parts = [`Added ${r.added} (${r.experimental} experimental, ${r.control} control).`];
+      // In a fixed-tutor cohort the split is the randomized assignment, not the tutor they get.
+      const mode = roster.data()?.cohort.group_mode;
+      const tutor = GROUP_MODES.find((m) => m.value === mode);
+      const parts = [
+        mode && mode !== 'random'
+          ? `Added ${r.added}. All get the tutor set below (${tutor?.label}); assigned groups for the study: ${r.experimental} experimental, ${r.control} control.`
+          : `Added ${r.added} (${r.experimental} experimental, ${r.control} control).`,
+      ];
       if (r.skipped.length) parts.push(`${r.skipped.length} already in this cohort: ${r.skipped.slice(0, 8).join(', ')}${r.skipped.length > 8 ? '…' : ''}.`);
       if (r.invalid.length) parts.push(`${r.invalid.length} not valid IDs: ${r.invalid.slice(0, 8).join(', ')}${r.invalid.length > 8 ? '…' : ''}.`);
       setMessage(parts.join(' '));
@@ -465,6 +474,9 @@ const CohortDetailPage: Component = () => {
                     )}
                   </For>
                 </div>
+                <Show when={tutorError()}>
+                  <p class="text-sm text-garnet">{tutorError()}</p>
+                </Show>
               </section>
 
               <section class="rounded-md border border-line bg-white p-6 space-y-4">

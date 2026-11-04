@@ -22,6 +22,7 @@ import { type ConsoleRun, givesResultWrapper } from "#/components/ide/ConsoleDra
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
 import { useSessionExercises } from "#/components/session/SessionGate";
+import { Navigate } from "@tanstack/react-router";
 import { authClient } from "#/lib/auth-client";
 import { codeStorageKey } from "#/lib/codeStorage";
 import { useLessonVisit } from "#/lib/useLessonVisit";
@@ -194,10 +195,9 @@ function Course() {
   const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
   // A study session's exercises: one list, numbered, with no syllabus or week.
   const inSession = useSessionExercises();
-  const exerciseNumber =
-    inSession && questions && currentIndex !== -1
-      ? { number: currentIndex + 1, of: questions.length }
-      : null;
+  const exerciseNumber = inSession
+    ? { number: currentIndex + 1 || 1, of: questions?.length ?? 0 }
+    : null;
   const unlockedSet = unlocked ? new Set<string>(unlocked) : unlocked;
   // Locked until the lesson before it (same week) is completed. The panel
   // clears itself as soon as that pass is recorded, e.g. after "Next lesson".
@@ -390,6 +390,8 @@ function Course() {
   }
 
   if (activeQuestion === null) {
+    // In a session, a lesson outside it (convex/courses.ts) goes back to the current exercise.
+    if (inSession) return <Navigate to="/" replace />;
     return (
       <div className="xa-workspace flex h-dvh w-screen items-center justify-center bg-surface-page text-ink-label">
         No questions found.
@@ -704,8 +706,13 @@ function Course() {
                   setIsConsoleOpen={setIsConsoleOpen}
                   onRun={() => handleExecute("run")}
                   onSubmit={() => handleExecute("submit")}
-                  // After a passing Submit (this session), Submit becomes "Next lesson".
-                  onNextLesson={passedThisSession ? handleNextLesson : undefined}
+                  // After a passing Submit (this session), Submit becomes "Next lesson";
+                  // in a study session also on any passed exercise (there's no index).
+                  onNextLesson={
+                    passedThisSession || (inSession && activeProgress?.status === "completed")
+                      ? handleNextLesson
+                      : undefined
+                  }
                 />
               </Suspense>
             </div>
