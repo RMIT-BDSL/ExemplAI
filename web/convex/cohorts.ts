@@ -69,6 +69,25 @@ async function nextCheckOrder(ctx: MutationCtx, cohortId: Id<"cohorts">, group: 
 }
 
 
+/** The tutor a participant gets: the cohort's fixed group, else their randomized one. */
+function groupOf(cohort: Doc<"cohorts">, p: Doc<"cohortParticipants">): Group {
+  return cohort.group_mode && cohort.group_mode !== "random" ? cohort.group_mode : p.group;
+}
+
+/** Give the student's account the group they get, so the tutor follows it. */
+async function applyGroup(ctx: MutationCtx, userId: Id<"users">, group: Group, name?: string) {
+  const user = await ctx.db.get(userId);
+  if (!user) return;
+  if (user.experiment_condition !== group || user.condition_source !== "roster") {
+    await ctx.db.patch(userId, {
+      experiment_condition: group,
+      condition_assigned_at: user.condition_assigned_at ?? Date.now(),
+      condition_source: "roster",
+      ...(name && !user.name ? { name } : {}),
+    });
+  }
+}
+
 const UNLISTED = { name: "Not on a roster", code: "unlisted" };
 
 function slug(name: string) {
@@ -218,15 +237,9 @@ export const joinWithId = mutation({
     if (profile) await ctx.db.patch(profile._id, { invitationCode: cohort.code, tokenIdentifier: authUser._id });
     else await ctx.db.insert("userProfiles", { userId: user._id, tokenIdentifier: authUser._id, invitationCode: cohort.code });
 
-    // The roster group wins over anything assigned before (e.g. by the testing toggle).
-    if (user.experiment_condition !== participant.group || user.condition_source !== "roster") {
-      await ctx.db.patch(user._id, {
-        experiment_condition: participant.group,
-        condition_assigned_at: user.condition_assigned_at ?? now,
-        condition_source: "roster",
-        name: user.name ?? studentId,
-      });
-    }
+    // The roster group (or the cohort's fixed one) wins over anything assigned
+    // before (e.g. by the testing toggle).
+    await applyGroup(ctx, user._id, groupOf(cohort, participant), studentId);
     return { cohort: cohort.name, onRoster: participant.on_roster, phase };
   },
 });
@@ -403,6 +416,24 @@ export const setSession = adminMutation({
   },
 });
 
+/**
+ * Which tutor the cohort's students get: "random" (each keeps their
+ * randomized group) or one group for everyone. Takes effect at once, also for
+ * students already signed in; their randomized group is kept for later.
+ */
+export const setGroupMode = adminMutation({
+  args: { cohortId: v.id("cohorts"), mode: v.union(v.literal("random"), v.literal("experimental"), v.literal("control")) },
+  handler: async (ctx, { cohortId, mode }) => {
+    const cohort = await ctx.db.get(cohortId);
+    if (!cohort) throw new Error("Cohort not found");
+    await ctx.db.patch(cohortId, { group_mode: mode });
+    const updated = { ...cohort, group_mode: mode };
+    for (const p of await ctx.db.query("cohortParticipants").withIndex("by_cohort", (q) => q.eq("cohortId", cohortId)).collect()) {
+      if (p.userId) await applyGroup(ctx, p.userId, groupOf(updated, p));
+    }
+  },
+});
+
 /** End the exercises for everyone now (they move on to the post-survey), or undo that. */
 export const setExercisesEnded = adminMutation({
   args: { cohortId: v.id("cohorts"), ended: v.boolean() },
@@ -501,8 +532,8 @@ export const list = adminQuery({
         return {
           ...c,
           participants: rows.length,
-          experimental: rows.filter((r) => r.group === "experimental").length,
-          control: rows.filter((r) => r.group === "control").length,
+          experimental: rows.filter((r) => groupOf(c, r) === "experimental").length,
+          control: rows.filter((r) => groupOf(c, r) === "control").length,
           joined: rows.filter((r) => r.userId).length,
           consented: rows.filter((r) => r.consented).length,
           declined: rows.filter((r) => r.consented === false).length,
@@ -556,10 +587,14 @@ export const roster = adminQuery({
         session_week: cohort.session_week ?? DEFAULT_SESSION_WEEK,
         exercise_minutes: cohort.exercise_minutes ?? DEFAULT_EXERCISE_MINUTES,
         check_minutes: cohort.check_minutes ?? DEFAULT_CHECK_MINUTES,
+        group_mode: cohort.group_mode ?? "random",
       },
       participants: await Promise.all(
         rows.map(async (r) => ({
           ...r,
+          // The tutor they get; `assigned_group` is their randomized group.
+          group: groupOf(cohort, r),
+          assigned_group: r.group,
           usage: r.userId ? await usageByPhase(ctx, r.userId) : null,
           checks: await checkScores(ctx, r, cohort),
           // When the exercises actually started and ended (a check that ran out

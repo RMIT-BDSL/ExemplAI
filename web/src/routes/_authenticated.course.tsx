@@ -21,6 +21,7 @@ import { defineEditorThemes } from "#/lib/editorThemes";
 import { type ConsoleRun, givesResultWrapper } from "#/components/ide/ConsoleDrawer";
 import LessonSkeleton from "#/components/student/LessonSkeleton";
 import StatusBar from "#/components/student/StatusBar";
+import { useSessionExercises } from "#/components/session/SessionGate";
 import { authClient } from "#/lib/auth-client";
 import { codeStorageKey } from "#/lib/codeStorage";
 import { useLessonVisit } from "#/lib/useLessonVisit";
@@ -191,6 +192,12 @@ function Course() {
   const failedSubmits: number = activeProgress?.failed_submits ?? 0;
 
   const currentIndex = questions?.findIndex((q: any) => q._id === activeQuestionId) ?? -1;
+  // A study session's exercises: one list, numbered, with no syllabus or week.
+  const inSession = useSessionExercises();
+  const exerciseNumber =
+    inSession && questions && currentIndex !== -1
+      ? { number: currentIndex + 1, of: questions.length }
+      : null;
   const unlockedSet = unlocked ? new Set<string>(unlocked) : unlocked;
   // Locked until the lesson before it (same week) is completed. The panel
   // clears itself as soon as that pass is recorded, e.g. after "Next lesson".
@@ -586,12 +593,13 @@ function Course() {
           topic={activeQuestion?.topic}
           isIndexOpen={isIndexOpen}
           onOpenIndex={() => setIsIndexOpen(true)}
+          exercise={exerciseNumber}
         />
 
         {/* Workspace Spread Container */}
         <div className="relative flex flex-1 flex-row overflow-hidden w-full bg-surface-page">
           {/* Lesson index drawer (opened from the status bar) */}
-          <LessonIndex
+          {!inSession && <LessonIndex
             isIndexOpen={isIndexOpen}
             setIsIndexOpen={setIsIndexOpen}
             questions={questions}
@@ -599,7 +607,7 @@ function Course() {
             lessonProgress={lessonProgress}
             unlocked={unlockedSet}
             onSelectLesson={handleSelectLesson}
-          />
+          />}
 
           {isLocked ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -628,7 +636,7 @@ function Course() {
                 to="/"
                 className="mt-2 text-[10px] uppercase tracking-[0.15em] text-ink-label hover:text-brass transition-colors"
               >
-                Back to syllabus
+                {inSession ? "Back to your exercise" : "Back to syllabus"}
               </Link>
             </div>
           ) : (

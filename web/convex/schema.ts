@@ -132,6 +132,10 @@ export default defineSchema({
     exercises_end_at: v.optional(v.number()),
     // Minutes for each quick check (convex/quickChecks.ts).
     check_minutes: v.optional(v.number()),
+    // Which tutor students get: "random" (absent) uses each participant's
+    // randomized group; a group name gives everyone that tutor (e.g. staff
+    // test sessions). Participants keep their randomized group underneath.
+    group_mode: v.optional(v.union(v.literal("random"), experimentCondition)),
     created_at: v.number(),
     created_by: v.optional(v.string()),
   })
