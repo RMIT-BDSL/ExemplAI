@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { internalAction, internalQuery } from "./_generated/server";
 import { createAuth } from "./auth";
 import { internalMutation } from "./functions";
-import type { Group } from "./studentIds";
+import { balancedGroups, type Group, shuffled } from "./studentIds";
 
 /**
  * Pre-made study accounts (decided 2026-11-10), created by
@@ -22,9 +22,9 @@ import type { Group } from "./studentIds";
  * accounts and keys their randomization block. C and E get their group set
  * on the account now, so it never changes.
  *
- * An invite code (createInviteCode) lets students sign up themselves. For C or
- * E, the code's randomization block is filled with that group, one per use,
- * so everyone who signs up with it gets that group.
+ * Instead of accounts, the script can make single-use invite codes
+ * (createInviteCodes), numbered the same way, for students to sign up with
+ * their own email.
  */
 
 export const EMAIL_DOMAIN = "socratestutor.rmit.edu.vn";
@@ -114,23 +114,37 @@ export const createAccounts = internalAction({
 });
 
 /**
- * An invite code for students to sign up with (sign-up form). For C or E,
- * everyone who uses it gets that group: its randomization block holds one
- * entry of the group per use. For P, groups are randomized as usual.
+ * Single-use invite codes, one per student, numbered like the accounts and
+ * after the group's earlier codes: C01-X7KM9Q, C02-..., for students to sign
+ * up with their own email (sign-up form). The group is fixed per code: the
+ * code's randomization block (experiment.ensureCondition, keyed by the code
+ * the student signed up with) holds just that group. P codes get groups
+ * balanced across the batch.
  */
-export const createInviteCode = internalMutation({
-  args: { prefix, code: v.string(), uses: v.number() },
-  handler: async (ctx, { prefix, code, uses }) => {
-    if (!Number.isInteger(uses) || uses < 1 || uses > 2000) throw new Error("Uses must be 1 to 2000");
-    if (await ctx.db.query("invitationCodes").withIndex("by_code", (q) => q.eq("code", code)).unique()) {
-      throw new Error(`Invite code ${code} already exists`);
+export const createInviteCodes = internalMutation({
+  args: { prefix, suffixes: v.array(v.string()) },
+  handler: async (ctx, { prefix, suffixes }) => {
+    const pattern = new RegExp(`^${prefix}(\\d+)-`);
+    let n = 1;
+    for (const c of await ctx.db.query("invitationCodes").collect()) {
+      const m = pattern.exec(c.code);
+      if (m) n = Math.max(n, Number(m[1]) + 1);
     }
-    await ctx.db.insert("invitationCodes", {
-      code, isValid: true, quantity: uses, usesCount: 0, whoUsed: [], createdBy: "scripts/create-study-accounts",
-    });
-    const { group } = GROUPS[prefix];
-    if (group) await ctx.db.insert("randomizationBlocks", { cohort: code, remaining: Array(uses).fill(group) });
-    return { code, uses, group: group ?? "random" };
+    const fixed = GROUPS[prefix].group;
+    const groups = fixed ? suffixes.map(() => fixed) : shuffled(balancedGroups({ experimental: 0, control: 0 }, suffixes.length));
+    const out: { code: string; group: Group }[] = [];
+    for (let i = 0; i < suffixes.length; i++) {
+      const code = `${prefix}${String(n++).padStart(2, "0")}-${suffixes[i]}`;
+      if (await ctx.db.query("invitationCodes").withIndex("by_code", (q) => q.eq("code", code)).unique()) {
+        throw new Error(`Invite code ${code} already exists`);
+      }
+      await ctx.db.insert("invitationCodes", {
+        code, isValid: true, quantity: 1, usesCount: 0, whoUsed: [], createdBy: "scripts/create-study-accounts",
+      });
+      await ctx.db.insert("randomizationBlocks", { cohort: code, remaining: [groups[i]] });
+      out.push({ code, group: groups[i] });
+    }
+    return out;
   },
 });
 
