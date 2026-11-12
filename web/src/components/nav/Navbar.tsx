@@ -1,16 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import ChangelogButton from "../changelog/ChangelogButton";
 import UserStatusButton from "./UserStatusButton";
 
 /**
  * Top bar for authenticated pages (the syllabus). Same look as the lesson
  * workspace's status bar: wordmark on the left, the account menu (theme
- * switch, What's new, sign out) on the right. Not rendered on /course: the
+ * switch, sign out) on the right. Not rendered on /course: the
  * workspace has its own status bar (components/student/StatusBar).
  */
 export default function Navbar() {
-  const [whatsNewRequest, setWhatsNewRequest] = useState(0);
   return (
     <header className="sticky top-0 z-45 border-b border-rule-strong bg-surface-void">
       <nav className="flex h-9 items-center justify-between px-6">
@@ -21,12 +18,7 @@ export default function Navbar() {
           ExemplAI
         </Link>
         <div className="flex items-center">
-          <UserStatusButton
-            variant="workspace"
-            onWhatsNew={() => setWhatsNewRequest((n) => n + 1)}
-          />
-          {/* Dialog only; opened from the account menu (and auto-opens for new notes). */}
-          <ChangelogButton trigger="none" openRequest={whatsNewRequest} />
+          <UserStatusButton variant="workspace" />
         </div>
       </nav>
     </header>

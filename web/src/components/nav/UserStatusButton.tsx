@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronDown, LogOut, Megaphone, Moon, Sun } from "lucide-react";
+import { ChevronDown, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { DropdownMenu } from "radix-ui";
 import { authClient } from "#/lib/auth-client";
@@ -14,11 +14,9 @@ import { cn } from "#/lib/utils.ts";
 interface UserStatusButtonProps {
   /** "nav" = landing/syllabus navbar styling; "workspace" = lesson status bar (design tokens). */
   variant?: "nav" | "workspace";
-  /** When set, the menu shows a "What's new" item (the workspace has no megaphone button). */
-  onWhatsNew?: () => void;
 }
 
-export default function UserStatusButton({ variant = "nav", onWhatsNew }: UserStatusButtonProps) {
+export default function UserStatusButton({ variant = "nav" }: UserStatusButtonProps) {
   const ws = variant === "workspace";
   const { data: session, isPending } = authClient.useSession();
   const navigate = useNavigate();
@@ -99,13 +97,6 @@ export default function UserStatusButton({ variant = "nav", onWhatsNew }: UserSt
           </div>
 
           <DropdownMenu.Separator className={cn("my-1 h-px", ws ? "bg-rule" : "bg-line")} />
-
-          {onWhatsNew && (
-            <DropdownMenu.Item onSelect={onWhatsNew} className={itemClass}>
-              <Megaphone className={iconClass} />
-              What's new
-            </DropdownMenu.Item>
-          )}
 
           <DropdownMenu.Item
             onSelect={(e) => {

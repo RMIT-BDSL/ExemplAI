@@ -1,6 +1,4 @@
 import { Menu } from "lucide-react";
-import { useState } from "react";
-import ChangelogButton from "#/components/changelog/ChangelogButton";
 import GroupToggle from "#/components/student/GroupToggle";
 import UserStatusButton from "#/components/nav/UserStatusButton";
 
@@ -20,7 +18,7 @@ interface StatusBarProps {
  * The lesson workspace's only bar (replaces the global navbar on /course):
  * "Week N · Topic" on the left opens the lesson index (in a study session,
  * "Exercise N of M" with no index); the account menu sits
- * on the right and also carries the theme switch and "What's new". During staff
+ * on the right and also carries the theme switch. During staff
  * testing a study-group toggle sits beside it (GroupToggle).
  */
 export default function StatusBar({
@@ -30,7 +28,6 @@ export default function StatusBar({
   onOpenIndex,
   exercise,
 }: StatusBarProps) {
-  const [whatsNewRequest, setWhatsNewRequest] = useState(0);
   const label = [week !== undefined ? `Week ${week}` : null, topic]
     .filter(Boolean)
     .join(" · ");
@@ -58,12 +55,7 @@ export default function StatusBar({
 
       <div className="flex items-center">
         <GroupToggle />
-        <UserStatusButton
-          variant="workspace"
-          onWhatsNew={() => setWhatsNewRequest((n) => n + 1)}
-        />
-        {/* Dialog only; opened from the account menu (and auto-opens for new notes). */}
-        <ChangelogButton trigger="none" openRequest={whatsNewRequest} />
+        <UserStatusButton variant="workspace" />
       </div>
     </header>
   );
