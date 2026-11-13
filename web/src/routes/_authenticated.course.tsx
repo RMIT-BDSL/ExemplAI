@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "#/lib/utils.ts";
 import ResetCodeForm from "#/components/student/ResetCodeForm";
+import PassedDialog from "#/components/student/PassedDialog";
 
 // Heavy, non-LCP subtrees — kept out of the initial route chunk.
 // Monaco (via CodeEditor) alone is several hundred KB of JS.
@@ -141,6 +142,9 @@ function Course() {
   const runIdRef = useRef(0);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  // The Submit that just passed (pop-up shown while set). Keeps its lesson so a
+  // late result for a lesson the student already left never shows over another.
+  const [passed, setPassed] = useState<{ lessonId: string; total: number } | null>(null);
   // This session's Submits on the current lesson, newest first, shown in the
   // Description column. Tagged with their lesson so a new lesson never shows the
   // previous one's results, even for a frame. Not persisted (cleared on reload).
@@ -239,6 +243,7 @@ function Course() {
   useEffect(() => {
     setSubmitHistory([]);
     setRuns([]);
+    setPassed(null);
   }, [activeQuestionId]);
 
   useEffect(() => {
@@ -531,6 +536,8 @@ function Course() {
               : undefined,
         };
         setSubmitHistory((prev) => [record, ...prev]);
+        if (record.total > 0 && record.passed === record.total)
+          setPassed({ lessonId: record.lessonId, total: record.total });
         // Submit results live in the Description; the console opens only when
         // the code itself failed (syntax or runtime error), to show the trace.
         const codeError =
@@ -573,6 +580,9 @@ function Course() {
   const passedThisSession =
     !!lastSubmit && lastSubmit.total > 0 && lastSubmit.passed === lastSubmit.total;
 
+
+  const closePassed = () => setPassed(null);
+  const nextLabel = inSession ? "Next exercise" : "Next lesson";
 
   function handleExampleRequested(trigger: "get_help" | "new_example", examplesUsed: number) {
     posthog.capture(trigger === "get_help" ? "get_help_clicked" : "new_example_clicked", {
@@ -713,6 +723,7 @@ function Course() {
                       ? handleNextLesson
                       : undefined
                   }
+                  nextLabel={nextLabel}
                 />
               </Suspense>
             </div>
@@ -796,6 +807,17 @@ function Course() {
         {/* Solid Reset Confirmation Modal */}
         {showResetModal && (
           <ResetCodeForm setShowResetModal={setShowResetModal} handleReset={handleReset} />
+        )}
+
+        {/* A passing Submit: a pop-up, so moving on can't be missed */}
+        {passed !== null && passed.lessonId === activeQuestionId && (
+          <PassedDialog
+            total={passed.total}
+            nextLabel={nextLabel}
+            onNext={handleNextLesson}
+            onClose={closePassed}
+            inSession={inSession}
+          />
         )}
       </div>
   );

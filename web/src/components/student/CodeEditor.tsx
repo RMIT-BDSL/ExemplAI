@@ -27,6 +27,8 @@ interface CodeEditorProps {
   onSubmit: () => void;
   /** Set only after a passing Submit: the Submit button turns into "Next lesson". */
   onNextLesson?: () => void;
+  /** Label for that button: "Next exercise" in a study session, else "Next lesson". */
+  nextLabel?: string;
   /** No typing yet (e.g. while the saved code is still loading). */
   readOnly?: boolean;
 }
@@ -48,6 +50,7 @@ export default function CodeEditor({
   onRun,
   onSubmit,
   onNextLesson,
+  nextLabel = "Next lesson",
   readOnly = false,
 }: CodeEditorProps) {
   const isLoading = isRunning || isSubmitting;
@@ -155,7 +158,7 @@ export default function CodeEditor({
                 onClick={onNextLesson}
                 className="flex h-7 items-center gap-1.5 rounded-[2px] border border-brass-fill bg-brass-fill px-3 text-[11px] font-semibold tracking-[0.02em] text-on-brass transition-opacity hover:opacity-90 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
               >
-                Next lesson
+                {nextLabel}
                 <ArrowRight className="size-3.5" />
               </button>
             ) : (
