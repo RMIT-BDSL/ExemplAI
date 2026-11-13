@@ -22,17 +22,46 @@ export default function PassedDialog({
   inSession: boolean;
 }) {
   const primaryRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   // The parent passes a new onClose each render; Esc always uses the latest.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
   useEffect(() => {
+    // Put focus back where it was when the dialog closes.
+    const returnFocus = document.activeElement as HTMLElement | null;
     primaryRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeRef.current();
+      if (e.key === "Escape") {
+        closeRef.current();
+        return;
+      }
+      // Keep Tab inside the dialog (it's modal).
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const buttons = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>("button"),
+      );
+      if (buttons.length === 0) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      const active = document.activeElement;
+      if (!dialogRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      // Skip if it left the page (e.g. Submit became the Next button).
+      if (returnFocus?.isConnected) returnFocus.focus();
+    };
   }, []);
 
   const tests = total === 1 ? "The test passed." : `All ${total} tests passed.`;
@@ -40,6 +69,7 @@ export default function PassedDialog({
   return (
     <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 px-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="passed-title"

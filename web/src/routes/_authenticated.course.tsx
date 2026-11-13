@@ -142,8 +142,9 @@ function Course() {
   const runIdRef = useRef(0);
   const [isConsoleOpen, setIsConsoleOpen] = useState<boolean>(false);
   const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  // Tests passed by the Submit that just passed (pop-up shown while set).
-  const [passedTotal, setPassedTotal] = useState<number | null>(null);
+  // The Submit that just passed (pop-up shown while set). Keeps its lesson so a
+  // late result for a lesson the student already left never shows over another.
+  const [passed, setPassed] = useState<{ lessonId: string; total: number } | null>(null);
   // This session's Submits on the current lesson, newest first, shown in the
   // Description column. Tagged with their lesson so a new lesson never shows the
   // previous one's results, even for a frame. Not persisted (cleared on reload).
@@ -242,7 +243,7 @@ function Course() {
   useEffect(() => {
     setSubmitHistory([]);
     setRuns([]);
-    setPassedTotal(null);
+    setPassed(null);
   }, [activeQuestionId]);
 
   useEffect(() => {
@@ -535,7 +536,8 @@ function Course() {
               : undefined,
         };
         setSubmitHistory((prev) => [record, ...prev]);
-        if (record.total > 0 && record.passed === record.total) setPassedTotal(record.total);
+        if (record.total > 0 && record.passed === record.total)
+          setPassed({ lessonId: record.lessonId, total: record.total });
         // Submit results live in the Description; the console opens only when
         // the code itself failed (syntax or runtime error), to show the trace.
         const codeError =
@@ -579,7 +581,7 @@ function Course() {
     !!lastSubmit && lastSubmit.total > 0 && lastSubmit.passed === lastSubmit.total;
 
 
-  const closePassed = () => setPassedTotal(null);
+  const closePassed = () => setPassed(null);
   const nextLabel = inSession ? "Next exercise" : "Next lesson";
 
   function handleExampleRequested(trigger: "get_help" | "new_example", examplesUsed: number) {
@@ -808,9 +810,9 @@ function Course() {
         )}
 
         {/* A passing Submit: a pop-up, so moving on can't be missed */}
-        {passedTotal !== null && (
+        {passed !== null && passed.lessonId === activeQuestionId && (
           <PassedDialog
-            total={passedTotal}
+            total={passed.total}
             nextLabel={nextLabel}
             onNext={handleNextLesson}
             onClose={closePassed}
